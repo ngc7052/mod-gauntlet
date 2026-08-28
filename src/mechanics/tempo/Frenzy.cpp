@@ -10,6 +10,7 @@
 #include "GauntletSummons.h"
 #include "../Boons.h"
 
+#include "Chat.h"
 #include "Creature.h"
 #include "Player.h"
 #include "Unit.h"
@@ -105,9 +106,15 @@ namespace Gauntlet
             void Chain(Ctx& ctx, Creature* killed);
             void Reset(Ctx& ctx);
             void Publish(Ctx& ctx);
+            void Announce(Player* player) const;
 
             uint32 _stacks   = 0;
             uint32 _windowMs = 0;
+
+            // What the chat line last said, so it says it once per chain rather
+            // than once per kill. Mutable because Announce is const: it reports
+            // the state, it does not change it.
+            mutable uint32 _lastAnnounced = 0;
         };
 
         void Frenzy::Chain(Ctx& ctx, Creature* killed)
@@ -161,12 +168,46 @@ namespace Gauntlet
 
         void Frenzy::Publish(Ctx& ctx)
         {
-            // A counter rather than a chat line: it changes on every kill, and
-            // the whole point is that the player watches it and decides. CTR
-            // coalesces to the latest value per key, so a chain of five kills
-            // in five seconds costs at most a handful of messages.
+            // The counter is the real readout: it changes on every kill, and
+            // the whole point of the affix is that the player watches it and
+            // decides. CTR coalesces to the latest value per key, so a chain of
+            // five kills in five seconds costs at most a handful of messages.
             if (ctx.addon && ctx.player)
                 ctx.addon->QueueCounter(ctx.player, MechanicKey(), _stacks, MAX_STACKS);
+
+            Announce(ctx.player);
+        }
+
+        // And the two moments that matter, in chat, for a player with no addon.
+        //
+        // Not every change: five lines per chain is a combat log nobody reads,
+        // and the counter above is what a player watching the dial actually
+        // wants. But this affix applies no aura -- nothing in this module does,
+        // by design, since there are no client patches and no new spell visuals
+        // -- so without the addon it is completely invisible, and design
+        // section 5's fourth rule is that a scalar you cannot see acting is one
+        // you cannot learn from.
+        //
+        // Full stacks and the drop are the two edges the decision turns on:
+        // one says "you are at your most dangerous, in both directions", the
+        // other says "the window closed, you are clean again".
+        void Frenzy::Announce(Player* player) const
+        {
+            if (!player || !player->GetSession())
+                return;
+
+            if (_stacks == MAX_STACKS && _lastAnnounced != MAX_STACKS)
+            {
+                ChatHandler(player->GetSession()).PSendSysMessage(
+                    "|cffff2020[Gauntlet]|r Frenzy at five: you deal and take much more damage until the killing stops.");
+            }
+            else if (_stacks == 0 && _lastAnnounced == MAX_STACKS)
+            {
+                ChatHandler(player->GetSession()).PSendSysMessage(
+                    "|cffff2020[Gauntlet]|r Frenzy fades.");
+            }
+
+            _lastAnnounced = _stacks;
         }
 
         std::string Frenzy::Describe(AffixInstance const& self) const
