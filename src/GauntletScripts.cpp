@@ -5,7 +5,12 @@
 
 #include "GauntletAddon.h"
 #include "GauntletMgr.h"
+#include "GauntletRegistry.h"
+#include "GauntletSummons.h"
 #include "Chat.h"
+#include "Creature.h"
+#include "LootMgr.h"
+#include "ObjectAccessor.h"
 #include "Player.h"
 #include "ScriptMgr.h"
 
@@ -18,6 +23,13 @@ using namespace Gauntlet;
 // is the free function AzerothCore uses for exactly this, declared here and
 // defined beside the commands it registers.
 void AddSC_gauntlet_commands();
+
+// The same seam again, for the shared summon AI and the two creature scripts
+// that keep it honest. Without this call the templates' ScriptName resolves to
+// no AI at all: the module is archived into libmodules.a and linked plainly, so
+// GauntletSummonAI.cpp, which nothing else references, is simply dropped and
+// every creature this module spawns is an inert mob standing where it spawned.
+void AddSC_gauntlet_summons();
 
 static char const* GAUNTLET_RETIRED_MSG =
     "Your Gauntlet run has ended. This character is retired.";
@@ -123,6 +135,12 @@ public:
 
         sGauntlet->Save(player);
 
+        // CONTRACT-P1 section 2.4's first despawn path, and the one it calls
+        // the worst failure this phase can produce: a creature left standing
+        // after its owner has gone. It runs before DetachAll so that a
+        // mechanic's own OnDetach finds nothing left to take out.
+        sGauntletSummons->DespawnAll(player);
+
         // OnDetach is documented as firing on swap, logout and death. Logout
         // is here, the swap is in Mgr::Pick, and death deliberately is not:
         // the character stays in the world with its affixes listed by
@@ -156,10 +174,15 @@ public:
     // timer expire is what ends the run, which is Blizzard's own rule.
     void OnPlayerJustDied(Player* player) override
     {
-        if (!sGauntlet->Enabled() || !sGauntlet->Hardcore() || !sGauntlet->IsEligible(player))
+        if (!sGauntlet->Enabled() || !sGauntlet->IsEligible(player))
             return;
 
-        sGauntlet->BeginPendingDeath(player);
+        // KILLBY, the empty queue, the despawns and the state write, all of
+        // which are owed whether or not the realm is hardcore.
+        sGauntlet->OnDied(player);
+
+        if (sGauntlet->Hardcore())
+            sGauntlet->BeginPendingDeath(player);
     }
 
     void OnPlayerReleasedGhost(Player* player) override
@@ -195,21 +218,24 @@ public:
     {
     }
 
-    // The 60-second timer, with no scheduler to hang it on: Phase 1 brings
-    // one, and until then this is the module's only clock. It runs for every
-    // player on every tick, so the first thing it does is an integer test that
-    // is false whenever nobody in the world is dying.
+    // The module's one clock. Everything with a cadence hangs off it: the
+    // hardcore death timer, the grace window, the scheduler, IMechanic::OnTick
+    // and the periodic state write. This hook is the world tick, not a fixed
+    // cadence -- it fires once per World::Update, which MinWorldUpdateTime
+    // leaves at roughly a millisecond and load stretches -- so everything below
+    // accumulates `diff` rather than assuming an interval.
     void OnPlayerUpdate(Player* player, uint32 diff) override
     {
-        if (sGauntlet->AnyPendingDeath() && sGauntlet->Enabled() && sGauntlet->IsEligible(player))
-            sGauntlet->UpdateDeathTimer(player, diff);
+        if (sGauntlet->Enabled() && sGauntlet->IsEligible(player))
+        {
+            if (sGauntlet->AnyPendingDeath())
+                sGauntlet->UpdateDeathTimer(player, diff);
 
-        // The addon channel's 500 ms flush has no clock of its own either.
-        // This hook is the world tick, not a fixed cadence -- it fires once
-        // per World::Update, which MinWorldUpdateTime leaves at roughly 1 ms
-        // and load stretches -- so Addon::Update accumulates `diff` and
-        // returns on an integer test whenever nothing is queued, which in
-        // Phase 0 is always.
+            sGauntlet->Tick(player, diff);
+        }
+
+        // Addon::Update returns on an integer test whenever nothing anywhere is
+        // queued, so it stays outside the eligibility check it makes itself.
         sGauntletAddon->Update(player, diff);
     }
 
@@ -264,9 +290,68 @@ public:
         return !sGauntletAddon->HandleIncoming(player, msg);
     }
 
-    void OnPlayerGiveXP(Player* player, uint32& amount, Unit* /*victim*/, uint8 /*source*/) override
+    // The experience path: IMechanic::OnXP over the carried set, then
+    // Gauntlet.Summons.XpRate for a kill on a creature this module spawned,
+    // then the Experience aggregate. Mgr::OnGiveXP is the order.
+    void OnPlayerGiveXP(Player* player, uint32& amount, Unit* victim, uint8 /*source*/) override
     {
-        amount = uint32(amount * sGauntlet->Aggregate(player, AggregateKind::Experience));
+        sGauntlet->OnGiveXP(player, amount, victim);
+    }
+
+    // The out-of-combat edge, and only that edge: CombatManager returns early
+    // unless the combat state actually changed (CombatManager.cpp:411) and sets
+    // UNIT_FLAG_IN_COMBAT at :417, four lines before this hook at :423. That is
+    // what makes Champions a counter of fights rather than of creatures.
+    void OnPlayerEnterCombat(Player* player, Unit* enemy) override
+    {
+        sGauntlet->OnEnterCombat(player, enemy);
+    }
+
+    // The core can reach this twice for one exit (CombatManager.cpp:433 through
+    // EndAllCombat, then Unit::ClearInCombat at Unit.cpp:10714), so every
+    // mechanic behind it has to be idempotent; Champions and Falling Sky both
+    // are.
+    void OnPlayerLeaveCombat(Player* player) override
+    {
+        sGauntlet->OnLeaveCombat(player);
+    }
+
+    void OnPlayerCreatureKill(Player* killer, Creature* killed) override
+    {
+        sGauntlet->OnCreatureKill(killer, killed, false);
+    }
+
+    void OnPlayerCreatureKilledByPet(Player* owner, Creature* killed) override
+    {
+        sGauntlet->OnCreatureKill(owner, killed, true);
+    }
+
+    // Plan section 2.5's floor on maximum health, and Deep Wounds' wound, both
+    // applied here and the floor exactly once over the finished value.
+    // PlayerScript.h:476; Player::UpdateMaxHealth rebuilds `value` from the stat
+    // chain on every call, so nothing here compounds.
+    void OnPlayerAfterUpdateMaxHealth(Player* player, float& value) override
+    {
+        sGauntlet->OnMaxHealth(player, value);
+    }
+
+    // Champions' guaranteed extra coin roll. PlayerScript.h:290, "called before
+    // looted money is added to a player", which is after the server's money
+    // rate has already been applied -- so doubling the purse is the honest
+    // reading of the card and re-rolling mingold..maxgold is not.
+    void OnPlayerBeforeLootMoney(Player* player, Loot* loot) override
+    {
+        sGauntlet->OnLootMoney(player, loot);
+    }
+
+    // The grace window re-opens on a zone change, and every summon comes out of
+    // the world with it (CONTRACT-P1 section 2.4).
+    void OnPlayerUpdateZone(Player* player, uint32 /*newZone*/, uint32 /*newArea*/) override
+    {
+        if (!sGauntlet->Enabled() || !sGauntlet->IsEligible(player))
+            return;
+
+        sGauntlet->OnZoneChanged(player);
     }
 };
 
@@ -275,28 +360,87 @@ class GauntletUnitScript : public UnitScript
 public:
     GauntletUnitScript() : UnitScript("GauntletUnitScript", true) { }
 
+    // The three Modify* hooks are where the aggregate is *applied*, and they
+    // now pass the other unit and the spell through, because Mgr::AggregateAt
+    // folds IMechanic::DamageTakenMult and its two siblings into the product
+    // before the cap. Champions' +25% is one of those, and applied after the
+    // cap it would sail straight past the 2.0x ceiling.
     void ModifyMeleeDamage(Unit* target, Unit* attacker, uint32& damage) override
     {
         if (Player* victim = target ? target->ToPlayer() : nullptr)
-            damage = uint32(damage * sGauntlet->Aggregate(victim, AggregateKind::DamageTaken));
+            damage = uint32(damage * sGauntlet->AggregateAt(victim, AggregateKind::DamageTaken, attacker, nullptr));
         if (Player* dealer = attacker ? attacker->ToPlayer() : nullptr)
-            damage = uint32(damage * sGauntlet->Aggregate(dealer, AggregateKind::DamageDone));
+            damage = uint32(damage * sGauntlet->AggregateAt(dealer, AggregateKind::DamageDone, target, nullptr));
     }
 
-    void ModifySpellDamageTaken(Unit* target, Unit* attacker, int32& damage, SpellInfo const* /*spellInfo*/) override
+    void ModifySpellDamageTaken(Unit* target, Unit* attacker, int32& damage, SpellInfo const* spellInfo) override
     {
         if (Player* victim = target ? target->ToPlayer() : nullptr)
-            damage = int32(damage * sGauntlet->Aggregate(victim, AggregateKind::DamageTaken));
+            damage = int32(damage * sGauntlet->AggregateAt(victim, AggregateKind::DamageTaken, attacker, spellInfo));
         if (Player* dealer = attacker ? attacker->ToPlayer() : nullptr)
-            damage = int32(damage * sGauntlet->Aggregate(dealer, AggregateKind::DamageDone));
+            damage = int32(damage * sGauntlet->AggregateAt(dealer, AggregateKind::DamageDone, target, spellInfo));
     }
 
-    void ModifyHealReceived(Unit* target, Unit* /*healer*/, uint32& heal, SpellInfo const* /*spellInfo*/) override
+    void ModifyHealReceived(Unit* target, Unit* healer, uint32& heal, SpellInfo const* spellInfo) override
     {
         if (Player* p = target ? target->ToPlayer() : nullptr)
-            heal = uint32(heal * sGauntlet->Aggregate(p, AggregateKind::HealTaken));
+            heal = uint32(heal * sGauntlet->AggregateAt(p, AggregateKind::HealTaken, healer, spellInfo));
+    }
+
+    // The only place IMechanic::OnDamageTaken is dispatched from, and
+    // deliberately not the three hooks above. This one runs once per blow, from
+    // Unit::DealDamage ($CORE/src/server/game/Entities/Unit/Unit.cpp:984),
+    // after absorbs and resists have already come off and before the health is
+    // applied -- which is what the card means by "after mitigation", and what
+    // lets Deep Wounds see the health the blow is about to come out of and so
+    // refuse to make a wound out of overkill. Dispatching from the Modify*
+    // hooks as well would count every hit twice.
+    //
+    // The damage is returned exactly as it arrived: this is an observer, and
+    // the multipliers have already been applied above.
+    uint32 DealDamage(Unit* attacker, Unit* victim, uint32 damage, DamageEffectType /*type*/) override
+    {
+        if (Player* p = victim ? victim->ToPlayer() : nullptr)
+            sGauntlet->OnDamageTaken(p, attacker, damage);
+        return damage;
     }
 };
+
+// The catch-all for "the owner is no longer where its creature is": a
+// teleport, a dungeon portal, a battleground queue popping, a logout. The
+// summons worker called this the important one, and it is: every other despawn
+// path is a specific event this module happens to hook, and this one is the
+// core telling us the player has left the map the creature is standing on.
+// Map::RemovePlayerFromMap fires it for all of them.
+class GauntletMapScript : public AllMapScript
+{
+public:
+    GauntletMapScript() : AllMapScript("GauntletMapScript") { }
+
+    void OnPlayerLeaveAll(Map* /*map*/, Player* player) override
+    {
+        sGauntletSummons->DespawnAll(player);
+    }
+};
+
+// The addon's half of "a stalker is alive for you". Summons calls this whenever
+// a creature it owns appears or disappears, including the despawns no mechanic
+// initiated -- a cap eviction, a leash, a zone change -- which is exactly the
+// set the mechanics cannot see for themselves. It is deliberately narrowed to
+// MF_Stalker rows: SUMMON means "something is hunting you", and Falling Sky's
+// invisible ground trigger appearing every twenty seconds is not that.
+//
+// The owner arrives as a guid because a summon frequently outlives its owner's
+// session by the few milliseconds it takes to despawn it.
+static void GauntletSummonChanged(ObjectGuid ownerGuid, uint16 mechanic, uint32 /*entry*/, bool alive)
+{
+    MechanicDef const* def = FindMechanic(mechanic);
+    if (!def || !(def->flags & MF_Stalker))
+        return;
+
+    if (Player* owner = ObjectAccessor::FindPlayer(ownerGuid))
+        sGauntletAddon->SendSummon(owner, def->key, alive);
+}
 
 // Static-archive anchors. The module is archived into libmodules.a and linked
 // plainly, so a translation unit nothing references is dropped and the
@@ -309,10 +453,19 @@ public:
 // invokes the macro, and the macro defines the anchor wherever it is invoked.
 namespace Gauntlet
 {
+    // Phase 0's four scalars, declared through GAUNTLET_MECHANIC_FN, so the
+    // name carries the factory function rather than the class.
     void AddSC_gauntlet_mechanic_MakeExposed();
     void AddSC_gauntlet_mechanic_MakeFeeble();
     void AddSC_gauntlet_mechanic_MakeWithering();
     void AddSC_gauntlet_mechanic_MakeForgetful();
+
+    // Phase 1's four, declared through GAUNTLET_MECHANIC, so the name carries
+    // the class. Registry ids 1, 6, 14 and 19.
+    void AddSC_gauntlet_mechanic_Shade();
+    void AddSC_gauntlet_mechanic_Champions();
+    void AddSC_gauntlet_mechanic_FallingSky();
+    void AddSC_gauntlet_mechanic_DeepWounds();
 }
 
 static void AnchorMechanics()
@@ -321,6 +474,11 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_MakeFeeble();
     AddSC_gauntlet_mechanic_MakeWithering();
     AddSC_gauntlet_mechanic_MakeForgetful();
+
+    AddSC_gauntlet_mechanic_Shade();
+    AddSC_gauntlet_mechanic_Champions();
+    AddSC_gauntlet_mechanic_FallingSky();
+    AddSC_gauntlet_mechanic_DeepWounds();
 }
 
 void Addmod_gauntletScripts()
@@ -328,6 +486,11 @@ void Addmod_gauntletScripts()
     new GauntletWorldScript();
     new GauntletPlayerScript();
     new GauntletUnitScript();
+    new GauntletMapScript();
     AddSC_gauntlet_commands();
+    AddSC_gauntlet_summons();
     AnchorMechanics();
+
+    // Installed before anything can summon, so no appearance is missed.
+    sGauntletSummons->SetObserver(&GauntletSummonChanged);
 }
