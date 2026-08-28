@@ -258,8 +258,16 @@ namespace Gauntlet
             out += "    mechanics = {\n";
             for (MechanicDef const& def : table)
             {
+                // `key` is the registry key, and the addon needs it because the
+                // live channel is keyed on it: EVT, CTR, STAT and SUMMON all
+                // carry "frenzy" or "deep_wounds" rather than an id, so Hud.lua
+                // cannot find a mechanic's name or icon without a way back from
+                // the key to the row. Exporting it here is what keeps the two
+                // tables from drifting -- the same reason the names and icons
+                // are exported rather than written into the addon by hand.
                 out += "        [" + std::to_string(static_cast<uint32>(def.id)) + "] = { name = "
                      + LuaQuote(def.name)
+                     + ", key = " + LuaQuote(def.key)
                      + ", family = " + std::to_string(static_cast<uint32>(def.family)) + ",\n"
                      + "                 icon = " + LuaQuote(IconForMechanic(def))
                      + ", desc = " + LuaQuote(def.blurb) + " },\n";
