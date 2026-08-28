@@ -60,3 +60,29 @@ accidentally depends on something `src/common` provides differently than the
 full core tree, or on a symbol the `modules` library doesn't export the way
 this harness assumes. Treat a green run here as "the fast loop is happy," and
 the coordinator's real build as the final word.
+
+### What the invariant sweep asserts about `relaxations`
+
+`OfferInvariantsTest.cpp` runs 1,600,000 offer sets over the whole 73-entry
+table. The hard invariants — exactly three offers, tier windows, class
+relevance, rank range, rank-up shape, exclusive keys, the swap in slot C at
+tiers 4/8/12, and never `Always`/`InCombat`/`VersusElites` on a Scalar — are
+zero at every tier with no exceptions.
+
+Relaxations are *not* asserted to be `GR_None`. Measured: tiers 1, 2 and 8
+never relax, tiers 3–14 relax between 0.87% and 6.47%, tier 15 relaxes 28.8%
+and tier 16 relaxes 46.1%. That is structural rather than a fault — only 21 of
+the 73 mechanics have a tier window reaching 15, and a run that far in is
+carrying most of them, so the "new mechanic" pools genuinely empty. Design
+§4.6 expects rank-ups to dominate at those tiers.
+
+What *is* asserted exactly, at every tier, is that the relaxation word
+describes the set it came back with: `GR_RepeatedFamily` iff a family repeats,
+`GR_RepeatedMechanic` iff a mechanic repeats, `GR_FellBackToScalar` iff the set
+has no reward-shaped offer. The test prints a per-tier census so the numbers
+behind its ceilings can be re-read from any run.
+
+Tiers 1 and 2 relaxing zero percent is load-bearing: before commit `8aa2843`
+moved Champions, Carrion and Hubris to `minTier = 1`, tier 1 had two families
+and no reward-shaped mechanic and relaxed 100% of the time. The test fails if
+that commit is reverted.
