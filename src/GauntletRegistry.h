@@ -31,6 +31,18 @@ namespace Gauntlet
         char const* exclusiveKeys;  // '|'-separated; no two active mechanics share one
         Boon        boon;
         uint32      requiresSpell;  // 0 = no spell gate
+
+        // 0 = any spec; otherwise the talent tree that makes this curse
+        // relevant, encoded as the DBC tabpage PLUS ONE, so that 1, 2 and 3
+        // are a class's first, second and third tab in client order (shaman
+        // 1 = Elemental, druid 2 = Feral Combat, priest 3 = Shadow).
+        // IPlayerView::GetTalentTree() answers in the same encoding and
+        // returns 0 for a character that has spent no talent points, so the
+        // whole spec filter is
+        //     requiresTree == 0 || requiresTree == view.GetTalentTree()
+        // with no +1 to remember at the comparison, and a character that has
+        // not chosen a spec satisfies no spec gate.
+        uint8       requiresTree;
         char const* blurb;          // one player-facing sentence, present tense
     };
 
