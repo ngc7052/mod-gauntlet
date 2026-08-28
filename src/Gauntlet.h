@@ -166,6 +166,14 @@ namespace Gauntlet
         uint8      boonMag   = 0;
         uint8      slot      = 0;          // the tier at which it was taken
         uint16     genVersion = 0;         // generator version that produced it
+
+        // Generator 1 expressed a curse as a free percentage (2..115); the
+        // redesign has only a three-step rank. A migrated affix keeps its exact
+        // number here rather than being rounded onto a rank, which would change
+        // a live player's run. 0 means "take the strength from the rank", which
+        // is every generator 2 row. Mirrors gauntlet_affix.legacy_mag.
+        uint16     legacyMag = 0;
+
         IMechanic* impl      = nullptr;    // owned by RunState
     };
 
