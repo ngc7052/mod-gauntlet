@@ -22,4 +22,6 @@ namespace Gauntlet
     }
 
     IMechanic* MakeExposed() { return new Exposed(); }
+
+    GAUNTLET_MECHANIC_FN(21, MakeExposed);
 }

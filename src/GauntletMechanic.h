@@ -120,7 +120,39 @@ namespace Gauntlet
     // normal answer rather than an error -- a run migrated from a newer
     // registry, or a family switched off in config, legitimately carries one.
     // Nothing may crash on it; Aggregate() ignores such an instance entirely.
+    // Registry id to implementation. Returns nullptr for an id this build has
+    // no code for, which is a normal state -- a run migrated from a newer
+    // registry, or a mechanic whose phase has not landed yet -- and every
+    // caller must tolerate it.
     IMechanic* MakeMechanic(uint16 id);
+
+    using MechanicFactoryFn = IMechanic* (*)();
+
+    // A mechanic registers itself from its own translation unit, so adding one
+    // never means editing a file someone else is editing. Declare one at file
+    // scope in the .cpp:
+    //
+    //     GAUNTLET_MECHANIC(6, Champions);
+    //
+    // where Champions is default-constructible and derives from IMechanic.
+    struct MechanicRegistrar
+    {
+        MechanicRegistrar(uint16 id, MechanicFactoryFn fn);
+    };
+
+#define GAUNTLET_MECHANIC(id, Type)                                                \
+    namespace                                                                      \
+    {                                                                              \
+        ::Gauntlet::IMechanic* Make##Type() { return new Type(); }                  \
+        ::Gauntlet::MechanicRegistrar const g_register##Type{ (id), &Make##Type };  \
+    }
+
+// The same, for a file that already has its own factory function.
+#define GAUNTLET_MECHANIC_FN(id, fn)                                               \
+    namespace                                                                      \
+    {                                                                              \
+        ::Gauntlet::MechanicRegistrar const g_register_##fn{ (id), &fn };           \
+    }
 }
 
 #endif // MOD_GAUNTLET_MECHANIC_H

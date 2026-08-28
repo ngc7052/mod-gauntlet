@@ -22,4 +22,6 @@ namespace Gauntlet
     }
 
     IMechanic* MakeFeeble() { return new Feeble(); }
+
+    GAUNTLET_MECHANIC_FN(22, MakeFeeble);
 }

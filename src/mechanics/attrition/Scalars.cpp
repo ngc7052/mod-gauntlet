@@ -83,28 +83,4 @@ namespace Gauntlet
             default:                    return "";
         }
     }
-
-    // Registry id to implementation. A switch rather than a table because the
-    // ids are sparse and this is read once per affix on attach, never on the
-    // damage path. Everything the registry marks MF_NotImplemented answers
-    // nullptr, and so does an id from a registry this build has never seen.
-    //
-    // Withering and Forgetful are here despite being MF_NotImplemented: the
-    // flag stops the generator offering them again, it does not stop a
-    // migrated run carrying one, and such a run must keep working.
-    //
-    // Phase 1 moves this to its own translation unit once mechanics exist
-    // outside this family; in Phase 0 all four are attrition scalars, so it
-    // sits beside them.
-    IMechanic* MakeMechanic(uint16 id)
-    {
-        switch (id)
-        {
-            case 21:                 return MakeExposed();
-            case 22:                 return MakeFeeble();
-            case MECHANIC_WITHERING: return MakeWithering();
-            case MECHANIC_FORGETFUL: return MakeForgetful();
-            default:                 return nullptr;
-        }
-    }
 }

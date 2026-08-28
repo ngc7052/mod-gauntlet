@@ -22,4 +22,6 @@ namespace Gauntlet
     }
 
     IMechanic* MakeWithering() { return new Withering(); }
+
+    GAUNTLET_MECHANIC_FN(MECHANIC_WITHERING, MakeWithering);
 }

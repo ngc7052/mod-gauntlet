@@ -23,4 +23,6 @@ namespace Gauntlet
     }
 
     IMechanic* MakeForgetful() { return new Forgetful(); }
+
+    GAUNTLET_MECHANIC_FN(MECHANIC_FORGETFUL, MakeForgetful);
 }
