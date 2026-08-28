@@ -7,6 +7,7 @@
 #define MOD_GAUNTLET_H
 
 #include "Define.h"
+#include "GauntletState.h"
 #include <string>
 #include <vector>
 
@@ -15,6 +16,12 @@
 // into unit_tests as well as into worldserver, and the test build has no
 // game objects. Anything that needs a Player belongs in GauntletMgr.h or in
 // a mechanic implementation.
+//
+// GauntletState.h is the one module header this one includes, and it is
+// included for the same reason it is safe: it is free of Player.h and of
+// DatabaseEnv.h, and it does not include this header back. GauntletScheduler.h
+// does, which is why the Scheduler that belongs beside RunState::state is not
+// a member of RunState -- see the note there.
 
 namespace Gauntlet
 {
@@ -224,6 +231,37 @@ namespace Gauntlet
         // Set by anything that changes a column of gauntlet_run, cleared by
         // Save, so a logout does not rewrite a row nothing touched.
         bool   dirty = false;
+
+        // Plan section 3.3's per-mechanic key/value store: Champions' fight
+        // counter, the Shade's nemesis rank, Deep Wounds' wound. Loaded once on
+        // login -- before OnAttach, because a Shade that reads shade.rank out of
+        // an empty map answers "never left behind" for a nemesis that has been
+        // left behind four times -- and written on logout, on death, on a pick
+        // and every sixty seconds while it is dirty. It lives here because it is
+        // run data and its lifetime is exactly the run's.
+        //
+        // The Scheduler that goes with it does not, and cannot: every mechanic
+        // reaches its clock through Ctx, GauntletScheduler.h includes this
+        // header to spell MECHANIC_NONE, and a header cannot include something
+        // that includes it back. Holding one by pointer would put an owning
+        // pointer and an out-of-line constructor into a header three test
+        // binaries compile, for no gain. Mgr keeps one Scheduler per loaded run
+        // instead, on a map keyed by the same ObjectGuid and erased by the same
+        // Forget; Mgr::ClockFor is what fills Ctx::clock.
+        State  state;
+
+        // Counts down in milliseconds. No scheduled event fires while it is
+        // non-zero, which is design section 4.2's grace: a character is never
+        // ambushed before the player has taken control of it. Set on login and
+        // on a zone change from Gauntlet.Grace.Seconds.
+        uint32 graceMs = 0;
+
+        // Which affix last did something to this character, and how much longer
+        // that claim stays true. KILLBY is built out of the pair, and it is a
+        // pair rather than a single field because a Falling Sky that struck
+        // twenty minutes ago has no business being named for a death now.
+        uint16 lastActor   = MECHANIC_NONE;
+        uint32 lastActorMs = 0;
 
         RunState() = default;
         ~RunState();

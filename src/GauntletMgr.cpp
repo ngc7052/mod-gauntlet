@@ -4,21 +4,27 @@
  */
 
 #include "GauntletMgr.h"
+#include "GauntletAddon.h"
 #include "GauntletGenerator.h"
 #include "GauntletLegacy.h"
 #include "GauntletMechanic.h"
 #include "GauntletRegistry.h"
+#include "GauntletSummons.h"
 #include "Chat.h"
 #include "Config.h"
+#include "Creature.h"
+#include "DBCStores.h"
 #include "DatabaseEnv.h"
 #include "Group.h"
 #include "Log.h"
+#include "LootMgr.h"
 #include "Map.h"
 #include "World.h"
 #include "WorldSessionMgr.h"
 #include "GameTime.h"
 #include "WorldSession.h"
 #include <algorithm>
+#include <limits>
 #include <memory>
 #include <utility>
 
@@ -61,16 +67,23 @@ namespace Gauntlet
         pendingDeath = other.pendingDeath;
         deathTimerMs = other.deathTimerMs;
         dirty        = other.dirty;
+        graceMs      = other.graceMs;
+        lastActor    = other.lastActor;
+        lastActorMs  = other.lastActorMs;
 
         affixes = std::move(other.affixes);
         pending = std::move(other.pending);
+        state   = std::move(other.state);
 
         // A moved-from vector is valid but unspecified. Making it definitely
         // empty is what guarantees the source's destructor frees nothing.
         other.affixes.clear();
         other.pending.clear();
+        other.state.Clear();
         other.pendingDeath = false;
         other.deathTimerMs = 0;
+        other.lastActor    = MECHANIC_NONE;
+        other.lastActorMs  = 0;
         return *this;
     }
 
@@ -215,6 +228,58 @@ namespace Gauntlet
                 default:                      return MECHANIC_NONE;
             }
         }
+
+        // How often the key/value store is written while a character is
+        // logged in. CONTRACT-P1 section 5.2 states the sixty seconds.
+        constexpr uint32 STATE_SAVE_MS = 60000;
+
+        // How long "this affix acted on you" stays true. KILLBY names whatever
+        // is remembered here, and a Falling Sky that struck twenty minutes ago
+        // must not be blamed for a death now. The design gives no number, so
+        // this is a chosen one: long enough to cover a whole fight, short
+        // enough that it can only mean the fight the player just lost.
+        constexpr uint32 ACTOR_MEMORY_MS = 15000;   // TODO(design)
+
+        // Caps wide enough that ClampProduct in GauntletAggregate.cpp is the
+        // identity, so the shared -- and unit-tested -- affix maths can be
+        // asked for the raw product and the clamp applied later, once, over a
+        // number it has not seen.
+        AggregateCaps const& UncappedCaps()
+        {
+            static AggregateCaps const caps = []
+            {
+                AggregateCaps c;
+                c.damageTakenMin = 0.0f;
+                c.damageTakenMax = std::numeric_limits<float>::max();
+                c.damageDoneMin  = 0.0f;
+                c.healTakenMin   = 0.0f;
+                c.maxHealthMin   = 0.0f;
+                c.enemySpeedMax  = std::numeric_limits<float>::max();
+                return c;
+            }();
+            return caps;
+        }
+
+        // Deliberately the same switch as ClampProduct in
+        // GauntletAggregate.cpp, and deliberately not shared with it: that one
+        // is file-local to the Player-free translation unit, and what has to be
+        // clamped here is a product that unit never sees -- one with the three
+        // IMechanic Mult callbacks folded in. Plan section 2.5 is the authority
+        // for both. Change them together.
+        float ClampToCaps(float v, AggregateKind kind, AggregateCaps const& caps)
+        {
+            switch (kind)
+            {
+                case AggregateKind::DamageTaken:
+                    return std::max(caps.damageTakenMin, std::min(caps.damageTakenMax, v));
+                case AggregateKind::DamageDone:  return std::max(caps.damageDoneMin, v);
+                case AggregateKind::HealTaken:   return std::max(caps.healTakenMin, v);
+                case AggregateKind::MaxHealth:   return std::max(caps.maxHealthMin, v);
+                case AggregateKind::EnemySpeed:  return std::min(caps.enemySpeedMax, v);
+                case AggregateKind::Experience:  return v;
+                default:                         return v;
+            }
+        }
     }
 
     Mgr* Mgr::instance()
@@ -244,11 +309,33 @@ namespace Gauntlet
         _caps.maxHealthMin   = sConfigMgr->GetOption<float>("Gauntlet.Caps.MaxHealth", 0.6f);
         _caps.enemySpeedMax  = sConfigMgr->GetOption<float>("Gauntlet.Caps.EnemySpeed", 1.4f);
 
-        // Gauntlet.Grace.Seconds is the conf worker's key for the Phase 1
-        // event grace period; the death timer borrows its 60 s because plan
-        // section 6 decision 5 names the same number and Phase 0 has nothing
-        // else to hang it on.
-        _graceMs = sConfigMgr->GetOption<uint32>("Gauntlet.Grace.Seconds", 60) * 1000;   // TODO(design)
+        // Gauntlet.Grace.Seconds: the window after login or a zone change in
+        // which no scheduled event fires, which is what the conf file has
+        // always documented it as and what Phase 1 finally makes it do.
+        _graceMs = sConfigMgr->GetOption<uint32>("Gauntlet.Grace.Seconds", 60) * 1000;
+
+        // Phase 1 gives that key the consumer the conf file documents -- the
+        // window after login or a zone change in which no event fires -- and
+        // the hardcore death window keeps its own field rather than sharing the
+        // variable. They read the same number today because plan section 6
+        // decision 5 names the same sixty seconds and there is no second key;
+        // they are separate so that a tuning pass which shortens the grace
+        // cannot silently shorten the window a hardcore character has to be
+        // saved in. See the TODO on _deathWindowMs.
+        _deathWindowMs = _graceMs;
+
+        // The event scheduler. MinSpacing is configured in seconds and
+        // Scheduler::SetMinSpacingMs takes milliseconds; this multiplication is
+        // the only place the two units meet.
+        _eventsEnabled = sConfigMgr->GetOption<bool>("Gauntlet.Events.Enable", true);
+        _minSpacingMs  = sConfigMgr->GetOption<uint32>("Gauntlet.Events.MinSpacing", 12) * 1000;
+        _budgetStep    = sConfigMgr->GetOption<float>("Gauntlet.Events.BudgetStep", 0.25f);
+
+        // A kill on a creature this module put into the world. Clamped to
+        // [0, 1] because the key exists to stop summons being farmed, and a
+        // value above 1 would turn it into the opposite.
+        _summonXpRate = sConfigMgr->GetOption<float>("Gauntlet.Summons.XpRate", 0.5f);
+        _summonXpRate = std::max(0.0f, std::min(1.0f, _summonXpRate));
 
         if (_interval == 0)
             _interval = 5;
@@ -256,6 +343,21 @@ namespace Gauntlet
             _choices = 1;
         if (_graceMs == 0)
             _graceMs = 60000;
+        if (_deathWindowMs == 0)
+            _deathWindowMs = 60000;
+        if (_budgetStep < 0.0f)
+            _budgetStep = 0.0f;
+
+        // This runs again on `.reload config`, with runs already loaded, so the
+        // schedulers that exist have to be told rather than only the ones
+        // created afterwards.
+        for (auto& entry : _live)
+        {
+            entry.second.clock.SetMinSpacingMs(_minSpacingMs);
+            entry.second.clock.SetBudgetStep(_budgetStep);
+        }
+
+        sGauntletSummons->LoadConfig();
     }
 
     bool Mgr::IsEligible(Player* player) const
@@ -273,6 +375,53 @@ namespace Gauntlet
             return nullptr;
         auto it = _runs.find(player->GetGUID());
         return it == _runs.end() ? nullptr : &it->second;
+    }
+
+    Mgr::Live* Mgr::LiveFor(Player* player)
+    {
+        if (!player)
+            return nullptr;
+        auto it = _live.find(player->GetGUID());
+        return it == _live.end() ? nullptr : &it->second;
+    }
+
+    Scheduler* Mgr::ClockFor(Player* player)
+    {
+        Live* live = LiveFor(player);
+        return live ? &live->clock : nullptr;
+    }
+
+    Ctx Mgr::MakeCtx(Player* player, RunState* run, AffixInstance* self)
+    {
+        Ctx ctx;
+        ctx.player = player;
+        ctx.run    = run;
+        ctx.self   = self;
+        ctx.clock  = ClockFor(player);
+        ctx.addon  = sGauntletAddon;
+        ctx.state  = run ? &run->state : nullptr;
+        return ctx;
+    }
+
+    template <typename Fn>
+    void Mgr::ForEachMechanic(Player* player, RunState* run, Fn&& fn)
+    {
+        if (!run)
+            return;
+
+        // Indexed rather than range-for: a callback may not add or remove a
+        // carried affix -- nothing reachable from one does -- but taking the
+        // address fresh each time is what makes that assumption cheap to check
+        // rather than something the loop silently depends on.
+        for (std::size_t i = 0; i < run->affixes.size(); ++i)
+        {
+            AffixInstance& a = run->affixes[i];
+            if (!a.impl)
+                continue;
+
+            Ctx ctx = MakeCtx(player, run, &a);
+            fn(ctx, a);
+        }
     }
 
     std::string Mgr::NameOf(uint16 mechanic, Condition condition, Boon boon) const
@@ -315,6 +464,18 @@ namespace Gauntlet
         RunState st;
         std::vector<AffixInstance> loaded;
         uint32 const low = player->GetGUID().GetCounter();
+
+        // One scheduler per loaded run, created here and erased by Forget, so
+        // its lifetime is exactly the run's. CancelAll rather than a fresh
+        // object because a relog inside the same worldserver session must not
+        // inherit a queue, and the config has to be re-applied either way.
+        Live& live = _live[player->GetGUID()];
+        live.clock.CancelAll();
+        live.clock.SetTimedAffixCount(0);
+        live.clock.SetMinSpacingMs(_minSpacingMs);
+        live.clock.SetBudgetStep(_budgetStep);
+        live.tickMs      = 0;
+        live.stateSaveMs = 0;
 
         if (QueryResult r = CharacterDatabase.Query(
                 "SELECT `seed`, `tier`, `dead`, `gen_version`, `class` FROM `gauntlet_run` WHERE `guid` = {}", low))
@@ -372,6 +533,13 @@ namespace Gauntlet
                     "VALUES ({}, {}, 0, 0, {}, {})",
                     low, st.seed, static_cast<uint32>(st.genVersion), static_cast<uint32>(st.playerClass));
 
+                st.graceMs = _graceMs;
+
+                // The fresh RunState carries an empty State, and the move
+                // assignment below replaces whatever the previous occupant of
+                // this guid had left in the map. That matters: PurgeCharacter
+                // has just deleted the gauntlet_state rows, and a State object
+                // still holding them in memory would write them straight back.
                 _runs[player->GetGUID()] = std::move(st);
                 return;
             }
@@ -439,20 +607,38 @@ namespace Gauntlet
         if (!run)
             return;
 
-        // OnAttach is handed a pointer into this vector, so it must not move
-        // under the loop.
-        run->affixes.reserve(loaded.size());
+        // Before OnAttach, and that order is the whole point of doing it here:
+        // the Shade reads shade.rank and shade.alive in OnAttach, and a state
+        // store still empty at that moment would answer "never left behind" for
+        // a nemesis that has been left behind four times. One query.
+        run->state.LoadFrom(low);
 
+        // No event fires for the first minute of a session. Design section
+        // 4.2: a character is never ambushed before the player has taken
+        // control of it.
+        run->graceMs     = _graceMs;
+        run->lastActor   = MECHANIC_NONE;
+        run->lastActorMs = 0;
+
+        // OnAttach is handed a pointer into this vector, so it must not move
+        // under the loop below.
+        run->affixes.reserve(loaded.size());
         for (AffixInstance const& a : loaded)
+            run->Attach(a);
+
+        // Attach first, then the budget, then OnAttach. The order is the point:
+        // Budget() is 1 + step x (timed affixes - 1), a mechanic arms its first
+        // event from inside OnAttach, and Scheduler::Arm scales the interval
+        // once at arming time -- so a count taken afterwards would leave every
+        // affix's first event of the session unstretched.
+        SyncTimedAffixCount(player);
+
+        for (AffixInstance& stored : run->affixes)
         {
-            AffixInstance& stored = run->Attach(a);
             if (!stored.impl)
                 continue;
 
-            Ctx ctx;
-            ctx.player = player;
-            ctx.run    = run;
-            ctx.self   = &stored;
+            Ctx ctx = MakeCtx(player, run, &stored);
             stored.impl->OnAttach(ctx);
         }
     }
@@ -462,6 +648,13 @@ namespace Gauntlet
         RunState* st = Get(player);
         if (!st || !player)
             return;
+
+        // The key/value store has its own dirty tracking and issues no query at
+        // all when nothing changed, so it is written on every save rather than
+        // gated on gauntlet_run's flag: the two move independently, and a
+        // Champions counter that advanced without the run's tier moving would
+        // otherwise never reach the database.
+        st->state.SaveTo(player->GetGUID().GetCounter());
 
         // gauntlet_affix rows are written when they are picked and never
         // rewritten, so a save is one row of gauntlet_run and only when
@@ -491,6 +684,11 @@ namespace Gauntlet
 
         if (it->second.pendingDeath && _pendingDeaths != 0)
             --_pendingDeaths;
+
+        // The scheduler goes with the run it belongs to. Anything still queued
+        // on it is dropped, which is correct: the events were for a player who
+        // is no longer here.
+        _live.erase(guid);
 
         // ~RunState frees every IMechanic the run owned.
         _runs.erase(it);
@@ -612,10 +810,7 @@ namespace Gauntlet
                     // look the way it did while the affix was carried.
                     if (out->impl)
                     {
-                        Ctx ctx;
-                        ctx.player = player;
-                        ctx.run    = st;
-                        ctx.self   = out;
+                        Ctx ctx = MakeCtx(player, st, out);
                         out->impl->OnDetach(ctx);
                     }
                     st->DetachSlot(chosen.swapSlot);
@@ -633,12 +828,14 @@ namespace Gauntlet
             instance.legacyMag  = 0;   // generator 2: the rank is the strength
 
             AffixInstance& stored = st->Attach(instance);
+
+            // Before OnAttach, for the reason Mgr::Load spells out: the budget
+            // has to be right by the time the new affix arms its first event.
+            SyncTimedAffixCount(player);
+
             if (stored.impl)
             {
-                Ctx ctx;
-                ctx.player = player;
-                ctx.run    = st;
-                ctx.self   = &stored;
+                Ctx ctx = MakeCtx(player, st, &stored);
                 stored.impl->OnAttach(ctx);
             }
 
@@ -670,6 +867,12 @@ namespace Gauntlet
                       st->tier, st->dead ? 1 : 0, low);
         CharacterDatabase.CommitTransaction(trans);
         st->dirty = false;
+
+        // A pick is one of the four moments CONTRACT-P1 section 5.2 names for
+        // writing the state store, and the only one where the carried set
+        // changed underneath it: an affix that was swapped away has just had
+        // its OnDetach, and whatever that wrote must not wait for a logout.
+        st->state.SaveTo(low);
 
         AffixInstance const* carried = st->Find(chosen.mechanic);
         std::string const describe = carried ? DescribeOf(*carried) : std::string();
@@ -764,17 +967,7 @@ namespace Gauntlet
         if (!st)
             return;
 
-        for (AffixInstance& a : st->affixes)
-        {
-            if (!a.impl)
-                continue;
-
-            Ctx ctx;
-            ctx.player = player;
-            ctx.run    = st;
-            ctx.self   = &a;
-            a.impl->OnDetach(ctx);
-        }
+        ForEachMechanic(player, st, [](Ctx& ctx, AffixInstance& a) { a.impl->OnDetach(ctx); });
     }
 
     // =====================================================================
@@ -787,7 +980,7 @@ namespace Gauntlet
             return;
 
         st->pendingDeath = true;
-        st->deathTimerMs = _graceMs;
+        st->deathTimerMs = _deathWindowMs;
         ++_pendingDeaths;
     }
 
@@ -890,6 +1083,441 @@ namespace Gauntlet
         // Qualified so the free function in GauntletAggregate.h is called and
         // not this member: unqualified lookup inside a member finds the member.
         return Gauntlet::Aggregate(it->second.affixes, in, _caps);
+    }
+
+    float Mgr::RawProduct(Player* player, AggregateKind kind, Unit* other, SpellInfo const* spellInfo)
+    {
+        if (!_enabled || !IsEligible(player))
+            return 1.0f;
+
+        auto it = _runs.find(player->GetGUID());
+        if (it == _runs.end())
+            return 1.0f;
+
+        RunState& st = it->second;
+
+        AggregateInput in;
+        in.kind = kind;
+        FillConditions(player, in);
+
+        // The affix maths stay where they are tested. Asking for them with caps
+        // that cannot bite is what gets the raw product back out of a function
+        // whose whole job is to clamp: the three Mult callbacks below have to
+        // be folded into the same product, before section 2.5's ceiling rather
+        // than on top of it, and there is no other way to reach the middle of
+        // that calculation without duplicating it.
+        float product = Gauntlet::Aggregate(st.affixes, in, UncappedCaps());
+
+        for (std::size_t i = 0; i < st.affixes.size(); ++i)
+        {
+            AffixInstance& a = st.affixes[i];
+            if (!a.impl || a.condition >= Condition::MAX)
+                continue;
+
+            // The same condition gate the aggregate applies to
+            // AggregateFactor. An affix that is not in force does not multiply
+            // a blow either.
+            if (!in.conditionActive[static_cast<std::size_t>(a.condition)])
+                continue;
+
+            Ctx ctx = MakeCtx(player, &st, &a);
+
+            float factor = 1.0f;
+            switch (kind)
+            {
+                case AggregateKind::DamageTaken: factor = a.impl->DamageTakenMult(ctx, other, spellInfo); break;
+                case AggregateKind::DamageDone:  factor = a.impl->DamageDoneMult (ctx, other, spellInfo); break;
+                case AggregateKind::HealTaken:   factor = a.impl->HealTakenMult  (ctx, other, spellInfo); break;
+                default: break;
+            }
+
+            if (factor == 1.0f)
+                continue;
+
+            product *= factor;
+
+            // Attribution, and the one place it can be read off cheaply: an
+            // affix that just made this blow hurt more is an affix that acted.
+            // KILLBY needs a name and this is where one is.
+            if (kind == AggregateKind::DamageTaken && factor > 1.0f)
+            {
+                st.lastActor   = a.mechanic;
+                st.lastActorMs = ACTOR_MEMORY_MS;
+            }
+        }
+
+        return product;
+    }
+
+    float Mgr::AggregateAt(Player* player, AggregateKind kind, Unit* other, SpellInfo const* spellInfo)
+    {
+        return ClampToCaps(RawProduct(player, kind, other, spellInfo), kind, _caps);
+    }
+
+    // =====================================================================
+    // The hook fan-outs.
+    // =====================================================================
+
+    void Mgr::Tick(Player* player, uint32 diffMs)
+    {
+        RunState* st = Get(player);
+        Live* live   = LiveFor(player);
+        if (!st || !live)
+            return;
+
+        // Two plain countdowns, and they run whatever else is switched off:
+        // the grace window is a promise to the player, and the actor's memory
+        // going stale is what stops a death being blamed on an affix that
+        // stopped acting a quarter of an hour ago.
+        if (st->graceMs != 0)
+            st->graceMs = st->graceMs > diffMs ? st->graceMs - diffMs : 0;
+
+        if (st->lastActorMs != 0)
+        {
+            if (st->lastActorMs > diffMs)
+            {
+                st->lastActorMs -= diffMs;
+            }
+            else
+            {
+                st->lastActorMs = 0;
+                st->lastActor   = MECHANIC_NONE;
+            }
+        }
+
+        // CONTRACT-P1 section 5.2's "every 60 s while dirty". SaveTo issues no
+        // query when nothing is dirty, so the test is an optimisation rather
+        // than a correctness rule.
+        live->stateSaveMs += diffMs;
+        if (live->stateSaveMs >= STATE_SAVE_MS)
+        {
+            live->stateSaveMs = 0;
+            if (st->state.Dirty())
+                st->state.SaveTo(player->GetGUID().GetCounter());
+        }
+
+        if (st->dead)
+            return;
+
+        // OnTick goes to *every* carried mechanic and not only the MF_Timed
+        // ones. MF_Timed means "spends the event budget", which Deep Wounds
+        // must not, and its decay, its batched write onto maximum health and
+        // its readout all hang off this tick without ever arming an event.
+        //
+        // The accumulator is here rather than in each mechanic because this
+        // hook is the world tick -- once per World::Update, roughly every
+        // millisecond -- and the interface documents OnTick as a 500 ms hook.
+        // The accumulated figure is what is passed, so a mechanic integrating
+        // over diffMs measures real time.
+        live->tickMs += diffMs;
+        if (live->tickMs >= Scheduler::TICK_MS)
+        {
+            uint32 const elapsed = live->tickMs;
+            live->tickMs = 0;
+            ForEachMechanic(player, st,
+                            [elapsed](Ctx& ctx, AffixInstance& a) { a.impl->OnTick(ctx, elapsed); });
+        }
+
+        // Gauntlet.Events.Enable = 0 means no event is armed and none is
+        // delivered. The scheduler has no opinion about it; this is the gate.
+        if (!_eventsEnabled)
+            return;
+
+        // Design section 4.2's suppression list, filled from the live player so
+        // that Scheduler::Tick itself stays free of Player.h and testable with
+        // a fake clock. Nothing is dropped by any of these -- the same event
+        // comes out on the first tick after the flag clears.
+        Suppression sup;
+        sup.mounted      = player->IsMounted();                 // Unit.h:1887
+        sup.inFlight     = player->IsInFlight();                // Unit.h:1709
+        sup.dead         = !player->IsAlive();                  // Unit.h:1793
+        sup.inGrace      = st->graceMs != 0;
+        sup.offerPending = !st->pending.empty();
+
+        // The core's own sanctuary test (PlayerUpdates.cpp:1242) is exactly
+        // this pair. pvpInfo.IsInNoPvPArea would need no DBC lookup but is a
+        // superset -- it is also true in a friendly capital city -- and design
+        // section 4.2 says sanctuary, so the literal reading is what is used.
+        if (AreaTableEntry const* area = sAreaTableStore.LookupEntry(player->GetAreaId()))
+            sup.inSanctuary = area->IsSanctuary();              // DBCStructure.h:533
+
+        // Tick returns a copy, so a mechanic that arms or cancels from inside
+        // its own callback cannot move the list being walked.
+        for (ScheduledEvent const& ev : live->clock.Tick(diffMs, sup))
+        {
+            // A Fire can be lethal -- Falling Sky's is -- and the death path
+            // empties the queue underneath us. The batch was handed out before
+            // that happened, so it is checked here rather than assumed.
+            if (st->dead || !player->IsAlive())
+                break;
+
+            AffixInstance* inst = st->Find(ev.mechanic);
+            if (!inst || !inst->impl)
+                continue;   // a mechanic this build has no code for; a normal answer
+
+            Ctx ctx = MakeCtx(player, st, inst);
+            if (ev.kind == EventKind::Fire)
+            {
+                // The affix did something on its own clock, which is the
+                // clearest possible reading of "the last mechanic to act".
+                st->lastActor   = ev.mechanic;
+                st->lastActorMs = ACTOR_MEMORY_MS;
+                inst->impl->OnEvent(ctx, ev.id);
+            }
+            else
+            {
+                inst->impl->OnWarn(ctx, ev.id);
+            }
+        }
+    }
+
+    void Mgr::OnEnterCombat(Player* player, Unit* enemy)
+    {
+        if (!_enabled || !IsEligible(player))
+            return;
+
+        RunState* st = Get(player);
+        if (!st || st->dead)
+            return;
+
+        // wasOutOfCombat is true and not a guess. PlayerScript::OnPlayerEnterCombat
+        // is reached only from CombatManager::UpdateOwnerCombatState, which
+        // returns early unless the combat state actually changed
+        // (CombatManager.cpp:411) and sets UNIT_FLAG_IN_COMBAT at :417, four
+        // lines before the hook at :423 -- so the hook *is* the out-of-combat
+        // edge and a body-pull into a fight already under way never reaches it.
+        ForEachMechanic(player, st,
+                        [enemy](Ctx& ctx, AffixInstance& a) { a.impl->OnEnterCombat(ctx, enemy, true); });
+    }
+
+    void Mgr::OnLeaveCombat(Player* player)
+    {
+        if (!_enabled || !IsEligible(player))
+            return;
+
+        RunState* st = Get(player);
+        if (!st)
+            return;
+
+        ForEachMechanic(player, st, [](Ctx& ctx, AffixInstance& a) { a.impl->OnLeaveCombat(ctx); });
+    }
+
+    void Mgr::OnCreatureKill(Player* player, Creature* killed, bool byPet)
+    {
+        if (!_enabled || !IsEligible(player) || !killed)
+            return;
+
+        RunState* st = Get(player);
+        if (!st)
+            return;
+
+        ForEachMechanic(player, st, [killed, byPet](Ctx& ctx, AffixInstance& a)
+        {
+            if (byPet)
+                a.impl->OnPetKill(ctx, killed);
+            else
+                a.impl->OnKill(ctx, killed);
+        });
+    }
+
+    void Mgr::OnDamageTaken(Player* player, Unit* attacker, uint32 amount)
+    {
+        if (!_enabled || !IsEligible(player) || amount == 0)
+            return;
+
+        RunState* st = Get(player);
+        if (!st)
+            return;
+
+        // A creature this module put into the world is the clearest attribution
+        // there is: the Shade that killed you is named by name rather than by
+        // whatever multiplied the last blow.
+        if (Creature* creature = attacker ? attacker->ToCreature() : nullptr)
+        {
+            uint16 const mechanic = sGauntletSummons->MechanicOf(creature);
+            if (mechanic != MECHANIC_NONE)
+            {
+                st->lastActor   = mechanic;
+                st->lastActorMs = ACTOR_MEMORY_MS;
+            }
+        }
+
+        ForEachMechanic(player, st, [attacker, amount](Ctx& ctx, AffixInstance& a)
+        {
+            a.impl->OnDamageTaken(ctx, attacker, amount);
+        });
+    }
+
+    void Mgr::OnMaxHealth(Player* player, float& value)
+    {
+        if (!_enabled || !IsEligible(player) || value <= 0.0f)
+            return;
+
+        RunState* st = Get(player);
+        if (!st)
+            return;
+
+        // What arrives is the pool the stat chain built with nothing of this
+        // module in it: Player::UpdateMaxHealth rebuilds `value` from scratch on
+        // every call (StatSystem.cpp:313-324) and nothing below is ever written
+        // back into that chain, which is what stops any of this compounding.
+        float const base = value;
+
+        // Raw, not clamped: the wound below has to come off before the floor is
+        // applied, or the two clamps compound into 0.36 x base.
+        value *= RawProduct(player, AggregateKind::MaxHealth, nullptr, nullptr);
+
+        ForEachMechanic(player, st,
+                        [&value](Ctx& ctx, AffixInstance& a) { a.impl->OnMaxHealth(ctx, value); });
+
+        // Plan section 2.5's floor, applied once over the finished number and
+        // never per mechanic. Deep Wounds caps its own wound at 40% of the pool
+        // for the same reason -- the two are one rule seen from either end --
+        // so this only bites when an aggregate and a wound stack.
+        float const minimum = base * _caps.maxHealthMin;
+        if (value < minimum)
+            value = minimum;
+
+        // SetMaxHealth reads zero as one anyway (Unit.cpp:12410) and a pool of
+        // zero divides by zero in every health percentage in the core.
+        if (value < 1.0f)
+            value = 1.0f;
+    }
+
+    void Mgr::OnGiveXP(Player* player, uint32& amount, Unit* victim)
+    {
+        if (!_enabled || !IsEligible(player) || amount == 0)
+            return;
+
+        // The mechanics first: Champions doubles a Champion's experience and the
+        // Shade's Vindication pays 25% on everything for five minutes, and both
+        // are rewards the affix promised.
+        ForEachMechanic(player, Get(player), [&amount, victim](Ctx& ctx, AffixInstance& a)
+        {
+            a.impl->OnXP(ctx, amount, victim);
+        });
+
+        // Then the summon rate. A creature this module spawned on demand is not
+        // a source of experience: without this, an affix that summons is an
+        // affix that can be farmed. CONTRACT-P1 section 5.3.
+        if (Creature* creature = victim ? victim->ToCreature() : nullptr)
+            if (sGauntletSummons->IsGauntletSummon(creature))
+                amount = static_cast<uint32>(static_cast<float>(amount) * _summonXpRate);
+
+        // And last the aggregate, which is where a migrated Forgetful lives.
+        amount = static_cast<uint32>(static_cast<float>(amount) * Aggregate(player, AggregateKind::Experience));
+    }
+
+    void Mgr::OnLootMoney(Player* player, Loot* loot)
+    {
+        if (!_enabled || !IsEligible(player) || !loot)
+            return;
+
+        RunState* st = Get(player);
+        if (!st)
+            return;
+
+        // OnPlayerBeforeLootMoney carries no loot guid, so the empty one is
+        // passed and the mechanic falls back to Loot::sourceWorldObjectGUID,
+        // which Creature::AddToWorld stamps on (Creature.cpp:331).
+        ForEachMechanic(player, st, [loot](Ctx& ctx, AffixInstance& a)
+        {
+            a.impl->OnLoot(ctx, ObjectGuid::Empty, loot);
+        });
+    }
+
+    void Mgr::OpenGrace(Player* player)
+    {
+        if (RunState* st = Get(player))
+            st->graceMs = _graceMs;
+    }
+
+    void Mgr::OnZoneChanged(Player* player)
+    {
+        OpenGrace(player);
+
+        // CONTRACT-P1 section 2.4: a summon despawns on logout, on death, on a
+        // zone change and on the leash. AllMapScript::OnPlayerLeaveAll covers
+        // every move between maps; this is the one that covers a move inside
+        // one, and it is why a Shade cannot follow its owner across a zone
+        // line. That is the card's own counterplay -- leaving it behind -- read
+        // at its strongest.
+        sGauntletSummons->DespawnAll(player);
+    }
+
+    void Mgr::NoteActor(Player* player, uint16 mechanic)
+    {
+        if (mechanic == MECHANIC_NONE)
+            return;
+
+        if (RunState* st = Get(player))
+        {
+            st->lastActor   = mechanic;
+            st->lastActorMs = ACTOR_MEMORY_MS;
+        }
+    }
+
+    void Mgr::ReportKilledBy(Player* player)
+    {
+        RunState* st = Get(player);
+        if (!st || st->lastActor == MECHANIC_NONE || !player->GetSession())
+            return;
+
+        MechanicDef const* def = FindMechanic(st->lastActor);
+        std::string const name = def ? std::string(def->name)
+                                     : ("#" + std::to_string(static_cast<uint32>(st->lastActor)));
+
+        sGauntletAddon->SendKilledBy(player, st->lastActor, name);
+
+        // Design section 4.8's fourth question -- does the player know which
+        // affix acted when they die -- cannot be answered with "install the
+        // addon", so the same fact goes out as a chat line.
+        ChatHandler(player->GetSession()).PSendSysMessage(
+            "|cffff2020[Gauntlet]|r The last affix to act on you was |cffffff00{}|r.", name);
+    }
+
+    void Mgr::OnDied(Player* player)
+    {
+        RunState* st = Get(player);
+        if (!st)
+            return;
+
+        ReportKilledBy(player);
+
+        // Nothing keeps running past a death. The queue is emptied rather than
+        // suppressed because the run is either over or about to be, and
+        // Scheduler::CancelAll deliberately leaves the spacing clock alone so a
+        // player raised inside the death window gets no free burst.
+        if (Scheduler* sched = ClockFor(player))
+            sched->CancelAll();
+
+        // CONTRACT-P1 section 2.4's second despawn path.
+        sGauntletSummons->DespawnAll(player);
+
+        st->state.SaveTo(player->GetGUID().GetCounter());
+    }
+
+    void Mgr::SyncTimedAffixCount(Player* player)
+    {
+        RunState*  st    = Get(player);
+        Scheduler* sched = ClockFor(player);
+        if (!st || !sched)
+            return;
+
+        // Design section 4.2 counts *timed affixes carried*, not affixes: the
+        // budget stretches the intervals of things that keep a clock, and an
+        // affix with no implementation in this build keeps none.
+        uint32 timed = 0;
+        for (AffixInstance const& a : st->affixes)
+        {
+            if (!a.impl)
+                continue;
+            if (MechanicDef const* def = FindMechanic(a.mechanic))
+                if (def->flags & MF_Timed)
+                    ++timed;
+        }
+
+        sched->SetTimedAffixCount(timed);
     }
 
     // =====================================================================

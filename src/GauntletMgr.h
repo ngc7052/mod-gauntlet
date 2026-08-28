@@ -8,6 +8,8 @@
 
 #include "Gauntlet.h"
 #include "GauntletAggregate.h"
+#include "GauntletMechanic.h"
+#include "GauntletScheduler.h"
 #include "DatabaseEnv.h"
 #include "Player.h"
 #include <string>
@@ -39,6 +41,63 @@ namespace Gauntlet
 
         RunState* Get(Player* player);
 
+        // The Scheduler for a loaded run. It is not a member of RunState
+        // because GauntletScheduler.h includes Gauntlet.h and a header cannot
+        // include something that includes it back; see the note beside
+        // RunState::state. Null for a player with no loaded run, which every
+        // caller already has to handle because Ctx::clock is documented as
+        // possibly null.
+        Scheduler* ClockFor(Player* player);
+
+        // The one way a Ctx is built. Every dispatch site goes through it, so a
+        // mechanic can never be handed a context with half its members filled
+        // in -- which is the failure Phase 0 shipped, where clock and state
+        // were null everywhere by construction.
+        Ctx MakeCtx(Player* player, RunState* run, AffixInstance* self);
+
+        // ------------------------------------------------------------------
+        // The hook fan-outs. GauntletScripts.cpp owns the adapters -- plan
+        // section 2.6 leaves it nothing else -- and the loops over the carried
+        // set live here, beside the map they walk.
+        // ------------------------------------------------------------------
+
+        // One player's world tick: the grace countdown, the actor's memory, the
+        // periodic state write, IMechanic::OnTick on the 500 ms cadence, and
+        // the scheduler with a filled Suppression.
+        void Tick(Player* player, uint32 diffMs);
+
+        void OnEnterCombat(Player* player, Unit* enemy);
+        void OnLeaveCombat(Player* player);
+        void OnCreatureKill(Player* player, Creature* killed, bool byPet);
+        void OnDamageTaken(Player* player, Unit* attacker, uint32 amount);
+        void OnMaxHealth(Player* player, float& value);
+        void OnGiveXP(Player* player, uint32& amount, Unit* victim);
+        void OnLootMoney(Player* player, Loot* loot);
+
+        // Login and a zone change both re-open the grace window; a zone change
+        // also takes every summon out of the world, which CONTRACT-P1 section
+        // 2.4 requires and which nothing else covers for a move inside one map.
+        void OpenGrace(Player* player);
+        void OnZoneChanged(Player* player);
+
+        // Death, whether or not the realm is hardcore: KILLBY goes out, the
+        // queue is emptied, every summon is despawned and the state store is
+        // written. The hardcore timer is armed separately.
+        void OnDied(Player* player);
+
+        // Which affix last acted on this character. Set by the dispatchers
+        // themselves -- a scheduler Fire, a summon's blow, a DamageTakenMult
+        // that came back above 1.0 -- because a mechanic has no way to say so.
+        void NoteActor(Player* player, uint16 mechanic);
+
+        // Design section 4.8's fourth question, answered on death: KILLBY on
+        // the addon channel and one chat line for the player without it.
+        void ReportKilledBy(Player* player);
+
+        // Design section 4.2's event budget: how many carried affixes are
+        // MF_Timed. Called whenever the carried set changes.
+        void SyncTimedAffixCount(Player* player);
+
         void OfferTier(Player* player, uint32 tier);
         bool Pick(Player* player, uint32 index);
         void EndRun(Player* player, std::string const& cause);
@@ -53,6 +112,13 @@ namespace Gauntlet
         // The conditions are evaluated here, against the live player, and
         // handed to the Player-free maths in GauntletAggregate.h.
         float Aggregate(Player* player, AggregateKind kind) const;
+
+        // The same product at a damage or heal site, where the other unit is
+        // known. The three IMechanic::*Mult callbacks are folded in *before*
+        // plan section 2.5's clamp rather than on top of it: Champions' +25% is
+        // one of them, and applied after the clamp it would sail straight past
+        // the 2.0x ceiling on damage taken.
+        float AggregateAt(Player* player, AggregateKind kind, Unit* other, SpellInfo const* spellInfo);
 
         // The death sequence (plan section 6, decision 5). Dying arms a timer
         // instead of ending the run outright, so a Phase 3 bargain charge has
@@ -96,7 +162,34 @@ namespace Gauntlet
         // Fills every slot of AggregateInput::conditionActive for `player`.
         void FillConditions(Player* player, AggregateInput& in) const;
 
+        // The aggregate product with the Mult hooks folded in and nothing
+        // clamped. AggregateAt clamps it; OnMaxHealth deliberately does not,
+        // because it has a wound to subtract first and section 2.5's floor
+        // must be applied once, over the finished number.
+        float RawProduct(Player* player, AggregateKind kind, Unit* other, SpellInfo const* spellInfo);
+
+        // Dispatches one callback to every carried affix that has an
+        // implementation. The Ctx is rebuilt per affix because `self` differs.
+        template <typename Fn>
+        void ForEachMechanic(Player* player, RunState* run, Fn&& fn);
+
+        // Everything per-player that cannot live on RunState. Scheduler is the
+        // reason this exists at all -- GauntletScheduler.h includes Gauntlet.h,
+        // so RunState cannot hold one -- and the two accumulators keep it
+        // company because they are the same kind of thing: session scheduling,
+        // not anything a run is made of. Created by Load, erased by Forget, so
+        // its lifetime is exactly the run's.
+        struct Live
+        {
+            Scheduler clock;
+            uint32    tickMs      = 0;   // up to Scheduler::TICK_MS, in front of OnTick
+            uint32    stateSaveMs = 0;   // up to STATE_SAVE_MS, in front of State::SaveTo
+        };
+
+        Live* LiveFor(Player* player);
+
         std::unordered_map<ObjectGuid, RunState> _runs;
+        std::unordered_map<ObjectGuid, Live>     _live;
         AggregateCaps _caps;
         bool   _enabled  = true;
         bool   _hardcore = true;
@@ -105,6 +198,25 @@ namespace Gauntlet
         bool   _announce = true;
         bool   _playersOnly = true;
         uint32 _graceMs  = 60000;
+
+        // The hardcore death window. It reads Gauntlet.Grace.Seconds like
+        // _graceMs does, because plan section 6 decision 5 names the same sixty
+        // seconds and there is no key of its own -- but it is a separate field
+        // on purpose. Phase 1 gives that key its documented consumer, the event
+        // grace window, and a later tuning pass that shortens the grace must not
+        // silently shorten the window a hardcore character has to be saved in.
+        uint32 _deathWindowMs = 60000;   // TODO(design)
+
+        // Gauntlet.Events.*. MinSpacing is configured in seconds and the
+        // scheduler takes milliseconds; the conversion is in LoadConfig and
+        // nowhere else.
+        bool   _eventsEnabled = true;
+        uint32 _minSpacingMs  = Scheduler::DEFAULT_MIN_SPACING_MS;
+        float  _budgetStep    = Scheduler::DEFAULT_BUDGET_STEP;
+
+        // Gauntlet.Summons.XpRate: what a kill on a creature this module put
+        // into the world is worth.
+        float  _summonXpRate  = 0.5f;
 
         // How many loaded runs are counting down. OnPlayerUpdate runs for
         // every player on every tick, so the common case has to be an integer
