@@ -149,6 +149,33 @@ namespace Gauntlet
         // already checked the instance's condition, and clamps the product.
         virtual float AggregateFactor(AffixInstance const& /*self*/, AggregateKind /*kind*/) const { return 1.f; }
 
+        // The one way a mechanic may move a cap, and the reason it exists is
+        // that two Phase 3 rows promise a number the clamp would quietly eat.
+        // Cursed Hoard's curse is a triple, and Gauntlet.Caps.DamageTaken is
+        // 2.0; Lone Wolf halves your health while you are in a group, and
+        // Gauntlet.Caps.MaxHealth floors at 0.6. Delivering -40% behind a blurb
+        // that says half is the same lie as an unfelt scalar, which is what
+        // this whole redesign exists to remove.
+        //
+        // What this is NOT: a bypass. The relaxation moves the ceiling and the
+        // product is still clamped exactly once, so a bargain curse and three
+        // ordinary affixes reach the new bound together rather than each being
+        // paid out on top of it. Nothing is ever applied after the clamp.
+        //
+        // Called once per carried affix per query, after the same condition
+        // gate the factors get, with `caps` starting at the configured values.
+        // A mechanic may only widen: narrowing here would let one affix trim
+        // another's contribution, which is precisely what clamping the product
+        // rather than the contribution was chosen to avoid. It must also be
+        // *state-dependent* -- Cursed Hoard relaxes only while the curse is up,
+        // Lone Wolf only while the player is grouped -- so the ceiling returns
+        // on its own the moment the mechanic stops needing it.
+        //
+        // AggregateTest.OnlyThePhaseThreeBargainsMoveACap is what keeps this
+        // from becoming the place everything goes to escape its budget.
+        virtual void RelaxCaps(AffixInstance const& /*self*/, AggregateKind /*kind*/,
+                               AggregateCaps& /*caps*/) const {}
+
         virtual std::string Describe(AffixInstance const& self) const = 0;
 
         // One line of internals for `.gauntlet debug dump`, and empty by

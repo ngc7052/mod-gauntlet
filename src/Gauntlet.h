@@ -238,6 +238,17 @@ namespace Gauntlet
         // Save, so a logout does not rewrite a row nothing touched.
         bool   dirty = false;
 
+        // Raised for the duration of a self-damage the module applies to its
+        // own player -- Blood Magic's health cost is the only one -- so the
+        // rest of the module can tell it apart from a blow the world landed.
+        // It cannot be told apart any other way: the attacker is the player in
+        // both cases.
+        //
+        // While it is up: no Deep Wound is made of it, no Last Rites charge is
+        // spent on it, and nothing on the kill path counts it. Set and cleared
+        // around the one DealDamage call, never held across a tick.
+        bool   selfDamage = false;
+
         // Plan section 3.3's per-mechanic key/value store: Champions' fight
         // counter, the Shade's nemesis rank, Deep Wounds' wound. Loaded once on
         // login -- before OnAttach, because a Shade that reads shade.rank out of

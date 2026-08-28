@@ -1115,6 +1115,34 @@ namespace Gauntlet
         return Gauntlet::Aggregate(it->second.affixes, in, _caps);
     }
 
+    AggregateCaps Mgr::EffectiveCaps(Player* player, AggregateKind kind) const
+    {
+        AggregateCaps caps = _caps;
+
+        if (!_enabled || !IsEligible(player))
+            return caps;
+
+        auto it = _runs.find(player->GetGUID());
+        if (it == _runs.end())
+            return caps;
+
+        AggregateInput in;
+        in.kind = kind;
+        FillConditions(player, in);
+
+        for (AffixInstance const& a : it->second.affixes)
+        {
+            if (!a.impl || a.condition >= Condition::MAX)
+                continue;
+            if (!in.conditionActive[static_cast<std::size_t>(a.condition)])
+                continue;
+
+            a.impl->RelaxCaps(a, kind, caps);
+        }
+
+        return caps;
+    }
+
     float Mgr::RawProduct(Player* player, AggregateKind kind, Unit* other, SpellInfo const* spellInfo)
     {
         if (!_enabled || !IsEligible(player))
@@ -1178,7 +1206,8 @@ namespace Gauntlet
 
     float Mgr::AggregateAt(Player* player, AggregateKind kind, Unit* other, SpellInfo const* spellInfo)
     {
-        return ClampToCaps(RawProduct(player, kind, other, spellInfo), kind, _caps);
+        return ClampToCaps(RawProduct(player, kind, other, spellInfo), kind,
+                           EffectiveCaps(player, kind));
     }
 
     // =====================================================================
@@ -1357,6 +1386,79 @@ namespace Gauntlet
         });
     }
 
+    uint32 Mgr::OnLethal(Player* player, uint32 damage)
+    {
+        // The hottest guard in the module: this runs inside Unit::DealDamage
+        // for every blow landed on every player on the realm, so the cheap
+        // integer test comes before the map lookup and before IsEligible.
+        if (damage == 0 || !_enabled)
+            return damage;
+
+        if (!player->IsAlive() || damage < player->GetHealth())
+            return damage;
+
+        if (!IsEligible(player))
+            return damage;
+
+        RunState* st = Get(player);
+        if (!st)
+            return damage;
+
+        // Self-inflicted damage the module applied itself is not a death a
+        // bargain gets to buy back. Blood Magic pays health to cast; a charge
+        // spent on its own spell cost would be absurd, and it floors at 1
+        // health anyway so it can never arrive here in the first place unless
+        // something else has changed.
+        if (st->selfDamage)
+            return damage;
+
+        // Every carried mechanic gets to reduce, in carried order, and the
+        // damage only ever falls: a mechanic may not raise a blow it was
+        // handed, which keeps this from becoming a second damage-multiplier
+        // path outside the aggregate's clamp.
+        ForEachMechanic(player, st, [&damage](Ctx& ctx, AffixInstance& a)
+        {
+            uint32 const out = a.impl->OnLethal(ctx, damage);
+            if (out < damage)
+                damage = out;
+        });
+
+        return damage;
+    }
+
+    void Mgr::OnSpellCast(Player* player, Spell* spell)
+    {
+        if (!_enabled || !spell || !IsEligible(player))
+            return;
+
+        RunState* st = Get(player);
+        if (!st)
+            return;
+
+        ForEachMechanic(player, st, [spell](Ctx& ctx, AffixInstance& a)
+        {
+            a.impl->OnSpellCast(ctx, spell);
+        });
+    }
+
+    // Joining or leaving a group is a stat change for exactly one mechanic --
+    // Lone Wolf halves the pool while you are in one -- and Player::
+    // UpdateMaxHealth is the only thing that fires OnPlayerAfterUpdateMaxHealth,
+    // which the core calls on level and stamina changes and on nothing else.
+    // Without this the penalty would appear at the player's next level-up and
+    // the affix would look broken, which is the exact fault that cost most of
+    // an evening in Phase 2.
+    void Mgr::OnGroupChanged(Player* player)
+    {
+        if (!_enabled || !IsEligible(player))
+            return;
+
+        if (!Get(player))
+            return;
+
+        RefreshStats(player);
+    }
+
     void Mgr::OnDamageTaken(Player* player, Unit* attacker, uint32 amount)
     {
         if (!_enabled || !IsEligible(player) || amount == 0)
@@ -1404,7 +1506,10 @@ namespace Gauntlet
         // never per mechanic. Deep Wounds caps its own wound at 40% of the pool
         // for the same reason -- the two are one rule seen from either end --
         // so this only bites when an aggregate and a wound stack.
-        float const minimum = base * _caps.maxHealthMin;
+        // EffectiveCaps and not _caps: Lone Wolf's grouped half is -50% against
+        // a floor of 0.6, and a floor that ate it would deliver -40% behind a
+        // blurb that says half.
+        float const minimum = base * EffectiveCaps(player, AggregateKind::MaxHealth).maxHealthMin;
         if (value < minimum)
             value = minimum;
 

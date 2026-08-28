@@ -9,6 +9,7 @@
 #include "GauntletSummons.h"
 #include "Chat.h"
 #include "Creature.h"
+#include "Group.h"
 #include "LootMgr.h"
 #include "ObjectAccessor.h"
 #include "Player.h"
@@ -271,6 +272,18 @@ public:
     // The experience path: IMechanic::OnXP over the carried set, then
     // Gauntlet.Summons.XpRate for a kill on a creature this module spawned,
     // then the Experience aggregate. Mgr::OnGiveXP is the order.
+    // Blood Magic's only hook. It fires once per cast that gets as far as
+    // being cast (PlayerScript.h:331), which is where a cost is paid; the
+    // mechanic reads the spell's own power cost to decide whether this was a
+    // spell at all, so a wand swing and an auto-attack cost nothing.
+    void OnPlayerSpellCast(Player* player, Spell* spell, bool /*skipCheck*/) override
+    {
+        if (!sGauntlet->Enabled() || !sGauntlet->IsEligible(player))
+            return;
+
+        sGauntlet->OnSpellCast(player, spell);
+    }
+
     void OnPlayerGiveXP(Player* player, uint32& amount, Unit* victim, uint8 /*source*/) override
     {
         sGauntlet->OnGiveXP(player, amount, victim);
@@ -391,8 +404,25 @@ public:
     // the multipliers have already been applied above.
     uint32 DealDamage(Unit* attacker, Unit* victim, uint32 damage, DamageEffectType /*type*/) override
     {
-        if (Player* p = victim ? victim->ToPlayer() : nullptr)
-            sGauntlet->OnDamageTaken(p, attacker, damage);
+        Player* p = victim ? victim->ToPlayer() : nullptr;
+        if (!p)
+            return damage;
+
+        // The cheat-death clamp comes first, and the observer sees what is
+        // left. Unit::DealDamage takes this return value straight back
+        // ($CORE/src/server/game/Entities/Unit/Unit.cpp:984) and ScriptMgr
+        // chains every registered script's answer
+        // (ScriptDefines/UnitScript.cpp:52-64), so a blow reduced here really
+        // is the blow that lands.
+        //
+        // Order matters and this is the whole reason it does: Deep Wounds
+        // wounds off the damage taken, and if it observed the pre-clamp figure
+        // a Last Rites save would hand it a wound made out of overkill that
+        // never happened -- turning the affix that saved the run into the one
+        // that ends it.
+        damage = sGauntlet->OnLethal(p, damage);
+
+        sGauntlet->OnDamageTaken(p, attacker, damage);
         return damage;
     }
 
@@ -445,6 +475,59 @@ public:
 // path is a specific event this module happens to hook, and this one is the
 // core telling us the player has left the map the creature is standing on.
 // Map::RemovePlayerFromMap fires it for all of them.
+// Group membership, for the one affix that cares. The module had no
+// GroupScript at all before Phase 3.
+//
+// Why observation and not a veto: OnPlayerCanGroupInvite is the *inviter's*
+// hook (PlayerScript.h:506) and never sees the player being invited, so even
+// the card's original "you cannot join a group" could not have been written as
+// a refusal on the joining side. What the core does offer is the fact of
+// membership after it changes, which is exactly what a live, reversible
+// penalty needs.
+//
+// All three hooks do the same thing, because all three change the answer to
+// "am I in a group": OnAddMember and OnRemoveMember for a join and a leave
+// (GroupScript.h:48, :54), and OnDisband for the case nothing else covers --
+// the last member leaving takes the group with it and no OnRemoveMember is
+// sent for the player left holding it.
+class GauntletGroupScript : public GroupScript
+{
+public:
+    GauntletGroupScript() : GroupScript("GauntletGroupScript", { GROUPHOOK_ON_ADD_MEMBER,
+                                                                GROUPHOOK_ON_REMOVE_MEMBER,
+                                                                GROUPHOOK_ON_DISBAND }) { }
+
+    void OnAddMember(Group* /*group*/, ObjectGuid guid) override { Touch(guid); }
+
+    void OnRemoveMember(Group* /*group*/, ObjectGuid guid, RemoveMethod /*method*/,
+                        ObjectGuid /*kicker*/, char const* /*reason*/) override
+    {
+        Touch(guid);
+    }
+
+    // Every member at once, and the group is still whole when this fires, so
+    // the members are still reachable through it.
+    void OnDisband(Group* group) override
+    {
+        if (!group)
+            return;
+
+        for (GroupReference* ref = group->GetFirstMember(); ref; ref = ref->next())
+            if (Player* member = ref->GetSource())
+                sGauntlet->OnGroupChanged(member);
+    }
+
+private:
+    // Offline members are not a problem to solve here: the penalty is read off
+    // the live group at the next UpdateMaxHealth, and logging in runs the whole
+    // stat chain anyway.
+    static void Touch(ObjectGuid guid)
+    {
+        if (Player* player = ObjectAccessor::FindPlayer(guid))
+            sGauntlet->OnGroupChanged(player);
+    }
+};
+
 class GauntletMapScript : public AllMapScript
 {
 public:
@@ -550,6 +633,7 @@ void Addmod_gauntletScripts()
     new GauntletUnitScript();
     new GauntletMapScript();
     new GauntletGlobalScript();
+    new GauntletGroupScript();
     AddSC_gauntlet_commands();
     AddSC_gauntlet_summons();
     AnchorMechanics();

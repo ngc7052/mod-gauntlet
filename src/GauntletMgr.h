@@ -70,6 +70,19 @@ namespace Gauntlet
         void OnLeaveCombat(Player* player);
         void OnCreatureKill(Player* player, Creature* killed, bool byPet);
         void OnDamageTaken(Player* player, Unit* attacker, uint32 amount);
+
+        // The cheat-death path, dispatched from UnitScript::DealDamage before
+        // the health is applied. Returns the damage the blow should actually
+        // do; a mechanic may only lower it, never raise it. Called only when
+        // the blow would otherwise be fatal, so the ordinary case costs one
+        // integer comparison.
+        uint32 OnLethal(Player* player, uint32 damage);
+
+        void OnSpellCast(Player* player, Spell* spell);
+
+        // Group membership changed. Re-runs the stat chain, because nothing
+        // else will.
+        void OnGroupChanged(Player* player);
         void OnMaxHealth(Player* player, float& value);
         void OnGiveXP(Player* player, uint32& amount, Unit* victim);
         void OnLootMoney(Player* player, Loot* loot);
@@ -203,6 +216,18 @@ namespace Gauntlet
         // because it has a wound to subtract first and section 2.5's floor
         // must be applied once, over the finished number.
         float RawProduct(Player* player, AggregateKind kind, Unit* other, SpellInfo const* spellInfo);
+
+        // The configured caps with every carried affix given its one chance to
+        // widen one, per IMechanic::RelaxCaps. Two Phase 3 rows need it and
+        // nothing else may: Cursed Hoard's curse is a genuine triple against a
+        // 2.0x ceiling, and Lone Wolf halves your health against a 0.6 floor.
+        //
+        // It is evaluated per query rather than cached because both are
+        // state-dependent by design -- the curse lifts after three kills, the
+        // health returns the moment you leave the group -- so a cached ceiling
+        // would outlive the thing that asked for it. The cost is one virtual
+        // call per carried affix on a path that already makes three.
+        AggregateCaps EffectiveCaps(Player* player, AggregateKind kind) const;
 
         // Dispatches one callback to every carried affix that has an
         // implementation. The Ctx is rebuilt per affix because `self` differs.
