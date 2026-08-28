@@ -473,7 +473,12 @@ namespace
         if (def.boon != Boon::None || !(def.flags & MF_Scalar))
             return def.boon;
 
-        return static_cast<Boon>(RollIn(state, 1, static_cast<uint32>(Boon::MAX) - 1));
+        // LastRolledBoon, not Boon::MAX: the enum grew in Phase 1 with values a
+        // mechanic names for itself -- a cooldown reduction, a second life -- and
+        // none of them has a magnitude table, an aggregate kind or an
+        // implementation. Rolling one onto a Scalar would name an affix for an
+        // upside it does not have.
+        return static_cast<Boon>(RollIn(state, 1, static_cast<uint32>(LastRolledBoon)));
     }
 
     Offer MakeOffer(uint64& state, MechanicDef const& def, SlotContext const& ctx, OfferKind kind)

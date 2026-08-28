@@ -36,7 +36,7 @@ namespace
 
 TEST(HarnessSmoke, CommittedConstants)
 {
-    EXPECT_EQ(Gauntlet::GeneratorVersion, 2);
+    EXPECT_EQ(Gauntlet::GeneratorVersion, 3);
     EXPECT_EQ(Gauntlet::MECHANIC_WITHERING, 72);
     EXPECT_EQ(Gauntlet::MECHANIC_FORGETFUL, 73);
     EXPECT_EQ(Gauntlet::MAX_RANK, 3);
