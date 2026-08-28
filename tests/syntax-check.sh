@@ -20,6 +20,9 @@ CORE_HEADER_PATTERN='#include[[:space:]]*"(Player\.h|ScriptMgr\.h|Chat\.h|Databa
 
 fail=0
 checked=0
+objs=()
+OBJDIR="$ROOT/build/syntax-check"
+mkdir -p "$OBJDIR"
 
 for src in $(find "$ROOT/src" -name "*.cpp" | sort); do
   [ -e "$src" ] || continue
@@ -31,15 +34,33 @@ for src in $(find "$ROOT/src" -name "*.cpp" | sort); do
   fi
 
   checked=$((checked + 1))
-  cmd=(g++ -std=c++2a -fsyntax-only -I "$ROOT/src" -I "$CORE/src/common" "$src")
+  obj="$OBJDIR/${name%.cpp}.o"
+  cmd=(g++ -std=c++2a -I "$ROOT/src" -I "$CORE/src/common" -c "$src" -o "$obj")
   if "${cmd[@]}"; then
     echo "PASS  $name"
+    objs+=("$obj")
   else
     echo "FAIL  $name"
     echo "      command: ${cmd[*]}"
     fail=1
   fi
 done
+
+# Compiling each file alone cannot see a symbol defined twice. That matters
+# right now: the legacy generator lives in both GauntletAffix.cpp and
+# GauntletLegacy.cpp until the switchover deletes the first, and a duplicate
+# definition would only surface when the core linked the module. So link the
+# lot together against a trivial main.
+if [ "$fail" -eq 0 ] && [ "${#objs[@]}" -gt 0 ]; then
+  printf 'int main() { return 0; }\n' > "$OBJDIR/link_probe.cpp"
+  if g++ -std=c++2a -c "$OBJDIR/link_probe.cpp" -o "$OBJDIR/link_probe.o" &&
+     g++ "$OBJDIR/link_probe.o" "${objs[@]}" -o "$OBJDIR/link_probe"; then
+    echo "PASS  link (${#objs[@]} objects, no duplicate or missing symbols)"
+  else
+    echo "FAIL  link"
+    fail=1
+  fi
+fi
 
 if [ "$checked" -eq 0 ]; then
   echo "No Player-free source files found under src/."
