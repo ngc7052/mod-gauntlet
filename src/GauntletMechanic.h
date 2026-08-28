@@ -147,19 +147,41 @@ namespace Gauntlet
         MechanicRegistrar(uint16 id, MechanicFactoryFn fn);
     };
 
+// Each macro also defines an empty global anchor, and this is not decoration.
+// The module's objects are archived into libmodules.a and linked plainly
+// (modules/CMakeLists.txt:286, src/server/apps/CMakeLists.txt:137), and a
+// static-archive member is pulled in only to resolve an undefined symbol. A
+// translation unit that nothing references is therefore dropped, its
+// .init_array never runs, and the registrar below never executes -- so
+// MakeMechanic returns nullptr for a mechanic whose code is right there in the
+// tree. Because nullptr is a legitimate answer, the affix would simply be
+// offered and do nothing, with no error anywhere.
+//
+// The anchor is defined in whatever namespace the macro is invoked in, which
+// is `namespace Gauntlet` for every mechanic in the tree, so that is where
+// GauntletScripts.cpp declares them.
+//
+// GauntletScripts.cpp calls every anchor from AnchorMechanics(). That is one
+// line per mechanic in a shared file, which is exactly what self-registration
+// was meant to avoid, but the alternative is forcing whole-archive on the
+// `modules` target, and that is a change to the core rather than to this
+// module. Measured both ways: plain archive registers 0 of 4, --whole-archive
+// registers 4 of 4.
 #define GAUNTLET_MECHANIC(id, Type)                                                \
     namespace                                                                      \
     {                                                                              \
         ::Gauntlet::IMechanic* Make##Type() { return new Type(); }                  \
         ::Gauntlet::MechanicRegistrar const g_register##Type{ (id), &Make##Type };  \
-    }
+    }                                                                              \
+    void AddSC_gauntlet_mechanic_##Type() {}
 
 // The same, for a file that already has its own factory function.
 #define GAUNTLET_MECHANIC_FN(id, fn)                                               \
     namespace                                                                      \
     {                                                                              \
         ::Gauntlet::MechanicRegistrar const g_register_##fn{ (id), &fn };           \
-    }
+    }                                                                              \
+    void AddSC_gauntlet_mechanic_##fn() {}
 }
 
 #endif // MOD_GAUNTLET_MECHANIC_H

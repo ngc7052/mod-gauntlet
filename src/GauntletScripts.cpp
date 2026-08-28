@@ -298,10 +298,36 @@ public:
     }
 };
 
+// Static-archive anchors. The module is archived into libmodules.a and linked
+// plainly, so a translation unit nothing references is dropped and the
+// GAUNTLET_MECHANIC registrar inside it never runs -- leaving MakeMechanic to
+// answer nullptr for a mechanic whose source is right there, and the affix to
+// be offered and do nothing. Measured: plain archive registers 0 of 4 mechanics,
+// --whole-archive registers 4 of 4. Every macro defines one of these; every one
+// has to be named here. See the comment on GAUNTLET_MECHANIC.
+// Declared in namespace Gauntlet because that is where each mechanic file
+// invokes the macro, and the macro defines the anchor wherever it is invoked.
+namespace Gauntlet
+{
+    void AddSC_gauntlet_mechanic_MakeExposed();
+    void AddSC_gauntlet_mechanic_MakeFeeble();
+    void AddSC_gauntlet_mechanic_MakeWithering();
+    void AddSC_gauntlet_mechanic_MakeForgetful();
+}
+
+static void AnchorMechanics()
+{
+    AddSC_gauntlet_mechanic_MakeExposed();
+    AddSC_gauntlet_mechanic_MakeFeeble();
+    AddSC_gauntlet_mechanic_MakeWithering();
+    AddSC_gauntlet_mechanic_MakeForgetful();
+}
+
 void Addmod_gauntletScripts()
 {
     new GauntletWorldScript();
     new GauntletPlayerScript();
     new GauntletUnitScript();
     AddSC_gauntlet_commands();
+    AnchorMechanics();
 }
