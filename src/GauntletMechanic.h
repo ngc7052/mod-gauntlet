@@ -40,6 +40,11 @@ namespace Gauntlet
     class Addon;
     class State;
 
+    // What a Rules affix may refuse. Named actions rather than a bitmask
+    // because the mechanic answers one question at a time and the caller
+    // always knows which one it is asking.
+    enum class Restricted : uint8 { Trade, Mail, AuctionBid };
+
     // Passed to every callback.
     //
     // Deviation from plan section 2.2, which declares run/self/clock/addon/state
@@ -138,6 +143,22 @@ namespace Gauntlet
         virtual void  OnMaxHealth(Ctx&, float& /*value*/) {}
         virtual void  OnXP(Ctx&, uint32& /*amount*/, Unit* /*victim*/) {}
         virtual void  OnTalentPoints(Ctx&, uint32& /*points*/) {}
+
+        // The repair bill's discount modifier, straight off
+        // OnPlayerBeforeDurabilityRepair. Multiply to make it dearer.
+        virtual void  OnRepair(Ctx&, float& /*discountMod*/) {}
+
+        // The economy vetoes, as one callback rather than three near-identical
+        // ones. Self-found is the only mechanic that refuses anything, and it
+        // refuses three things with the same sentence and a different noun; a
+        // virtual apiece would have been three copies of one function.
+        //
+        // Returning false stops the action. The mechanic that refuses owes the
+        // player a line saying which affix did it and why -- a veto with no
+        // explanation is indistinguishable from a bug, and the player has no
+        // other way to find out, because the core's own refusal for these is
+        // silent or generic.
+        virtual bool  Allows(Ctx&, Restricted) { return true; }
 
         virtual bool  IsRelevant(Player*) const { return true; }   // beyond the classMask
 

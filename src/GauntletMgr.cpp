@@ -1459,6 +1459,40 @@ namespace Gauntlet
         RefreshStats(player);
     }
 
+    void Mgr::OnRepair(Player* player, float& discountMod)
+    {
+        if (!_enabled || !IsEligible(player))
+            return;
+
+        RunState* st = Get(player);
+        if (!st)
+            return;
+
+        ForEachMechanic(player, st, [&discountMod](Ctx& ctx, AffixInstance& a)
+        {
+            a.impl->OnRepair(ctx, discountMod);
+        });
+    }
+
+    bool Mgr::Allows(Player* player, Restricted what)
+    {
+        if (!_enabled || !IsEligible(player))
+            return true;
+
+        RunState* st = Get(player);
+        if (!st)
+            return true;
+
+        bool allowed = true;
+        ForEachMechanic(player, st, [&allowed, what](Ctx& ctx, AffixInstance& a)
+        {
+            if (allowed && !a.impl->Allows(ctx, what))
+                allowed = false;
+        });
+
+        return allowed;
+    }
+
     void Mgr::OnDamageTaken(Player* player, Unit* attacker, uint32 amount)
     {
         if (!_enabled || !IsEligible(player) || amount == 0)

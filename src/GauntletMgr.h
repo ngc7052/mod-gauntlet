@@ -83,6 +83,13 @@ namespace Gauntlet
         // Group membership changed. Re-runs the stat chain, because nothing
         // else will.
         void OnGroupChanged(Player* player);
+
+        // The repair bill and the three economy vetoes. Allows() answers false
+        // the moment any carried mechanic refuses; it does not keep asking,
+        // because one refusal is the answer and a second chat line naming a
+        // second affix would be noise.
+        void OnRepair(Player* player, float& discountMod);
+        bool Allows(Player* player, Restricted what);
         void OnMaxHealth(Player* player, float& value);
         void OnGiveXP(Player* player, uint32& amount, Unit* victim);
         void OnLootMoney(Player* player, Loot* loot);

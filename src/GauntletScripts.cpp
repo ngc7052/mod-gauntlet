@@ -350,6 +350,44 @@ public:
 
     // The grace window re-opens on a zone change, and every summon comes out of
     // the world with it (CONTRACT-P1 section 2.4).
+    // The three refusals Self-found is made of. All three are [[nodiscard]]
+    // veto hooks (PlayerScript.h:628, :512, :448) where false stops the
+    // action, and the module answers true for everyone carrying nothing that
+    // refuses -- which is every player on the realm but a handful.
+    //
+    // The mechanic writes the chat line, not this adapter: it is the one that
+    // knows which affix refused and why, and a veto the player cannot account
+    // for is indistinguishable from a broken button.
+    bool OnPlayerCanInitTrade(Player* player, Player* /*target*/) override
+    {
+        return sGauntlet->Allows(player, Restricted::Trade);
+    }
+
+    bool OnPlayerCanSendMail(Player* player, ObjectGuid /*receiverGuid*/, ObjectGuid /*mailbox*/,
+                             std::string& /*subject*/, std::string& /*body*/, uint32 /*money*/,
+                             uint32 /*COD*/, Item* /*item*/) override
+    {
+        return sGauntlet->Allows(player, Restricted::Mail);
+    }
+
+    bool OnPlayerCanPlaceAuctionBid(Player* player, AuctionEntry* /*auction*/) override
+    {
+        return sGauntlet->Allows(player, Restricted::AuctionBid);
+    }
+
+    // Iron Purse. discountMod arrives as the reputation price discount and the
+    // core spends it as a multiplier on the bill (NPCHandler.cpp:780-782,
+    // Player.cpp:4955), so a mechanic makes repairs dearer by raising it.
+    void OnPlayerBeforeDurabilityRepair(Player* player, ObjectGuid /*npcGUID*/,
+                                        ObjectGuid /*itemGUID*/, float& discountMod,
+                                        uint8 /*guildBank*/) override
+    {
+        if (!sGauntlet->Enabled() || !sGauntlet->IsEligible(player))
+            return;
+
+        sGauntlet->OnRepair(player, discountMod);
+    }
+
     void OnPlayerUpdateZone(Player* player, uint32 /*newZone*/, uint32 /*newArea*/) override
     {
         if (!sGauntlet->Enabled() || !sGauntlet->IsEligible(player))
@@ -600,6 +638,10 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_Overextended();       // 16
     void AddSC_gauntlet_mechanic_Falter();             // 17
     void AddSC_gauntlet_mechanic_Hubris();             // 18
+
+    void AddSC_gauntlet_mechanic_SelfFound();          // 23
+    void AddSC_gauntlet_mechanic_LoneWolf();           // 24
+    void AddSC_gauntlet_mechanic_IronPurse();          // 25
 }
 
 static void AnchorMechanics()
@@ -624,6 +666,10 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_Overextended();
     AddSC_gauntlet_mechanic_Falter();
     AddSC_gauntlet_mechanic_Hubris();
+
+    AddSC_gauntlet_mechanic_IronPurse();
+    AddSC_gauntlet_mechanic_SelfFound();
+    AddSC_gauntlet_mechanic_LoneWolf();
 }
 
 void Addmod_gauntletScripts()

@@ -226,16 +226,27 @@ namespace
 
         // --- Family R: rules -------------------------------------------
         { 23, "self_found", "Self-found", Family::Rules, 0, 1, 4, 1,
-          MF_NotImplemented, "rule", Boon::BonusMoney, 0, 0,
+          MF_None, "rule", Boon::BonusMoney, 0, 0,
           "You cannot trade, mail, or use the auction house." },
 
+        // The blurb is not the card's, and the mechanic is not the card's
+        // either: Phase 3 decision 1 replaced "you cannot join a group" with a
+        // price paid only while in one. The reasoning is at the head of
+        // mechanics/rules/LoneWolf.cpp; the short version is that this row's
+        // window is levels 5-30, so the card does not make the levelling
+        // dungeons harder, it deletes them for the rest of the run.
         { 24, "lone_wolf", "Lone Wolf", Family::Rules, 0, 1, 6, 1,
-          MF_NotImplemented, "rule", Boon::BonusExperience, 0, 0,
-          "You cannot join a group." },
+          MF_None, "rule", Boon::BonusExperience, 0, 0,
+          "Half health in a group; more experience alone." },
 
-        // TODO(design): the family says rules always come with a boon; this card names none.
+        // TODO(design): the family says rules always come with a boon; this
+        // card names none, and it is left that way on purpose. The obvious
+        // boon for a gold tax is more gold, which would make the affix a wash
+        // -- a curse and a boon that cancel are worse than either alone. See
+        // the head of mechanics/rules/IronPurse.cpp for why this row is kept
+        // anyway despite being the weakest in the table.
         { 25, "iron_purse", "Iron Purse", Family::Rules, 0, 1, 3, 1,
-          MF_NotImplemented, "rule", Boon::None, 0, 0,
+          MF_None, "rule", Boon::None, 0, 0,
           "Repairs cost double." },
 
         // --- Family B: bargains ----------------------------------------
