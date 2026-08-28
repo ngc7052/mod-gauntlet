@@ -1,7 +1,7 @@
 ## Interface: 30300
 ## Title: Gauntlet UI
-## Notes: Affix selection and run status for mod-gauntlet.
+## Notes: Minimap button, affix browser and out-of-combat affix chooser for mod-gauntlet.
 ## Author: ngc7052
-## Version: 1.0
-## SavedVariablesPerCharacter: GauntletUIDB
+## Version: 2.0
+## SavedVariables: GauntletUIDB
 GauntletUI.lua
