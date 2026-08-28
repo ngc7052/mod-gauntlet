@@ -156,6 +156,23 @@ namespace Gauntlet
             _pending   = false;
             _transient = ctx.state ? std::max(0, ctx.state->Get(KEY_LOOTS, 0)) : 0;
 
+            // A counter that is already full when the session starts is armed
+            // straight away rather than waiting for one more corpse. The
+            // counter is persisted and `_pending` is not, so a player who
+            // logged out on the last loot before a pack came back to a counter
+            // reading 5/5 that would sit there until they looted a sixth --
+            // and looting a sixth is exactly what a player who thinks the affix
+            // is broken stops doing.
+            //
+            // Echo has done this since it was written; Carrion did not, and the
+            // two are the same shape. The scheduler's own grace window is what
+            // keeps the pack off the player until they have taken control.
+            if (ctx.clock && Loots(ctx) >= Threshold(ctx))
+            {
+                _pending = true;
+                ctx.clock->Arm(MECHANIC_CARRION, EVENT_SCAVENGERS, WARN_MS, WARN_MS);
+            }
+
             ShowCounter(ctx);
         }
 
