@@ -164,8 +164,25 @@ end
 local readings = {}    -- key -> { value, max, order }
 local order    = 0
 
-local event    = nil   -- { key, label, endsAt, total }
+-- Every countdown currently running, keyed by mechanic, and the one the bar is
+-- drawing. A single slot was wrong: four timed affixes can easily have
+-- countdowns overlapping -- the Shade's thirty seconds is long enough to have
+-- Falter's two, Ambush's four and Carrion's four land inside it -- and a new
+-- EVT replacing the old one meant the Shade's countdown vanished the moment
+-- anything else warned, and never came back even though it was still running.
+--
+-- The bar draws whichever is *soonest*, because that is the one the player has
+-- to act on first, and falls back to the next when it clears.
+local events   = {}    -- key -> { label, endsAt, total }
 local stalkers = {}    -- key -> true while one is alive
+
+local function Soonest()
+    local best, bestKey = nil, nil
+    for key, e in pairs(events) do
+        if not best or e.endsAt < best.endsAt then best, bestKey = e, key end
+    end
+    return best, bestKey
+end
 
 local function ValueText(key, v, m)
     local _, unit = Reading(key)
@@ -193,7 +210,8 @@ local function Layout()
     table.sort(live, function(a, b) return a.r.order < b.r.order end)
 
     local top = -22
-    if event then
+    local soon = Soonest()
+    if soon then
         bar:Show()
         top = top - 16
     else
@@ -215,7 +233,7 @@ local function Layout()
     local anyStalker = (next(stalkers) ~= nil)
 
     local n = #live
-    if n == 0 and not event and not anyStalker then
+    if n == 0 and not soon and not anyStalker then
         hud:Hide()
         return
     end
@@ -228,23 +246,27 @@ local function Layout()
         hud:SetBackdropBorderColor(unpack(BORDER))
     end
 
-    hud:SetHeight(26 + (event and 16 or 0) + math.max(n, 1) * ROW_H)
+    hud:SetHeight(26 + (soon and 16 or 0) + math.max(n, 1) * ROW_H)
     hud:Show()
 end
 
 -- ============================================================== updates ====
 hud:SetScript("OnUpdate", function(self, elapsed)
-    if not event then return end
+    local soon, key = Soonest()
+    if not soon then return end
 
-    local left = event.endsAt - GetTime()
+    local left = soon.endsAt - GetTime()
     if left <= 0 then
-        event = nil
+        -- A countdown that reaches zero without the server saying so has
+        -- either landed or been held; either way the bar has nothing true
+        -- left to draw, and the next one takes over.
+        events[key] = nil
         Layout()
         return
     end
 
-    bar:SetValue(event.total > 0 and (left / event.total) or 0)
-    bar.text:SetText(("%s  %.0f"):format(event.label or "", left + 0.5))
+    bar:SetValue(soon.total > 0 and (left / soon.total) or 0)
+    bar.text:SetText(("%s  %.0f"):format(soon.label or "", left + 0.5))
 end)
 
 -- =============================================================== wiring ====
@@ -275,18 +297,17 @@ end)
 GauntletProtocol.On("EVT", function(key, secs, label)
     local s = tonumber(secs) or 0
     if s <= 0 then
-        -- secs == 0 means "it landed, or it was called off". Either way the
-        -- countdown is over and leaving it on screen would be a lie.
-        if event and event.key == key then
-            event = nil
+        -- secs == 0 means "it landed, or it was called off". Either way that
+        -- one countdown is over -- and only that one: anything else still
+        -- running keeps its place and the bar moves to whichever is next.
+        if events[key] then
+            events[key] = nil
             Layout()
         end
         return
     end
 
-    event = { key = key, label = label or key, endsAt = GetTime() + s, total = s }
-    bar:SetValue(1)
-    bar.text:SetText(("%s  %d"):format(event.label, s))
+    events[key] = { label = label or key, endsAt = GetTime() + s, total = s }
     Layout()
 end)
 
