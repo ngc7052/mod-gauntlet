@@ -347,6 +347,16 @@ public:
         sGauntlet->OnLootMoney(player, loot);
     }
 
+    // Carrion counts the corpses whose loot window the owner opens, which is
+    // this hook and not the money one: a corpse with no coin on it is still a
+    // corpse that was rifled. Player.cpp:8369, inside SendLoot, after the
+    // permission check and before the packet is built, so a window the player
+    // is not allowed to open never reaches it.
+    void OnPlayerBeforeSendLoot(Player* player, ObjectGuid lootGuid, Loot* loot) override
+    {
+        sGauntlet->OnLootWindow(player, lootGuid, loot);
+    }
+
     // The grace window re-opens on a zone change, and every summon comes out of
     // the world with it (CONTRACT-P1 section 2.4).
     void OnPlayerUpdateZone(Player* player, uint32 /*newZone*/, uint32 /*newArea*/) override
@@ -406,6 +416,30 @@ public:
         if (Player* p = victim ? victim->ToPlayer() : nullptr)
             sGauntlet->OnDamageTaken(p, attacker, damage);
         return damage;
+    }
+
+    // The other side of the same blow, and the only hook in the core that can
+    // see a creature's health *about* to cross a threshold: OnDamage runs at
+    // Unit.cpp:999, twenty-five lines before the health is applied, with the
+    // damage already final. Craven's "flees the first time it drops below 25%"
+    // is exactly that subtraction and cannot be written anywhere else.
+    //
+    // The credited player is the attacker, or the attacker's owner when a pet,
+    // totem or guardian struck the blow -- an affix that keys on the owner's
+    // fights must not be blind to the half of them a hunter's pet fights.
+    void OnDamage(Unit* attacker, Unit* victim, uint32& damage) override
+    {
+        Creature* creature = victim ? victim->ToCreature() : nullptr;
+        if (!creature || !attacker || !damage)
+            return;
+
+        Player* owner = attacker->ToPlayer();
+        if (!owner)
+            owner = attacker->GetCharmerOrOwnerPlayerOrPlayerItself();   // Unit.h:1295
+        if (!owner)
+            return;
+
+        sGauntlet->OnCreatureDamaged(owner, creature, damage);
     }
 };
 
@@ -474,6 +508,13 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_Champions();
     void AddSC_gauntlet_mechanic_FallingSky();
     void AddSC_gauntlet_mechanic_DeepWounds();
+
+    // Phase 2's fifteen. tests/compile-check.sh audits this list against every
+    // GAUNTLET_MECHANIC in src/, in both directions, before it compiles
+    // anything -- which is the only cheap way to catch the failure this whole
+    // apparatus exists for.
+    void AddSC_gauntlet_mechanic_Echo();               // 2
+    void AddSC_gauntlet_mechanic_Reinforcements();     // 4
 }
 
 static void AnchorMechanics()
@@ -487,6 +528,9 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_Champions();
     AddSC_gauntlet_mechanic_FallingSky();
     AddSC_gauntlet_mechanic_DeepWounds();
+
+    AddSC_gauntlet_mechanic_Echo();
+    AddSC_gauntlet_mechanic_Reinforcements();
 }
 
 void Addmod_gauntletScripts()

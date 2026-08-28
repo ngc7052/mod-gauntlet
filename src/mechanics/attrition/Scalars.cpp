@@ -4,6 +4,7 @@
  */
 
 #include "Scalars.h"
+#include "../Boons.h"
 #include <algorithm>
 #include <cctype>
 
@@ -65,22 +66,4 @@ namespace Gauntlet
         }
     }
 
-    std::string BoonClause(Boon b, uint8 magnitude)
-    {
-        if (b == Boon::None || magnitude == 0)
-            return "";
-
-        std::string const mag = std::to_string(static_cast<uint32>(magnitude));
-        switch (b)
-        {
-            case Boon::BonusDamage:     return " In exchange, you deal " + mag + "% more damage.";
-            case Boon::BonusHealing:    return " In exchange, healing on you is " + mag + "% stronger.";
-            case Boon::BonusMoveSpeed:  return " In exchange, you move " + mag + "% faster.";
-            case Boon::BonusExperience: return " In exchange, you gain " + mag + "% more experience.";
-            case Boon::BonusMoney:      return " In exchange, you loot " + mag + "% more money.";
-            case Boon::BonusMaxHealth:  return " In exchange, you have " + mag + "% more health.";
-            case Boon::BonusRegen:      return " In exchange, you recover " + mag + "% faster.";
-            default:                    return "";
-        }
-    }
 }

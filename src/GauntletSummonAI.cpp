@@ -227,6 +227,31 @@ namespace
                 level = wanted;
         }
 
+        // Where a copied entry gets this module's AI. CreatureAISelector::
+        // SelectAI asks sScriptMgr->GetCreatureAI first and only falls back to
+        // the AIName registry afterwards ($CORE/src/server/game/AI/
+        // CreatureAISelector.cpp:80-88), and ScriptMgr::GetCreatureAI polls
+        // every AllCreatureScript before the ScriptName-bound CreatureScript
+        // (CreatureScript.cpp:156-171). So this wins for anything the module is
+        // in the middle of summoning, whatever the world DB says about it.
+        //
+        // The five reserved templates reach the same AI twice over -- here and
+        // through their ScriptName -- which is deliberate: the ScriptName is
+        // what makes the SQL rows say out loud what they are, and this is what
+        // covers Reinforcements' copy of a Defias Thug, which has a template
+        // this module does not own.
+        //
+        // The window is exactly one Summon() call, so no creature on the realm
+        // that this module did not spawn can be caught by it.
+        CreatureAI* GetCreatureAI(Creature* creature) const override
+        {
+            // No Idle() shortcut here, unlike the two hooks below: Idle() is
+            // true right up until the first record is written, and the first
+            // record is written *after* the SummonCreature call this runs
+            // inside. IsPendingSummon is itself two field comparisons.
+            return sGauntletSummons->IsPendingSummon(creature) ? new gauntlet_summon_ai(creature) : nullptr;
+        }
+
         // The only event that catches every way a summon can leave the world:
         // killed, despawned, unsummoned, or removed with the grid under it.
         // Creature::RemoveFromWorld fires it before anything is torn down

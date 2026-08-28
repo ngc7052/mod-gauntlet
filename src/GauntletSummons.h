@@ -140,6 +140,19 @@ namespace Gauntlet
         // of ours, which is the answer for every other spawn on the realm.
         bool PendingLevel(Creature* c, uint8& level) const;
 
+        // True while this exact creature is inside its own Summon() call, which
+        // is the window both AllCreatureScript hooks run in.
+        //
+        // OnBeforeCreatureSelectLevel is not the only one that needs it any
+        // more. Phase 2's Reinforcements summons a copy of *the creature the
+        // owner is already fighting*, so the thing that arrives carries a world
+        // DB template this module does not own and cannot give a ScriptName to
+        // -- and without an AI of ours it would be an ordinary mob that aggroes
+        // bystanders and never leashes to an owner. GetCreatureAI answers for
+        // it instead (plan section 6: "custom AI for stalkers without touching
+        // the world DB's script names"), and this is the test it makes.
+        bool IsPendingSummon(Creature* c) const;
+
         // Bookkeeping: the creature died, and the creature left the world.
         // Both exist because they are minutes apart -- a corpse lingers for the
         // normal decay -- and "the stalker is gone" is news the moment it dies,

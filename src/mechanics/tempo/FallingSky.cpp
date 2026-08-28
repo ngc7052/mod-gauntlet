@@ -8,7 +8,7 @@
 #include "GauntletRegistry.h"
 #include "GauntletScheduler.h"
 #include "GauntletSummons.h"
-#include "../attrition/Scalars.h"
+#include "../Boons.h"
 
 #include "Chat.h"
 #include "Creature.h"

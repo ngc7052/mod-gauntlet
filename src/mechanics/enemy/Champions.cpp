@@ -6,7 +6,7 @@
 #include "GauntletMechanic.h"
 #include "GauntletAddon.h"
 #include "GauntletState.h"
-#include "../attrition/Scalars.h"
+#include "../Boons.h"
 
 #include "Chat.h"
 #include "Creature.h"
@@ -155,7 +155,7 @@ namespace Gauntlet
             void OnLeaveCombat(Ctx& ctx) override;
             void OnKill(Ctx&, Creature* victim) override;
             void OnXP(Ctx&, uint32& amount, Unit* victim) override;
-            void OnLoot(Ctx&, ObjectGuid const& lootGuid, Loot* loot) override;
+            void OnLootMoney(Ctx&, Loot* loot) override;
 
             float DamageTakenMult(Ctx&, Unit* attacker, SpellInfo const*) override;
 
@@ -493,16 +493,15 @@ namespace Gauntlet
             amount = uint32(std::min<uint64>(doubled, std::numeric_limits<uint32>::max()));
         }
 
-        void Champions::OnLoot(Ctx& /*ctx*/, ObjectGuid const& lootGuid, Loot* loot)
+        void Champions::OnLootMoney(Ctx& /*ctx*/, Loot* loot)
         {
             if (!loot || !loot->gold)
                 return;
 
-            // Creature::AddToWorld stamps the creature's own guid onto its loot
-            // (Creature.cpp:331); lootGuid is the fallback for whatever
-            // integration hands us.
-            ObjectGuid const source = loot->sourceWorldObjectGUID.IsEmpty() ? lootGuid
-                                                                           : loot->sourceWorldObjectGUID;
+            // OnPlayerBeforeLootMoney carries no guid, so the source is read
+            // off the loot itself: Creature::AddToWorld stamps the creature's
+            // own guid onto it (Creature.cpp:331).
+            ObjectGuid const source = loot->sourceWorldObjectGUID;
             if (source.IsEmpty())
                 return;
 

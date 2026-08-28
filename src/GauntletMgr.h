@@ -74,6 +74,15 @@ namespace Gauntlet
         void OnGiveXP(Player* player, uint32& amount, Unit* victim);
         void OnLootMoney(Player* player, Loot* loot);
 
+        // The loot window opening, with a real guid on it. Carrion's
+        // counter is the only thing that wants the window rather than the
+        // purse, and the two hooks fire for the same corpse.
+        void OnLootWindow(Player* player, ObjectGuid const& lootGuid, Loot* loot);
+
+        // A blow this character or their pet landed on a creature, before
+        // the health comes off. Craven watches for the threshold crossing.
+        void OnCreatureDamaged(Player* player, Creature* victim, uint32 damage);
+
         // Re-opens the grace window. Login sets it in Load, where the run is
         // already in hand; this is the entry point for everything else. A zone
         // change also takes every summon out of the world, which CONTRACT-P1

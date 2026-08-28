@@ -7,7 +7,7 @@
 #include "GauntletMechanic.h"
 #include "GauntletState.h"
 #include "Player.h"
-#include "Scalars.h"
+#include "../Boons.h"
 
 #include <algorithm>
 #include <limits>

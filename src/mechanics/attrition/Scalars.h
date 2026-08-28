@@ -7,6 +7,7 @@
 #define MOD_GAUNTLET_MECHANICS_SCALARS_H
 
 #include "GauntletMechanic.h"
+#include "../Boons.h"
 
 namespace Gauntlet
 {
@@ -65,9 +66,6 @@ namespace Gauntlet
     // GauntletAffix.cpp, which step 4b deletes, and these four mechanics must
     // keep describing themselves afterwards.
     std::string ConditionClause(Condition c);
-
-    // " In exchange, you deal 12% more damage." -- empty for Boon::None.
-    std::string BoonClause(Boon b, uint8 magnitude);
 
     IMechanic* MakeExposed();
     IMechanic* MakeFeeble();

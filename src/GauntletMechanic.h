@@ -98,7 +98,35 @@ namespace Gauntlet
         virtual void  OnAuraApplied(Ctx&, Unit* /*target*/, Aura*) {}
         virtual void  OnAuraRemoved(Ctx&, Unit* /*target*/, AuraApplication*) {}
         virtual void  OnShapeshift(Ctx&, uint8 /*form*/) {}
+
+        // The loot window opening, from PlayerScript::OnPlayerBeforeSendLoot
+        // (Player.cpp:8369). `lootGuid` is real here and may be a creature, a
+        // game object or a corpse, so a mechanic that counts corpses branches
+        // on lootGuid.IsCreature() -- which is what Carrion does.
         virtual void  OnLoot(Ctx&, ObjectGuid const& /*lootGuid*/, Loot*) {}
+
+        // Money about to be added, from PlayerScript::OnPlayerBeforeLootMoney
+        // (PlayerScript.h:290), which carries no guid at all -- the source has
+        // to be read off Loot::sourceWorldObjectGUID, which Creature::
+        // AddToWorld stamps on (Creature.cpp:331).
+        //
+        // A separate callback and not the one above, because the two fire for
+        // the same corpse and a mechanic that multiplies a purse in both would
+        // double it twice. Champions' guaranteed extra coin roll and every
+        // BonusMoney boon are paid here and nowhere else.
+        virtual void  OnLootMoney(Ctx&, Loot*) {}
+
+        // A blow this character (or their pet) landed on a creature, from
+        // UnitScript::OnDamage (Unit.cpp:999), which runs *before* the health
+        // is applied -- so `victim->GetHealth() - damage` is the health the
+        // creature is about to have. Craven's whole mechanic is that
+        // subtraction crossing a threshold, and there is no other hook in the
+        // core that can see it happen.
+        //
+        // An observer: the damage is not passed by reference, because nothing
+        // in this phase changes it and a mechanic that wants to belongs in the
+        // three Mult callbacks above where the caps apply.
+        virtual void  OnCreatureDamaged(Ctx&, Creature* /*victim*/, uint32 /*damage*/) {}
         virtual void  OnMaxHealth(Ctx&, float& /*value*/) {}
         virtual void  OnXP(Ctx&, uint32& /*amount*/, Unit* /*victim*/) {}
         virtual void  OnTalentPoints(Ctx&, uint32& /*points*/) {}

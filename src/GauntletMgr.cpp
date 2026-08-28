@@ -1417,12 +1417,42 @@ namespace Gauntlet
         if (!st)
             return;
 
-        // OnPlayerBeforeLootMoney carries no loot guid, so the empty one is
-        // passed and the mechanic falls back to Loot::sourceWorldObjectGUID,
-        // which Creature::AddToWorld stamps on (Creature.cpp:331).
+        // OnPlayerBeforeLootMoney carries no loot guid, so a mechanic that
+        // needs the source reads Loot::sourceWorldObjectGUID, which
+        // Creature::AddToWorld stamps on (Creature.cpp:331).
         ForEachMechanic(player, st, [loot](Ctx& ctx, AffixInstance& a)
         {
-            a.impl->OnLoot(ctx, ObjectGuid::Empty, loot);
+            a.impl->OnLootMoney(ctx, loot);
+        });
+    }
+
+    void Mgr::OnLootWindow(Player* player, ObjectGuid const& lootGuid, Loot* loot)
+    {
+        if (!_enabled || !IsEligible(player) || !loot)
+            return;
+
+        RunState* st = Get(player);
+        if (!st || st->dead)
+            return;
+
+        ForEachMechanic(player, st, [&lootGuid, loot](Ctx& ctx, AffixInstance& a)
+        {
+            a.impl->OnLoot(ctx, lootGuid, loot);
+        });
+    }
+
+    void Mgr::OnCreatureDamaged(Player* player, Creature* victim, uint32 damage)
+    {
+        if (!_enabled || !IsEligible(player) || !victim || damage == 0)
+            return;
+
+        RunState* st = Get(player);
+        if (!st || st->dead)
+            return;
+
+        ForEachMechanic(player, st, [victim, damage](Ctx& ctx, AffixInstance& a)
+        {
+            a.impl->OnCreatureDamaged(ctx, victim, damage);
         });
     }
 

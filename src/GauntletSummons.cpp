@@ -420,12 +420,17 @@ namespace Gauntlet
         return ObjectAccessor::GetPlayer(*c, owned->second);
     }
 
-    bool Summons::PendingLevel(Creature* c, uint8& level) const
+    bool Summons::IsPendingSummon(Creature* c) const
     {
         if (_pendingOwner.IsEmpty() || !c || !c->IsSummon())
             return false;
 
-        if (c->ToTempSummon()->GetSummonerGUID() != _pendingOwner)
+        return c->ToTempSummon()->GetSummonerGUID() == _pendingOwner;
+    }
+
+    bool Summons::PendingLevel(Creature* c, uint8& level) const
+    {
+        if (!IsPendingSummon(c))
             return false;
 
         level = _pendingLevel;
