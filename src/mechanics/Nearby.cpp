@@ -117,7 +117,7 @@ namespace Gauntlet
         return true;
     }
 
-    bool IsFairGame(Player* owner, Creature* creature)
+    bool IsFairGame(Player* owner, Creature* creature, bool hostileOnly)
     {
         if (!owner || !creature || !creature->IsInWorld() || !creature->IsAlive())
             return false;
@@ -125,10 +125,14 @@ namespace Gauntlet
         if (!IsOrdinaryFoe(creature))
             return false;
 
-        // Hostility is asked of the creature rather than of the player: a
-        // player's own reaction can be softened by a disguise or a phase, and
-        // what matters here is whether the creature would fight.
-        return creature->IsHostileTo(owner);
+        // Asked of the creature rather than of the player: a player's own
+        // reaction can be softened by a disguise or a phase, and what matters
+        // is how the creature would answer.
+        //
+        // IsHostileTo is REP_HOSTILE or worse and IsFriendlyTo is REP_FRIENDLY
+        // or better (Unit.cpp:7303-7311), so neutral satisfies neither. See the
+        // header for which question each caller is actually asking.
+        return hostileOnly ? creature->IsHostileTo(owner) : !creature->IsFriendlyTo(owner);
     }
 
     Creature* NearestIdleKin(Player* owner, Creature const* kin, WorldObject const* origin,
@@ -148,7 +152,12 @@ namespace Gauntlet
                 continue;
             if (candidate->GetFaction() != faction)
                 continue;
-            if (!IsFairGame(owner, candidate))
+            // Not `hostileOnly`. The candidate shares a faction with a
+            // creature this player is already fighting, so "not on your side"
+            // is the right question -- and asking for hostility instead
+            // excluded every neutral camp in the game, which is most of what a
+            // levelling character pulls.
+            if (!IsFairGame(owner, candidate, /*hostileOnly*/ false))
                 continue;
 
             // "Idle": not already in a fight. A camp that is already awake

@@ -641,6 +641,12 @@ namespace Gauntlet
             Ctx ctx = MakeCtx(player, run, &stored);
             stored.impl->OnAttach(ctx);
         }
+
+        // Once, after all of them, rather than per affix: the recompute is a
+        // full stat pass and every carried affix contributes to the same
+        // product. Without it a character logs in with a BonusMaxHealth boon
+        // that does nothing until the next level or the next aura.
+        RefreshStats(player);
     }
 
     void Mgr::Save(Player* player)
@@ -867,6 +873,12 @@ namespace Gauntlet
         CharacterDatabase.CommitTransaction(trans);
         st->dirty = false;
 
+        // The carried set just changed, so anything it contributes to the
+        // health pool has to be recomputed now. A rank-up moves the number, a
+        // swap can take a contribution away entirely, and a new affix adds one;
+        // none of the three is a stat change the core would notice by itself.
+        RefreshStats(player);
+
         // A pick is one of the four moments CONTRACT-P1 section 5.2 names for
         // writing the state store, and the only one where the carried set
         // changed underneath it: an affix that was swapped away has just had
@@ -960,6 +972,18 @@ namespace Gauntlet
                                     player->GetName(), player->GetLevel(), st->tier, cause));
     }
 
+    void Mgr::RefreshStats(Player* player)
+    {
+        if (!player || !player->IsInWorld())
+            return;
+
+        // UpdateMaxHealth rebuilds the pool from the stat chain and then calls
+        // OnPlayerAfterUpdateMaxHealth, which is where this module's own
+        // contribution goes on. Nothing here compounds: the value it hands the
+        // hook has none of ours in it.
+        player->UpdateMaxHealth();
+    }
+
     void Mgr::DetachAll(Player* player)
     {
         RunState* st = Get(player);
@@ -967,6 +991,13 @@ namespace Gauntlet
             return;
 
         ForEachMechanic(player, st, [](Ctx& ctx, AffixInstance& a) { a.impl->OnDetach(ctx); });
+
+        // Whatever the carried set was contributing to the health pool stops
+        // here, and the pool has to be told -- after the detaches, so the
+        // recompute sees a set that is no longer contributing. Deep Wounds
+        // already did this for itself in OnDetach for the same reason; this
+        // covers every affix whose contribution goes through the aggregate.
+        RefreshStats(player);
     }
 
     // =====================================================================

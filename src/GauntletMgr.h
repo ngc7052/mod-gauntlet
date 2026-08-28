@@ -136,6 +136,18 @@ namespace Gauntlet
         // anything; ~RunState does the freeing when Forget drops the run.
         void DetachAll(Player* player);
 
+        // Recomputes the stats this module contributes to, and the only thing
+        // that makes an AggregateKind::MaxHealth contribution real.
+        //
+        // Player::UpdateMaxHealth is what calls OnPlayerAfterUpdateMaxHealth,
+        // and the core only calls it when *the core* thinks a stat moved -- a
+        // level, a stamina change, an aura. Picking an affix is none of those,
+        // so a BonusMaxHealth boon sat inert from the moment it was taken until
+        // something unrelated happened to trigger a recompute. Every affix that
+        // changes the pool has to ask for one when it arrives and when it
+        // leaves.
+        void RefreshStats(Player* player);
+
         // The product of every active affix's factor, clamped by the config's
         // caps. Replaces Multiplier: the old one summed percentages and
         // floored the result, this multiplies factors and clamps the product.

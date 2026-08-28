@@ -49,8 +49,28 @@ namespace Gauntlet
     // both start from a corpse and have to ask this question about one.
     bool IsOrdinaryFoe(Creature const* creature);
 
-    // IsOrdinaryFoe, alive, in the world, and hostile to `owner`.
-    bool IsFairGame(Player* owner, Creature* creature);
+    // IsOrdinaryFoe, alive, in the world, and not on the owner's side.
+    //
+    // `hostileOnly` is what separates the two questions this predicate gets
+    // asked, and getting it wrong costs whole affixes. Unit::IsHostileTo is
+    // `GetReactionTo(unit) <= REP_HOSTILE` (Unit.cpp:7303-7306), so a *neutral*
+    // creature -- every yellow nameplate in the game, which is most of what a
+    // levelling character fights -- is not hostile to anybody. A predicate that
+    // demanded hostility therefore excluded them all.
+    //
+    //   true  (default): "would this creature have attacked me anyway?"
+    //                    Keen-nosed asks this. It only makes an enemy notice
+    //                    you sooner than it would have, and waking a neutral
+    //                    mob that was never going to attack is a different and
+    //                    much larger affix than the card describes.
+    //
+    //   false:           "is this creature on my side?" Call to Arms and Craven
+    //                    ask this, about the kin of a creature the player is
+    //                    already fighting. If you are fighting one gnoll, the
+    //                    gnoll beside it is fair game whatever colour its
+    //                    nameplate is -- that is the whole of "a camp becomes a
+    //                    rolling fight".
+    bool IsFairGame(Player* owner, Creature* creature, bool hostileOnly = true);
 
     // The nearest creature to `origin` that is fair game for `owner`, shares
     // `kin`'s faction, and is not already fighting anybody -- what Call to Arms

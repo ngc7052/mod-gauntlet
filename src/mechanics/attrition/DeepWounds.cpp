@@ -6,6 +6,7 @@
 #include "GauntletAddon.h"
 #include "GauntletMechanic.h"
 #include "GauntletState.h"
+#include "Chat.h"
 #include "Player.h"
 #include "../Boons.h"
 
@@ -75,6 +76,12 @@ namespace Gauntlet
         // seconds is one message every twenty flushes, against a budget of
         // eight a second.
         constexpr uint32 REPUBLISH_INTERVAL_MS = 10000;   // TODO(design)
+
+        // How far the wound has to move, as a percentage of the pool, before
+        // the player without an addon is told again. Five is small enough that
+        // a real fight reports two or three times and large enough that
+        // chip damage does not report at all.
+        constexpr int32 ANNOUNCE_STEP_PCT = 5;   // TODO(design)
 
         // gauntlet_state key. Plan section 3.3, CONTRACT-P1 section 5.2 and
         // GauntletState.h all spell it "deepwounds.wound", which is what is
@@ -432,8 +439,25 @@ namespace Gauntlet
                 if (pct == _lastPct && !force)
                     return;
 
+                int32 const before = _lastPct;
+
                 _lastPct     = pct;
                 _sinceStatMs = 0;
+
+                // And a chat line for a player with no addon, which is the
+                // whole of what this affix looks like to them. Deep Wounds is
+                // the only mechanic in the module with no moment, no creature
+                // and no aura -- what it does is make a number smaller -- so
+                // without this it is genuinely invisible, and an affix a player
+                // cannot see is one they cannot learn from (design section 5,
+                // rule 4).
+                //
+                // Every five percent of the pool, not every change: the wound
+                // moves on every blow and a line per blow is a combat log
+                // nobody reads. Crossing back down through a step reports too,
+                // because the trip to the inn is the counterplay and it has to
+                // be visible to be worth taking.
+                Announce(player, before, pct);
 
                 // INTEGRATION: fill Ctx::addon wherever a Ctx is built. Addon
                 // is a singleton, so the fallback below is the same object and
@@ -443,6 +467,30 @@ namespace Gauntlet
                 // Addon::CanSend and Addon::Enqueue).
                 if (Addon* addon = ctx.addon ? ctx.addon : sGauntletAddon)
                     addon->QueueStat(player, STAT_KEY, pct);
+            }
+
+            void Announce(Player* player, int32 before, int32 now) const
+            {
+                if (!player || !player->GetSession())
+                    return;
+
+                int32 const wasStep = before < 0 ? 0 : before / ANNOUNCE_STEP_PCT;
+                int32 const nowStep = now / ANNOUNCE_STEP_PCT;
+                if (wasStep == nowStep)
+                    return;
+
+                if (now <= 0)
+                {
+                    ChatHandler(player->GetSession()).PSendSysMessage(
+                        "|cffff2020[Gauntlet]|r Your wounds have closed.");
+                    return;
+                }
+
+                ChatHandler(player->GetSession()).PSendSysMessage(
+                    nowStep > wasStep
+                        ? "|cffff2020[Gauntlet]|r Your wounds deepen: {}% of your health is gone until you rest."
+                        : "|cffff2020[Gauntlet]|r Your wounds are closing: {}% of your health is still gone.",
+                    now);
             }
 
             void Mirror(Ctx& ctx)
