@@ -149,6 +149,19 @@ namespace Gauntlet
         // UpdateSpeed(MOVE_RUN, true) (SpellAuraEffects.cpp:3815-3828), so the
         // new amount is live the moment it is set.
         //
+        // The one visible cost of overwriting it. The buff's tooltip is built
+        // by the client from its own copy of Spell.dbc -- 65828's aura
+        // description is "Increases move speed by $s1%." -- so hovering the
+        // icon reads 70%, not the 5/10/15% the server is applying. The
+        // countdown on the icon is right, because that number comes over the
+        // wire; the tooltip cannot be, because nothing but a client patch or a
+        // new spell id could make it so, and both are out of bounds. The
+        // alternative was three separate spells whose DBC amounts happen to be
+        // 5, 10 and 15 -- 22586, 22588 and 22590 -- but all three are item
+        // enchant auras with SpellIconID 1, no duration, and nothing in the
+        // core using them, which trades an honest tooltip for a blank icon and
+        // no telegraph at all. The icon is the telegraph; the tooltip is not.
+        //
         // TODO(design): the card says the reward is "worth testing", not what
         // it is worth. Five seconds, fixed at every rank. Rank scales the
         // percentage instead, which is how the curse scales -- 25/35/50% of
