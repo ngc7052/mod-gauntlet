@@ -92,7 +92,7 @@ namespace
           MF_Timed | MF_Stalker | MF_RewardShaped | MF_NotImplemented, "stalker", Boon::BonusExperience, 0, 0,
           "Every 25th enemy you kill returns as an echo of yourself." },
 
-        { 3, "carrion", "Carrion", Family::Spawn, 0, 2, 10, 3,
+        { 3, "carrion", "Carrion", Family::Spawn, 0, 1, 10, 3,
           MF_Timed | MF_OnKill | MF_RewardShaped | MF_NotImplemented, "", Boon::BonusMoney, 0, 0,
           "Every 4th corpse you loot draws scavengers." },
 
@@ -105,7 +105,7 @@ namespace
           "Resting in the wild attracts an ambush." },
 
         // --- Family E: enemies that behave differently -----------------
-        { 6, "champions", "Champions", Family::Enemy, 0, 2, 16, 3,
+        { 6, "champions", "Champions", Family::Enemy, 0, 1, 16, 3,
           MF_RewardShaped | MF_NotImplemented, "", Boon::BonusExperience, 0, 0,
           "Every 8th fight you start opens against a Champion: twice the health, harder hits, double the reward." },
 
@@ -156,7 +156,7 @@ namespace
           MF_Timed | MF_RoleTax | MF_NotImplemented, "roletax", Boon::None, 0, 0,
           "Every 45 seconds in combat your hands fail you for three seconds." },
 
-        { 18, "hubris", "Hubris", Family::Tempo, 0, 2, 10, 3,
+        { 18, "hubris", "Hubris", Family::Tempo, 0, 1, 10, 3,
           MF_RewardShaped | MF_NotImplemented, "", Boon::BonusExperience, 0, 0,
           "Enemies below your level give no experience; enemies above give 40% more." },
 
