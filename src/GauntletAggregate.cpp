@@ -4,6 +4,7 @@
  */
 
 #include "GauntletAggregate.h"
+#include "GauntletRegistry.h"
 #include "GauntletMechanic.h"
 #include <algorithm>
 
@@ -47,6 +48,15 @@ namespace Gauntlet
         // The floor is applied after the ceiling so that a configuration whose
         // min exceeds its max resolves to the min: taking less than base damage
         // is the outcome the cap exists to prevent, so the floor must win.
+        // A mechanic whose boon the generator rolled, rather than one the
+        // registry names for it. Only these have their boon paid by the
+        // aggregate; see the call site.
+        bool IsScalar(uint16 mechanic)
+        {
+            MechanicDef const* def = FindMechanic(mechanic);
+            return def && (def->flags & MF_Scalar) != 0;
+        }
+
         float ClampProduct(float v, AggregateKind k, AggregateCaps const& caps)
         {
             switch (k)
@@ -88,7 +98,16 @@ namespace Gauntlet
             // did in Mgr::Multiplier. It is a factor of its own rather than a
             // subtraction from the curse's percentage, which is what turning a
             // sum into a product means.
-            if (a.boon != Boon::None && a.boonMag != 0 && BoonOffsets(a.boon, in.kind))
+            //
+            // Only for a Scalar. A Scalar's boon is rolled generically by the
+            // generator and has nowhere else to be applied, so the aggregate
+            // owns it. Every other mechanic's boon is named by its registry row
+            // and delivered by the mechanic itself -- the Shade's is
+            // Vindication, five minutes of extra experience for killing it --
+            // and paying it here as well would hand the player a permanent
+            // multiplier the card never promised, on top of the reward it did.
+            if (a.boon != Boon::None && a.boonMag != 0 && IsScalar(a.mechanic)
+                && BoonOffsets(a.boon, in.kind))
             {
                 float const pct = static_cast<float>(a.boonMag) / 100.0f;
                 product *= Raises(in.kind) ? std::max(0.0f, 1.0f - pct) : (1.0f + pct);
