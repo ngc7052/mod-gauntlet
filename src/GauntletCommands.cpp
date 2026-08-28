@@ -507,13 +507,10 @@ public:
             // only be refreshed from inside the game.
             { "export-addon", HandleDebugExportAddon, SEC_GAMEMASTER, Console::Yes },
 
-            // Plan section 5.2 names three more. The scheduler and the state
-            // store they need exist now, but none of the three is wired: `fire`
-            // would need a Scheduler entry point this task does not own, and
-            // the other two were not asked for. They are present and answer
-            // plainly rather than absent, so a game master reading the
-            // subtree's help sees the whole surface and is told which parts of
-            // it are not wired up yet instead of wondering what is broken.
+            // Plan section 5.2's last three, wired in Phase 2. `fire` releases
+            // a queued event now and keeps the warning it already sent; `set`
+            // writes a gauntlet_state key straight through; `events on|off` is
+            // the realm switch for the length of a worldserver session.
             { "fire",         HandleDebugFire,        SEC_GAMEMASTER, Console::No },
             { "set",          HandleDebugSet,         SEC_GAMEMASTER, Console::No },
             { "events",       HandleDebugEvents,      SEC_GAMEMASTER, Console::No },
@@ -950,6 +947,14 @@ public:
                                      a.impl ? "yes" : "none",
                                      def ? (IsImplemented(*def) ? "yes" : "no") : "unknown");
             handler->PSendSysMessage("           {}", sGauntlet->DescribeOf(a));
+
+            if (a.impl)
+            {
+                Ctx ctx = sGauntlet->MakeCtx(p, st, const_cast<AffixInstance*>(&a));
+                std::string const internals = a.impl->Diagnose(ctx);
+                if (!internals.empty())
+                    handler->PSendSysMessage("           {}", internals);
+            }
         }
 
         PrintProducts(handler, p);
@@ -1139,34 +1144,126 @@ public:
     // none yet.
     // ------------------------------------------------------------------
 
-    static bool HandleDebugFire(ChatHandler* handler, Optional<Tail> /*key*/)
+    // Plan section 5.2's last three. All of them existed as stubs from step 8
+    // and said so; the scheduler entry point and the state store they needed
+    // are here now.
+
+    static bool HandleDebugFire(ChatHandler* handler, std::string_view keyOrId)
     {
         if (!DebugAllowed(handler))
             return false;
 
-        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r `fire` is still not wired: releasing a queued event "
-                                 "early needs a Scheduler entry point that does not exist. "
-                                 "`.gauntlet debug dump` shows the queue.");
+        Player* p = handler->GetPlayer();
+        RunState* st = MutableRun(handler, p);
+        if (!st)
+            return false;
+
+        MechanicDef const* def = LookupMechanic(keyOrId);
+        if (!def)
+        {
+            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r No mechanic '{}'. Give a registry id or a "
+                                      "key such as 'falling_sky'.", keyOrId);
+            return false;
+        }
+
+        if (!st->Find(def->id))
+        {
+            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r {} is not carried. Use .gauntlet debug give "
+                                      "first.", def->name);
+            return false;
+        }
+
+        if (!sGauntlet->FireNow(p, def->id))
+        {
+            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r {} has nothing queued. Its clock arms when the "
+                                      "affix's own conditions are met -- Falling Sky and Falter in combat, Ambush "
+                                      "while standing still. .gauntlet debug dump shows the queue.", def->name);
+            return false;
+        }
+
+        LOG_INFO("module", "Gauntlet: {} fired {} (id {}) early for {} (guid {}).",
+                 Actor(handler), def->name, static_cast<uint32>(def->id),
+                 p->GetName(), p->GetGUID().GetCounter());
+
+        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r CHEAT: released {}'s queued event now.", def->name);
         return true;
     }
 
-    static bool HandleDebugSet(ChatHandler* handler, Optional<Tail> /*keyAndValue*/)
+    static bool HandleDebugSet(ChatHandler* handler, std::string_view key, int32 value)
     {
         if (!DebugAllowed(handler))
             return false;
 
-        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r `set` is still not wired. gauntlet_state has live "
-                                 "writers now and `.gauntlet debug dump` reads them back.");
+        Player* p = handler->GetPlayer();
+        RunState* st = MutableRun(handler, p);
+        if (!st)
+            return false;
+
+        if (key.empty() || key.size() > State::MaxKeyLen)
+        {
+            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r A state key is 1 to {} characters. "
+                                      "gauntlet_state.k is VARCHAR({}), and State::Set refuses anything longer "
+                                      "rather than truncating two keys onto the same row.",
+                                      static_cast<uint32>(State::MaxKeyLen),
+                                      static_cast<uint32>(State::MaxKeyLen));
+            return false;
+        }
+
+        int32 const was = st->state.Get(key, 0);
+        st->state.Set(key, value);
+
+        // Written straight through rather than left to the sixty-second
+        // periodic save: a game master who sets a key and then relogs to see
+        // what happens must not find the old value waiting.
+        st->state.SaveTo(p->GetGUID().GetCounter());
+
+        // The mechanics read gauntlet_state in OnAttach and cache what they
+        // find, so a key set under a live affix is in the database and not in
+        // the object. Say so rather than letting it look like nothing happened;
+        // Deep Wounds is the one this matters for, and re-attaching it with
+        // .gauntlet debug remove / give is how to make it take.
+        LOG_INFO("module", "Gauntlet: {} set state '{}' from {} to {} for {} (guid {}).",
+                 Actor(handler), key, was, value, p->GetName(), p->GetGUID().GetCounter());
+
+        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r CHEAT: {} = {} (was {}), written to gauntlet_state.",
+                                 key, value, was);
+        handler->PSendSysMessage("  A carried mechanic reads its keys once, in OnAttach, so this reaches it on the "
+                                 "next login -- or now, with .gauntlet debug remove <slot> and give.");
         return true;
     }
 
-    static bool HandleDebugEvents(ChatHandler* handler, Optional<Tail> /*onOff*/)
+    static bool HandleDebugEvents(ChatHandler* handler, Optional<std::string_view> onOff)
     {
         if (!DebugAllowed(handler))
             return false;
 
-        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r `events` is still not wired. The realm-wide switch is "
-                                 "Gauntlet.Events.Enable in mod_gauntlet.conf, which the scheduler now reads.");
+        if (!onOff)
+        {
+            handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r scheduled events are {}.",
+                                     sGauntlet->EventsEnabled() ? "on" : "off");
+            return true;
+        }
+
+        bool enable;
+        if (*onOff == "on" || *onOff == "1")
+            enable = true;
+        else if (*onOff == "off" || *onOff == "0")
+            enable = false;
+        else
+        {
+            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Say 'on' or 'off'.");
+            return false;
+        }
+
+        sGauntlet->SetEventsEnabled(enable);
+
+        LOG_INFO("module", "Gauntlet: {} switched scheduled events {}.", Actor(handler), enable ? "on" : "off");
+
+        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r CHEAT: scheduled events {} for every player, until "
+                                 "the worldserver restarts or the config is reloaded. The file's own value is "
+                                 "Gauntlet.Events.Enable.", enable ? "on" : "off");
+        if (!enable)
+            handler->PSendSysMessage("  Every queued event was cancelled; the clocks re-arm when events come back.");
         return true;
     }
 };

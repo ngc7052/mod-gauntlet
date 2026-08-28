@@ -150,6 +150,19 @@ namespace Gauntlet
         virtual float AggregateFactor(AffixInstance const& /*self*/, AggregateKind /*kind*/) const { return 1.f; }
 
         virtual std::string Describe(AffixInstance const& self) const = 0;
+
+        // One line of internals for `.gauntlet debug dump`, and empty by
+        // default because most mechanics have nothing worth saying.
+        //
+        // It exists because of Deep Wounds. The mechanic was reported not to
+        // work, the dispatch chain read correct end to end, and the failing
+        // link was never identified -- which is a diagnosis problem, not a
+        // wound problem: an affix that runs entirely out of sight can only be
+        // debugged by reading it. A mechanic that keeps state a player cannot
+        // see should say here what it is holding and which of its callbacks
+        // have actually been reached, so "it does not work" becomes one
+        // command instead of a build.
+        virtual std::string Diagnose(Ctx&) const { return {}; }
     };
 
     // The registry table is pure data and carries no factory pointer, so the

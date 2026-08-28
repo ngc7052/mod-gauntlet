@@ -158,6 +158,8 @@ namespace Gauntlet
             // hit is counted twice.
             void OnDamageTaken(Ctx& ctx, Unit* /*attacker*/, uint32 amount) override
             {
+                ++_sawDamage;
+
                 Player* player = ctx.player;
                 if (_detached || !player || amount == 0 || !player->IsAlive())
                     return;
@@ -191,6 +193,8 @@ namespace Gauntlet
             // be a raw world diff or an accumulated 500 ms one; both work.
             void OnTick(Ctx& ctx, uint32 diffMs) override
             {
+                ++_sawTick;
+
                 Player* player = ctx.player;
                 if (_detached || !player)
                     return;
@@ -217,6 +221,8 @@ namespace Gauntlet
             // be allowed to compound into 0.36 x base.
             void OnMaxHealth(Ctx& ctx, float& value) override
             {
+                ++_sawMaxHealth;
+
                 if (_detached || value <= 0.0f)
                     return;
 
@@ -246,6 +252,42 @@ namespace Gauntlet
                 // health percentage in the core. The cap keeps this at 60% of
                 // what arrived, so the clamp is a belt on top of braces.
                 value = std::max(value - float(sub), 1.0f);
+            }
+
+            // Every number this mechanic holds, and -- the point of it -- how
+            // many times each of its three callbacks has actually been reached
+            // this session. The three are the whole dispatch chain, and a zero
+            // in any of them names the broken link outright:
+            //
+            //   ticks 0        Mgr::Tick is not reaching OnTick, so nothing
+            //                  decays, nothing is published and nothing is ever
+            //                  written onto the health pool.
+            //   blows 0        UnitScript::DealDamage is not reaching
+            //                  OnDamageTaken, so no wound is ever accumulated.
+            //   recomputes 0   OnPlayerAfterUpdateMaxHealth is not reaching
+            //                  OnMaxHealth, so the wound exists and is
+            //                  subtracted from nothing. `asked` above `applied`
+            //                  with recomputes at 0 is exactly this case, and
+            //                  ApplyIfDue stops asking after the first one.
+            //
+            // All three non-zero with `applied` tracking `wound` means the
+            // mechanic is working and the health bar is the place to look.
+            std::string Diagnose(Ctx& ctx) const override
+            {
+                uint32 const base = ctx.player ? const_cast<DeepWounds*>(this)->Base(ctx.player) : _base;
+                int32 const  pct  = base != 0 ? int32(int64(_wound) * 100 / base) : 0;
+
+                return "wound " + std::to_string(_wound) + " (" + std::to_string(pct)
+                     + "% of " + std::to_string(base) + ") | applied " + std::to_string(_applied)
+                     + " | asked " + std::to_string(_requested)
+                     + " | saved " + std::to_string(_savedWound)
+                     + " | cap " + std::to_string(CapFor(base))
+                     + " | level " + std::to_string(uint32(_level))
+                     + (ctx.player && Resting(ctx.player) ? " | resting" : "")
+                     + (_detached ? " | DETACHED" : "")
+                     + " | ticks " + std::to_string(_sawTick)
+                     + " blows " + std::to_string(_sawDamage)
+                     + " recomputes " + std::to_string(_sawMaxHealth);
             }
 
             std::string Describe(AffixInstance const& self) const override
@@ -423,6 +465,13 @@ namespace Gauntlet
             int32  _lastPct      = -1;   // last percentage sent to the addon
             uint8  _level        = 0;
             bool   _detached     = false;
+
+            // Diagnostics only, and never read by the mechanic itself. They
+            // exist so that `.gauntlet debug dump` can say which callback is
+            // not arriving; see Diagnose().
+            uint32 _sawTick      = 0;
+            uint32 _sawDamage    = 0;
+            uint32 _sawMaxHealth = 0;
         };
     }
 

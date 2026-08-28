@@ -1546,6 +1546,57 @@ namespace Gauntlet
         st->state.SaveTo(player->GetGUID().GetCounter());
     }
 
+    bool Mgr::FireNow(Player* player, uint16 mechanic)
+    {
+        RunState*  st    = Get(player);
+        Scheduler* sched = ClockFor(player);
+        if (!st || !sched || st->dead)
+            return false;
+
+        AffixInstance* inst = st->Find(mechanic);
+        if (!inst || !inst->impl)
+            return false;
+
+        // The queue is read rather than drained: Tick() is what releases an
+        // event normally, and a cheat that bypassed it would leave the entry
+        // behind to fire again on its own time. Cancel takes the pair out --
+        // warning included -- and the mechanic is called directly, which is
+        // exactly what the plan asks for ("skip the clock, keep the warning").
+        uint32 eventId = 0;
+        bool   found   = false;
+        for (ScheduledEvent const& ev : sched->Queue())
+            if (ev.mechanic == mechanic && ev.kind == EventKind::Fire)
+            {
+                eventId = ev.id;
+                found   = true;
+                break;
+            }
+
+        if (!found)
+            return false;
+
+        sched->Cancel(mechanic);
+
+        NoteActor(player, mechanic);
+
+        Ctx ctx = MakeCtx(player, st, inst);
+        inst->impl->OnEvent(ctx, eventId);
+        return true;
+    }
+
+    void Mgr::SetEventsEnabled(bool enabled)
+    {
+        _eventsEnabled = enabled;
+
+        if (enabled)
+            return;
+
+        // Nothing queued may survive the switch being thrown: a player who
+        // turns events off and then walks into one has not had them turned off.
+        for (auto& [guid, live] : _live)
+            live.clock.CancelAll();
+    }
+
     void Mgr::SyncTimedAffixCount(Player* player)
     {
         RunState*  st    = Get(player);

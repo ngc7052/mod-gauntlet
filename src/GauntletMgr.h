@@ -115,6 +115,19 @@ namespace Gauntlet
         // MF_Timed. Called whenever the carried set changes.
         void SyncTimedAffixCount(Player* player);
 
+        // `.gauntlet debug fire <key>`: releases one queued event now, keeping
+        // the warning it already sent. Returns false when that mechanic has
+        // nothing queued. It is here rather than on Scheduler because it has to
+        // build the Ctx and dispatch, which is Mgr's job and not the clock's.
+        bool FireNow(Player* player, uint16 mechanic);
+
+        // `.gauntlet debug events on|off`: the same switch as
+        // Gauntlet.Events.Enable, for the length of this worldserver session.
+        // Turning it off cancels every queued event; a config reload puts the
+        // file's value back.
+        void SetEventsEnabled(bool enabled);
+        bool EventsEnabled() const { return _eventsEnabled; }
+
         void OfferTier(Player* player, uint32 tier);
         bool Pick(Player* player, uint32 index);
         void EndRun(Player* player, std::string const& cause);
