@@ -1,19 +1,23 @@
 /*
- * mod-gauntlet - script hooks and commands
+ * mod-gauntlet - script hooks
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
 #include "GauntletAddon.h"
 #include "GauntletMgr.h"
 #include "Chat.h"
-#include "ChatCommand.h"
-#include "Config.h"
-#include "DatabaseEnv.h"
 #include "Player.h"
 #include "ScriptMgr.h"
 
-using namespace Acore::ChatCommands;
 using namespace Gauntlet;
+
+// The .gauntlet tree moved to GauntletCommands.cpp with step 8, so plan
+// section 2.6's "hook adapters only" is what is left here. The command script
+// still has to be constructed from Addmod_gauntletScripts below -- the core's
+// generated module loader calls that one name and nothing else -- so the seam
+// is the free function AzerothCore uses for exactly this, declared here and
+// defined beside the commands it registers.
+void AddSC_gauntlet_commands();
 
 static char const* GAUNTLET_RETIRED_MSG =
     "Your Gauntlet run has ended. This character is retired.";
@@ -284,107 +288,10 @@ public:
     }
 };
 
-class GauntletCommandScript : public CommandScript
-{
-public:
-    GauntletCommandScript() : CommandScript("GauntletCommandScript") { }
-
-    ChatCommandTable GetCommands() const override
-    {
-        static ChatCommandTable sub =
-        {
-            { "pick",   HandlePick,   SEC_PLAYER, Console::No },
-            { "status", HandleStatus, SEC_PLAYER, Console::No },
-            { "top",    HandleTop,    SEC_PLAYER, Console::No },
-        };
-        static ChatCommandTable root =
-        {
-            { "gauntlet", sub },
-        };
-        return root;
-    }
-
-    static bool HandlePick(ChatHandler* handler, uint32 index)
-    {
-        Player* p = handler->GetSession() ? handler->GetSession()->GetPlayer() : nullptr;
-        if (!p)
-            return false;
-
-        if (!sGauntlet->Pick(p, index))
-        {
-            handler->PSendSysMessage("|cffff2020[Gauntlet]|r Nothing to pick, or invalid choice.");
-            return true;
-        }
-
-        // The run line and the carried set both moved; the addon is told the
-        // same way whether the pick came from this command or from its own
-        // button.
-        sGauntletAddon->SendSnapshot(p);
-        return true;
-    }
-
-    static bool HandleStatus(ChatHandler* handler)
-    {
-        Player* p = handler->GetSession() ? handler->GetSession()->GetPlayer() : nullptr;
-        RunState* st = p ? sGauntlet->Get(p) : nullptr;
-        if (!st)
-            return false;
-
-        handler->PSendSysMessage("|cffff2020[Gauntlet]|r seed {} | tier {} | {}",
-                                 st->seed, st->tier, st->dead ? "RETIRED" : "alive");
-        for (uint32 i = 0; i < st->affixes.size(); ++i)
-        {
-            AffixInstance const& a = st->affixes[i];
-            handler->PSendSysMessage("  {}. {} - {}", i + 1,
-                                     sGauntlet->NameOf(a.mechanic, a.condition, a.boon),
-                                     sGauntlet->DescribeOf(a));
-        }
-        return true;
-    }
-
-    static bool HandleTop(ChatHandler* handler)
-    {
-        Player* p = handler->GetSession() ? handler->GetSession()->GetPlayer() : nullptr;
-
-        // conducts joins the select for the addon's TOP line; the chat lines
-        // below are unchanged, because a conduct list is too long to read in
-        // a chat frame and the plan gives it to the addon's leaderboard tab.
-        QueryResult r = CharacterDatabase.Query(
-            "SELECT `name`, `tier`, `level`, `cause`, `conducts` FROM `gauntlet_leaderboard` "
-            "ORDER BY `tier` DESC, `level` DESC LIMIT 10");
-
-        handler->PSendSysMessage("|cffff2020[Gauntlet]|r Furthest runs:");
-        if (!r)
-        {
-            handler->PSendSysMessage("  No completed runs yet.");
-            return true;
-        }
-
-        uint32 rank = 1;
-        do
-        {
-            Field* f = r->Fetch();
-            std::string const name  = f[0].Get<std::string>();
-            uint32 const      tier  = f[1].Get<uint32>();
-            uint32 const      level = f[2].Get<uint32>();
-            std::string const cause = f[3].Get<std::string>();
-
-            handler->PSendSysMessage("  {}. {} - tier {} at level {} ({})", rank,
-                                     name, tier, level, cause);
-
-            if (p)
-                sGauntletAddon->SendTop(p, rank, name, tier, level, cause, f[4].Get<std::string>());
-
-            ++rank;
-        } while (r->NextRow());
-        return true;
-    }
-};
-
 void Addmod_gauntletScripts()
 {
     new GauntletWorldScript();
     new GauntletPlayerScript();
     new GauntletUnitScript();
-    new GauntletCommandScript();
+    AddSC_gauntlet_commands();
 }
