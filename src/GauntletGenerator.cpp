@@ -16,8 +16,7 @@ namespace
     using Stream::Mix;
     using Stream::RollIn;
 
-    constexpr size_t FAMILY_COUNT    = static_cast<size_t>(Family::MAX);
-    constexpr size_t CONDITION_COUNT = static_cast<size_t>(Condition::MAX);
+    constexpr size_t FAMILY_COUNT = static_cast<size_t>(Family::MAX);
 
     // ------------------------------------------------------------------
     // Values the design does not give. Every one of them is a decision that

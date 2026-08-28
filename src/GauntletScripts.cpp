@@ -515,9 +515,12 @@ namespace Gauntlet
     // apparatus exists for.
     void AddSC_gauntlet_mechanic_Echo();               // 2
     void AddSC_gauntlet_mechanic_Reinforcements();     // 4
+    void AddSC_gauntlet_mechanic_Craven();             // 7
     void AddSC_gauntlet_mechanic_CallToArms();         // 8
     void AddSC_gauntlet_mechanic_DeathRattle();        // 9
     void AddSC_gauntlet_mechanic_Grudge();             // 10
+    void AddSC_gauntlet_mechanic_Nimble();             // 11
+    void AddSC_gauntlet_mechanic_Cunning();            // 12
     void AddSC_gauntlet_mechanic_KeenNosed();          // 13
 }
 
@@ -535,9 +538,12 @@ static void AnchorMechanics()
 
     AddSC_gauntlet_mechanic_Echo();
     AddSC_gauntlet_mechanic_Reinforcements();
+    AddSC_gauntlet_mechanic_Craven();
     AddSC_gauntlet_mechanic_CallToArms();
     AddSC_gauntlet_mechanic_DeathRattle();
     AddSC_gauntlet_mechanic_Grudge();
+    AddSC_gauntlet_mechanic_Nimble();
+    AddSC_gauntlet_mechanic_Cunning();
     AddSC_gauntlet_mechanic_KeenNosed();
 }
 
