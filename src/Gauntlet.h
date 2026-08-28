@@ -95,6 +95,12 @@ namespace Gauntlet
         std::string Describe() const;
     };
 
+    // Only effects and conditions with a working implementation are rolled.
+    // The enums above carry the full intended vocabulary; anything not yet
+    // wired to a hook is excluded here so no affix is ever cosmetic.
+    bool IsImplemented(Effect e);
+    bool IsImplemented(Condition c);
+
     // Deterministic: the same (seed, tier) always yields the same affix, so a
     // run can be reproduced and shared by its seed.
     Affix Roll(uint32 seed, uint32 tier, uint32 rollIndex);

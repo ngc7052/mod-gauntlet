@@ -1,0 +1,7 @@
+## Interface: 30300
+## Title: Gauntlet UI
+## Notes: Affix selection and run status for mod-gauntlet.
+## Author: ngc7052
+## Version: 1.0
+## SavedVariablesPerCharacter: GauntletUIDB
+GauntletUI.lua

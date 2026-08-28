@@ -3,7 +3,7 @@
 A hardcore roguelike challenge module for [AzerothCore](https://www.azerothcore.org/).
 
 One life. Every few levels, a new curse — drawn at random from a generator with
-**over 10,000 possible affixes**, never a fixed list. Two runs are never the same.
+**2,880 possible affixes**, never a fixed list. Two runs are never the same.
 
 ## How it works
 
@@ -18,12 +18,15 @@ Affixes are not chosen from a table — they are *generated*:
 
 ```
 affix = effect × condition × severity × optional boon
-        14     ×    16     ×    6     ×      8        = 10,752 combinations
+         4     ×    15     ×    6     ×      8        = 2,880 combinations
 ```
 
-- **Effect** — what it does: max health, damage taken, damage dealt, healing
-  received, movement and attack speed, mana, regeneration, experience, money,
-  durability, threat.
+- **Effect** — what it does. Four are active: **damage taken**, **damage
+  dealt**, **healing received** and **experience gained**. The enum carries a
+  wider vocabulary (movement, attack and cast speed, max health, mana,
+  regeneration, money, durability, threat) reserved for future work; those are
+  excluded from rolls, so **every affix you are offered actually does
+  something**.
 - **Condition** — *when* it bites, which is where the character comes from.
   `Everlasting` is simple. `Desperate` only applies below half health.
   `Solitary` only when you are alone. `Nocturnal` only at night. `Delving` only
@@ -34,9 +37,17 @@ affix = effect × condition × severity × optional boon
   a real trade-off rather than a choice of least harm. *Wrathful Desperate
   Brittle* costs you maximum health but pays out damage when you are cornered.
 
-Names are generated from the roll, so what you are carrying is legible at a
-glance: `Solitary Withering (Major)`, `Nocturnal Leaden (Minor)`,
-`Avaricious Embattled Exposed (Severe)`.
+Each affix carries a generated name plus a plain-language description, so
+there is no vocabulary to memorise:
+
+```
+Rivalrous Exposed
+  [Major] You take 21% more damage in battlegrounds and arenas.
+
+Wrathful Desperate Withering
+  [Severe] Healing on you is 34% weaker below half health.
+           In exchange, you deal 19% more damage.
+```
 
 ### Run seeds
 
@@ -50,6 +61,15 @@ shows yours.
 When a run ends, the character, level, tier and cause of death are recorded.
 `.gauntlet top` shows the furthest runs on the server. Death is a score, not
 just a loss.
+
+## The addon
+
+`addon/GauntletUI` is an optional client addon. Copy it into
+`World of Warcraft/Interface/AddOns/` and affix choices appear as clickable
+buttons with descriptions instead of chat text. `/gauntlet` shows your status.
+
+The module is fully playable without it — the addon only replaces the chat
+prompt with a panel.
 
 ## Commands
 
@@ -91,8 +111,8 @@ strategy — harsher, and worth trying once.
 ## Notes and limitations
 
 - Affixes apply to **players only**. Bots are unaffected.
-- `Outmatched` (versus elites) is evaluated where the target is known and is
-  treated as inactive for ambient stat queries.
+- `Outmatched` (versus elites) needs the target, which ambient stat queries do
+  not have, so it is excluded from rolls rather than shipped inert.
 - Effects are applied through damage, healing and experience hooks rather than
   auras, so they carry no client-side icon. Your affixes are visible through
   `.gauntlet status`.

@@ -5,6 +5,7 @@
 
 #include "Gauntlet.h"
 #include <array>
+#include <cctype>
 
 namespace Gauntlet
 {
@@ -60,6 +61,27 @@ namespace Gauntlet
                 default:                         return 100;
             }
         }
+    }
+
+
+    bool IsImplemented(Effect e)
+    {
+        switch (e)
+        {
+            case Effect::DamageTaken:
+            case Effect::DamageDone:
+            case Effect::HealingReceived:
+            case Effect::ExperienceGain:
+                return true;
+            default:
+                return false;   // vocabulary reserved, not yet wired to a hook
+        }
+    }
+
+    bool IsImplemented(Condition c)
+    {
+        // VersusElites needs the target, which ambient stat queries do not have.
+        return c != Condition::VersusElites;
     }
 
     std::string EffectName(Effect e)
@@ -148,16 +170,53 @@ namespace Gauntlet
 
     std::string Affix::Describe() const
     {
-        std::string const cond = (condition == Condition::Always)
-            ? "" : (" (" + ConditionName(condition) + ")");
+        std::string what;
+        switch (effect)
+        {
+            case Effect::DamageTaken:     what = "you take " + std::to_string(magnitude) + "% more damage"; break;
+            case Effect::DamageDone:      what = "you deal " + std::to_string(magnitude) + "% less damage"; break;
+            case Effect::HealingReceived: what = "healing on you is " + std::to_string(magnitude) + "% weaker"; break;
+            case Effect::ExperienceGain:  what = "you gain " + std::to_string(magnitude) + "% less experience"; break;
+            default:                      what = EffectName(effect) + " " + std::to_string(magnitude) + "%"; break;
+        }
 
-        std::string out = SeverityName(severity) + ": " + EffectName(effect)
-                        + " " + std::to_string(magnitude) + "%" + cond;
+        std::string when;
+        switch (condition)
+        {
+            case Condition::Always:          when = ""; break;
+            case Condition::InCombat:        when = " while in combat"; break;
+            case Condition::OutOfCombat:     when = " while out of combat"; break;
+            case Condition::BelowHalfHealth: when = " below half health"; break;
+            case Condition::AboveHalfHealth: when = " above half health"; break;
+            case Condition::WhileSolo:       when = " while alone"; break;
+            case Condition::WhileGrouped:    when = " while in a group"; break;
+            case Condition::InDungeon:       when = " inside dungeons"; break;
+            case Condition::InOpenWorld:     when = " in the open world"; break;
+            case Condition::VersusPlayers:   when = " in battlegrounds and arenas"; break;
+            case Condition::AtNight:         when = " at night"; break;
+            case Condition::AtDay:           when = " during the day"; break;
+            case Condition::WhileMoving:     when = " while moving"; break;
+            case Condition::WhileStationary: when = " while standing still"; break;
+            case Condition::WhileMounted:    when = " while mounted"; break;
+            default:                         when = ""; break;
+        }
+
+        std::string out = what + when;
+        out[0] = static_cast<char>(std::toupper(static_cast<unsigned char>(out[0])));
+        out += ".";
 
         if (boon != Boon::None)
-            out += " | boon: " + BoonName(boon) + " " + std::to_string(boonMagnitude) + "%";
+        {
+            switch (boon)
+            {
+                case Boon::BonusDamage:     out += " In exchange, you deal " + std::to_string(boonMagnitude) + "% more damage."; break;
+                case Boon::BonusHealing:    out += " In exchange, healing on you is " + std::to_string(boonMagnitude) + "% stronger."; break;
+                case Boon::BonusExperience: out += " In exchange, you gain " + std::to_string(boonMagnitude) + "% more experience."; break;
+                default:                    out += " In exchange, " + BoonName(boon) + " " + std::to_string(boonMagnitude) + "%."; break;
+            }
+        }
 
-        return out;
+        return "[" + SeverityName(severity) + "] " + out;
     }
 
     Affix Roll(uint32 seed, uint32 tier, uint32 rollIndex)
@@ -168,8 +227,10 @@ namespace Gauntlet
                          ^ static_cast<uint64>(rollIndex));
 
         Affix a;
-        a.effect    = static_cast<Effect>(RollIn(state, 0, static_cast<uint32>(Effect::MAX) - 1));
-        a.condition = static_cast<Condition>(RollIn(state, 0, static_cast<uint32>(Condition::MAX) - 1));
+        do { a.effect = static_cast<Effect>(RollIn(state, 0, static_cast<uint32>(Effect::MAX) - 1)); }
+        while (!IsImplemented(a.effect));
+        do { a.condition = static_cast<Condition>(RollIn(state, 0, static_cast<uint32>(Condition::MAX) - 1)); }
+        while (!IsImplemented(a.condition));
 
         // Severity drifts upward with tier but never becomes fully predictable.
         uint32 const floorSev = std::min<uint32>(tier / 4u, 3u);
