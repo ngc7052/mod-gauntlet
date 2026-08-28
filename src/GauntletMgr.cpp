@@ -1286,12 +1286,13 @@ namespace Gauntlet
         if (!st || st->dead)
             return;
 
-        // wasOutOfCombat is true and not a guess. PlayerScript::OnPlayerEnterCombat
-        // is reached only from CombatManager::UpdateOwnerCombatState, which
-        // returns early unless the combat state actually changed
-        // (CombatManager.cpp:411) and sets UNIT_FLAG_IN_COMBAT at :417, four
-        // lines before the hook at :423 -- so the hook *is* the out-of-combat
-        // edge and a body-pull into a fight already under way never reaches it.
+        // wasOutOfCombat is true and not a guess. CombatManager.cpp:423 is the
+        // only place in the core that calls OnPlayerEnterCombat, and the
+        // function it sits in returns early unless the combat state actually
+        // changed (:412-413) -- so the hook *is* the out-of-combat edge and a
+        // body-pull into a fight already under way never reaches it. Reading
+        // IsInCombat() here instead is not available: UNIT_FLAG_IN_COMBAT is
+        // set at :417, six lines earlier.
         ForEachMechanic(player, st,
                         [enemy](Ctx& ctx, AffixInstance& a) { a.impl->OnEnterCombat(ctx, enemy, true); });
     }

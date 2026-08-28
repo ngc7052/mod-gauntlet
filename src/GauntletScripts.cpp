@@ -298,19 +298,22 @@ public:
         sGauntlet->OnGiveXP(player, amount, victim);
     }
 
-    // The out-of-combat edge, and only that edge: CombatManager returns early
-    // unless the combat state actually changed (CombatManager.cpp:411) and sets
-    // UNIT_FLAG_IN_COMBAT at :417, four lines before this hook at :423. That is
-    // what makes Champions a counter of fights rather than of creatures.
+    // The out-of-combat edge, and only that edge. CombatManager.cpp:423 is the
+    // one call site in the core, inside UpdateOwnerCombatState, which returns
+    // early unless the combat state actually changed (:412-413) and sets
+    // UNIT_FLAG_IN_COMBAT at :417, six lines before the hook. That is what makes
+    // Champions a counter of fights rather than of creatures, and it is why
+    // wasOutOfCombat is passed as true rather than read off the player: by the
+    // time the hook runs, IsInCombat() is already the flag set at :417.
     void OnPlayerEnterCombat(Player* player, Unit* enemy) override
     {
         sGauntlet->OnEnterCombat(player, enemy);
     }
 
-    // The core can reach this twice for one exit (CombatManager.cpp:433 through
-    // EndAllCombat, then Unit::ClearInCombat at Unit.cpp:10714), so every
-    // mechanic behind it has to be idempotent; Champions and Falling Sky both
-    // are.
+    // The core has two call sites for this one -- CombatManager.cpp:433 and
+    // Unit::ClearInCombat at Unit.cpp:10714 -- so it can be reached twice for
+    // one exit and every mechanic behind it has to be idempotent. Champions'
+    // Restore() and Falling Sky's Disarm() both are.
     void OnPlayerLeaveCombat(Player* player) override
     {
         sGauntlet->OnLeaveCombat(player);
