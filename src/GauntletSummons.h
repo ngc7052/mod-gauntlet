@@ -54,8 +54,9 @@ namespace Gauntlet
     // an owner check, but TEMPSUMMON_TIMED_OR_DEAD_DESPAWN freezes its timer
     // while the creature is in combat, so a summon locked in a fight it can
     // neither win nor leave would otherwise be immortal. Nothing this module
-    // spawns has any business living a quarter of an hour.
-    constexpr uint32 SUMMON_MAX_LIFE_MS = 900000;
+    // spawns has any business living a quarter of an hour, and no card names a
+    // ceiling, so this is a chosen one.
+    constexpr uint32 SUMMON_MAX_LIFE_MS = 900000;   // TODO(design)
 
     // How often the shared AI re-checks its owner. The owner check is the one
     // that actually guarantees nothing is left behind, so it is deliberately

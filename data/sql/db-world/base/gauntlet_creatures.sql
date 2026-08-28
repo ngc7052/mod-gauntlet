@@ -73,6 +73,9 @@ VALUES
     -- speed_run is a rate against the 7.0 yd/s base, so 0.85 is 85% of an
     -- unmounted player exactly as the card asks.
     (900001, 'Shade', NULL, 1, 1, 0, 14, 0,
+     -- type 6 UNDEAD: the card calls the Shade a "humanoid-typed undead", which
+     -- no single `type` column can be. Undead keeps fear, stun and root working
+     -- as the counterplay promises and costs only Polymorph. -- TODO(design)
      1.0, 0.85, 20, 0, 0, 1.2,
      2000, 2000, 1, 1, 1,
      0, 2048, 0, 0, 6, 0, 0,
@@ -80,7 +83,10 @@ VALUES
      1, 1, 1, 0, 0,
      1, 102760704, 'gauntlet_summon'),
 
-    -- S3 Carrion's scavengers: fast and fragile, two or three at a time.
+    -- S3 Carrion's scavengers: fast and fragile, two or three at a time. The
+    -- card says "fast, fragile" and gives no numbers, so 0.6 health and 1.3 run
+    -- speed are chosen: fast enough that outrunning them unmounted fails, soft
+    -- enough that two of them are a fight and not a death. -- TODO(design)
     (900002, 'Scavenger', NULL, 1, 1, 0, 14, 0,
      1.0, 1.3, 20, 0, 0, 0.9,
      1600, 2000, 1, 1, 1,
@@ -118,7 +124,8 @@ VALUES
     -- appearance is replaced at runtime by 45204 Clone Me, exactly as the
     -- core's own Mirror Image does; the base display is a visible humanoid
     -- rather than Mirror Image's invisible one so that a clone that fails to
-    -- land leaves a person standing there and not a floating name.
+    -- land leaves a person standing there and not a floating name. Phase 2
+    -- owns Echo and may prefer the invisible model. -- TODO(design)
     (900005, 'Echo', NULL, 1, 1, 0, 14, 0,
      1.0, 1.14286, 20, 0, 0, 1.0,
      2000, 2000, 1, 1, 1,
