@@ -86,3 +86,41 @@ Tiers 1 and 2 relaxing zero percent is load-bearing: before commit `8aa2843`
 moved Champions, Carrion and Hubris to `minTier = 1`, tier 1 had two families
 and no reward-shaped mechanic and relaxed 100% of the time. The test fails if
 that commit is reverted.
+
+## `compile-check.sh` — the full core, in seconds
+
+`syntax-check.sh` and `run-tests.sh` can only reach the twelve translation
+units that are free of `Player.h`. The other eleven need boost, the mysql
+headers and a generated `revision_data.h`, so before this script they were
+first compiled by a Docker build minutes long — which is how Phase 1 shipped
+three separate build failures, each found a whole build apart.
+
+```bash
+tests/compile-check.sh                     # every module translation unit
+tests/compile-check.sh src/GauntletMgr.cpp # one file (path or bare name)
+tests/compile-check.sh --anchors           # the anchor audit alone, no Docker
+tests/compile-check.sh --rebuild-image     # rebuild the base image
+tests/compile-check.sh --stop              # remove the helper container
+```
+
+It keeps one long-lived container from the core's own `build` stage, bind-mounts
+this repository read-only over `/azerothcore/modules/mod-gauntlet` inside it,
+and drives the build tree's existing ninja. Nothing is copied and no image is
+rebuilt; the objects live in the container's writable layer, so a second run is
+incremental. A new `.cpp` triggers a `cmake .` first, because AzerothCore
+collects module sources with a plain `file(GLOB)` and no `CONFIGURE_DEPENDS`.
+
+Three things it checks, cheapest first:
+
+1. **The anchor audit.** Every `GAUNTLET_MECHANIC` in `src/` must have both a
+   declaration and a call in `GauntletScripts.cpp`'s `AnchorMechanics()`, and
+   every anchor called there must still be defined. Without the anchor the
+   linker drops the translation unit out of `libmodules.a`, the registrar never
+   runs, and `MakeMechanic` answers `nullptr` for a mechanic whose source is
+   right there — with no error anywhere. Pure text, no Docker, 0.03 s.
+2. **The compile**, against the real clang and the real core headers.
+3. **A partial link** (`ld -r`) over the module's own objects, which is the only
+   link this module can be given locally: it catches a symbol defined twice and
+   an anchor declared but never defined.
+
+A worker that has not run this on the file it wrote has not finished.
