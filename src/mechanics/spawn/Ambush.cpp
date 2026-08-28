@@ -53,6 +53,25 @@ namespace Gauntlet
         // Not on the card, and the same two minutes every other summon gets.
         constexpr uint32 LIFETIME_MS = 120000;   // TODO(design)
 
+        // "You hear footsteps" is the card's own wording, and it means a sound.
+        // A chat line alone is not one: a player watching their character, or
+        // reading a full combat log, misses it entirely -- and the four seconds
+        // between the warning and the Ambusher are the whole of this affix's
+        // counterplay, so a telegraph that can be missed is the affix broken.
+        //
+        // 8663 is the sound the core plays for C'Thun's out-of-combat whispers
+        // (boss_cthun.cpp:108), and it is played there the same way it is
+        // played here: PlayDirectSound(id, player) with the player as target,
+        // which sends SMSG_PLAY_SOUND to that one session and to nobody else
+        // (boss_cthun.cpp:449-452). It is a client-side sound in the 3.3.5 data
+        // already, so no patch is involved.
+        //
+        // TODO(design): the design names no sound, and this one is chosen for
+        // being low, wordless, already in the client and already used by the
+        // core for exactly this job -- a cue meant for one player who is about
+        // to be in trouble.
+        constexpr uint32 SOUND_FOOTSTEPS = 8663;
+
         uint8 RankIndex(AffixInstance const* self)
         {
             uint8 const rank = self ? self->rank : 1;
@@ -200,9 +219,15 @@ namespace Gauntlet
 
             AddonFor(ctx)->SendEvent(player, MechanicKey(), WARN_MS / 1000u, "Ambush");
 
+            // Three telegraphs, because each of them reaches a player the
+            // others do not: the addon's countdown bar for a player running it,
+            // the chat line for one who is not, and the sound for one who is
+            // looking at the world rather than at either.
+            player->PlayDirectSound(SOUND_FOOTSTEPS, player);              // Object.h:573
+
             if (player->GetSession())
                 ChatHandler(player->GetSession()).PSendSysMessage(
-                    "|cffff2020[Gauntlet]|r You hear footsteps.");
+                    "|cffff2020[Gauntlet]|r You hear footsteps behind you.");
         }
 
         void Ambush::OnEvent(Ctx& ctx, uint32 eventId)

@@ -106,6 +106,17 @@ namespace Gauntlet
         return _queue;
     }
 
+    bool Scheduler::WarnIssued(uint16 mechanic, uint32 id) const
+    {
+        for (Pending const& p : _pending)
+            if (p.mechanic == mechanic && p.id == id)
+                return p.warnLeadMs == 0 || p.warnIssued;
+
+        // No record: either the pair has already been released and dropped, or
+        // it was never armed. Both mean there is no warning left owing.
+        return true;
+    }
+
     void Scheduler::Arm(uint16 mechanic, uint32 id, uint32 inMs, uint32 warnMs)
     {
         // MECHANIC_NONE means "no mechanic" everywhere else in the module and

@@ -1185,7 +1185,8 @@ public:
                  Actor(handler), def->name, static_cast<uint32>(def->id),
                  p->GetName(), p->GetGUID().GetCounter());
 
-        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r CHEAT: released {}'s queued event now.", def->name);
+        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r CHEAT: released {}'s queued event now. Its warning "
+                                 "was delivered first if it had not already gone out.", def->name);
         return true;
     }
 

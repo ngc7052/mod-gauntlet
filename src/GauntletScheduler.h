@@ -117,6 +117,14 @@ namespace Gauntlet
 
         std::vector<ScheduledEvent> const& Queue() const;   // .gauntlet debug dump
 
+        // Whether the warning for (mechanic, id) has already gone out. False
+        // for a pair that has none and for one this scheduler has never heard
+        // of. `.gauntlet debug fire` is the only caller: releasing a fire early
+        // must not swallow a telegraph the player has not been given yet, and
+        // the plan's wording for that command is "skip the clock, keep the
+        // warning".
+        bool WarnIssued(uint16 mechanic, uint32 id) const;
+
         // The scheduler's own clock, in milliseconds since this instance was
         // created. Addition to the frozen interface: ScheduledEvent::dueMs is
         // an absolute time on this clock, so `.gauntlet debug dump` cannot turn

@@ -1575,11 +1575,21 @@ namespace Gauntlet
         if (!found)
             return false;
 
+        // "Skip the clock, keep the warning" (plan section 5.2). Cancel takes
+        // the whole pair out, so a fire released before its telegraph had gone
+        // out would arrive with none at all -- which is precisely the failure
+        // the affixes are built to avoid, produced by the tool meant to test
+        // them. So the warning is delivered first when it is still owed.
+        bool const owesWarning = !sched->WarnIssued(mechanic, eventId);
+
         sched->Cancel(mechanic);
 
-        NoteActor(player, mechanic);
-
         Ctx ctx = MakeCtx(player, st, inst);
+
+        if (owesWarning)
+            inst->impl->OnWarn(ctx, eventId);
+
+        NoteActor(player, mechanic);
         inst->impl->OnEvent(ctx, eventId);
         return true;
     }
