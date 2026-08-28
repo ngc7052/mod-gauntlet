@@ -37,9 +37,13 @@
 using namespace Acore::ChatCommands;
 using namespace Gauntlet;
 
-// The core has its own global `Condition` class (ConditionMgr.h), so an
-// unqualified `Condition` outside `namespace Gauntlet` below is ambiguous
-// and clang rejects it. Qualify it as `Gauntlet::Condition` out here.
+// Two of this module's names collide with the core's own globals: `Condition`
+// (a class in ConditionMgr.h) and `MECHANIC_NONE` (the spell Mechanics enum in
+// SharedDefines.h). Outside the `namespace Gauntlet` block below, an
+// unqualified use of either is ambiguous and clang rejects it outright, so
+// they are written `Gauntlet::Condition` and `Gauntlet::MECHANIC_NONE` out
+// here. Those two are the whole set -- every other name Gauntlet.h exports was
+// checked against the core's headers and is unique.
 
 namespace Gauntlet
 {
@@ -897,7 +901,7 @@ public:
         for (uint32 i = 0; i < set.offers.size(); ++i)
         {
             Offer const& o = set.offers[i];
-            if (o.mechanic == MECHANIC_NONE)
+            if (o.mechanic == Gauntlet::MECHANIC_NONE)
             {
                 handler->PSendSysMessage("  [{}] (empty) - nothing in the table fits this character at this "
                                          "tier.", i + 1);
