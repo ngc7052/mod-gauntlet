@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
+#include "GauntletAddon.h"
 #include "GauntletMgr.h"
 #include "Chat.h"
 #include "ChatCommand.h"
@@ -65,6 +66,11 @@ public:
         if (!st)
             return;
 
+        // HELLO and the snapshot go out before the chat lines and before the
+        // retired check: an addon that is listening wants the tombstone drawn
+        // too, and the run line below is the fallback for one that is not.
+        sGauntletAddon->OnLogin(player);
+
         ChatHandler ch(player->GetSession());
         if (st->dead)
         {
@@ -78,11 +84,19 @@ public:
         // A tier may have been reached while offline, or left unpicked.
         uint32 const due = player->GetLevel() / sGauntlet->Interval();
         if (due > st->tier)
+        {
             sGauntlet->OfferTier(player, st->tier + 1);
+            sGauntletAddon->SendOffers(player);
+        }
     }
 
     void OnPlayerLogout(Player* player) override
     {
+        // Unconditional and first: the addon's per-player state is keyed by
+        // guid and must not outlive the session that owns it, and eligibility
+        // is a config-dependent answer that may have changed since login.
+        sGauntletAddon->Forget(player->GetGUID());
+
         if (!sGauntlet->IsEligible(player))
             return;
 
@@ -116,7 +130,10 @@ public:
 
         uint32 const due = player->GetLevel() / sGauntlet->Interval();
         if (due > st->tier)
+        {
             sGauntlet->OfferTier(player, st->tier + 1);
+            sGauntletAddon->SendOffers(player);
+        }
     }
 
     // Death no longer ends the run here (plan section 6, decision 5): it arms
@@ -137,7 +154,15 @@ public:
             return;
 
         if (sGauntlet->IsPendingDeath(player))
+        {
             sGauntlet->EndRun(player, "slain");
+
+            // Beyond the plan's table, which lists RUN at login and after a
+            // pick. Without it the addon goes on drawing a retired run as
+            // alive until the next login, which is the one moment the panel
+            // has to be right about.
+            sGauntletAddon->SendRun(player);
+        }
     }
 
     // The seam the cancel path will use. Player::ResurrectPlayer is the one
@@ -162,12 +187,16 @@ public:
     // is false whenever nobody in the world is dying.
     void OnPlayerUpdate(Player* player, uint32 diff) override
     {
-        if (!sGauntlet->AnyPendingDeath())
-            return;
-        if (!sGauntlet->Enabled() || !sGauntlet->IsEligible(player))
-            return;
+        if (sGauntlet->AnyPendingDeath() && sGauntlet->Enabled() && sGauntlet->IsEligible(player))
+            sGauntlet->UpdateDeathTimer(player, diff);
 
-        sGauntlet->UpdateDeathTimer(player, diff);
+        // The addon channel's 500 ms flush has no clock of its own either.
+        // This hook is the world tick, not a fixed cadence -- it fires once
+        // per World::Update, which MinWorldUpdateTime leaves at roughly 1 ms
+        // and load stretches -- so Addon::Update accumulates `diff` and
+        // returns on an integer test whenever nothing is queued, which in
+        // Phase 0 is always.
+        sGauntletAddon->Update(player, diff);
     }
 
     // AzerothCore exposes proper veto hooks, so the run simply cannot be
@@ -203,6 +232,22 @@ public:
 
         RunState* st = sGauntlet->Get(player);
         return !(st && st->dead);
+    }
+
+    // The client half of the GNT channel. The addon whispers itself with
+    // SendAddonMessage("GNT", ...), which reaches Player::Whisper
+    // ($CORE/src/server/game/Entities/Player/Player.cpp:9680) and this hook
+    // before the packet is built, so returning false both acts on the message
+    // and stops it ever being sent back out.
+    bool OnPlayerCanUseChat(Player* player, uint32 /*type*/, uint32 lang, std::string& msg,
+                            Player* /*receiver*/) override
+    {
+        if (lang != uint32(LANG_ADDON))
+            return true;
+
+        // False only for a frame the module recognised; every other addon's
+        // traffic passes through untouched.
+        return !sGauntletAddon->HandleIncoming(player, msg);
     }
 
     void OnPlayerGiveXP(Player* player, uint32& amount, Unit* /*victim*/, uint8 /*source*/) override
@@ -270,6 +315,11 @@ public:
             handler->PSendSysMessage("|cffff2020[Gauntlet]|r Nothing to pick, or invalid choice.");
             return true;
         }
+
+        // The run line and the carried set both moved; the addon is told the
+        // same way whether the pick came from this command or from its own
+        // button.
+        sGauntletAddon->SendSnapshot(p);
         return true;
     }
 
@@ -294,8 +344,13 @@ public:
 
     static bool HandleTop(ChatHandler* handler)
     {
+        Player* p = handler->GetSession() ? handler->GetSession()->GetPlayer() : nullptr;
+
+        // conducts joins the select for the addon's TOP line; the chat lines
+        // below are unchanged, because a conduct list is too long to read in
+        // a chat frame and the plan gives it to the addon's leaderboard tab.
         QueryResult r = CharacterDatabase.Query(
-            "SELECT `name`, `tier`, `level`, `cause` FROM `gauntlet_leaderboard` "
+            "SELECT `name`, `tier`, `level`, `cause`, `conducts` FROM `gauntlet_leaderboard` "
             "ORDER BY `tier` DESC, `level` DESC LIMIT 10");
 
         handler->PSendSysMessage("|cffff2020[Gauntlet]|r Furthest runs:");
@@ -309,9 +364,18 @@ public:
         do
         {
             Field* f = r->Fetch();
-            handler->PSendSysMessage("  {}. {} - tier {} at level {} ({})", rank++,
-                                     f[0].Get<std::string>(), f[1].Get<uint32>(),
-                                     f[2].Get<uint32>(), f[3].Get<std::string>());
+            std::string const name  = f[0].Get<std::string>();
+            uint32 const      tier  = f[1].Get<uint32>();
+            uint32 const      level = f[2].Get<uint32>();
+            std::string const cause = f[3].Get<std::string>();
+
+            handler->PSendSysMessage("  {}. {} - tier {} at level {} ({})", rank,
+                                     name, tier, level, cause);
+
+            if (p)
+                sGauntletAddon->SendTop(p, rank, name, tier, level, cause, f[4].Get<std::string>());
+
+            ++rank;
         } while (r->NextRow());
         return true;
     }
