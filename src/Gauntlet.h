@@ -263,6 +263,28 @@ namespace Gauntlet
         uint16 lastActor   = MECHANIC_NONE;
         uint32 lastActorMs = 0;
 
+        // How long a claim on "the last affix to act" stays true. Design
+        // section 4.8's fourth question is answered from it, and the pair
+        // exists rather than a single field because a Falling Sky that struck
+        // twenty minutes ago has no business being named for a death now.
+        // Fifteen seconds is long enough to cover a fight that a mechanic's
+        // blow started and short enough that an unrelated death is not blamed
+        // on it. The value moved here from GauntletMgr.cpp unchanged.
+        static constexpr uint32 ACTOR_MEMORY_MS = 15000;   // TODO(design)
+
+        // Mgr::NoteActor does this for a scheduler Fire and for a blow from a
+        // creature this module summoned, which covers most of the set. A
+        // mechanic that hurts its owner on its own tick -- Grudge standing on a
+        // corpse, Death Rattle's burst -- has to say so itself, and this is how,
+        // without dragging GauntletMgr.h and Player.h into a mechanic.
+        void NoteActor(uint16 mechanic)
+        {
+            if (mechanic == MECHANIC_NONE)
+                return;
+            lastActor   = mechanic;
+            lastActorMs = ACTOR_MEMORY_MS;
+        }
+
         RunState() = default;
         ~RunState();
 

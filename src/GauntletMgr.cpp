@@ -233,13 +233,6 @@ namespace Gauntlet
         // logged in. CONTRACT-P1 section 5.2 states the sixty seconds.
         constexpr uint32 STATE_SAVE_MS = 60000;
 
-        // How long "this affix acted on you" stays true. KILLBY names whatever
-        // is remembered here, and a Falling Sky that struck twenty minutes ago
-        // must not be blamed for a death now. The design gives no number, so
-        // this is a chosen one: long enough to cover a whole fight, short
-        // enough that it can only mean the fight the player just lost.
-        constexpr uint32 ACTOR_MEMORY_MS = 15000;   // TODO(design)
-
         // Caps wide enough that ClampProduct in GauntletAggregate.cpp is the
         // identity, so the shared -- and unit-tested -- affix maths can be
         // asked for the raw product and the clamp applied later, once, over a
@@ -1481,10 +1474,7 @@ namespace Gauntlet
             return;
 
         if (RunState* st = Get(player))
-        {
-            st->lastActor   = mechanic;
-            st->lastActorMs = ACTOR_MEMORY_MS;
-        }
+            st->NoteActor(mechanic);
     }
 
     void Mgr::ReportKilledBy(Player* player)
