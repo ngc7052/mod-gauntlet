@@ -44,6 +44,12 @@ namespace Gauntlet
         }
     }
 
+    // A boon is a word the player wears in front of the affix's name --
+    // "Wrathful Desperate Exposed" -- so every one of these is an adjective
+    // and none of them is a category label. The five below BonusRegen were
+    // added in Phase 1 for the cards the original seven could not express;
+    // they name the shape of the gift rather than its size, because their
+    // magnitude is bespoke and lives in the mechanic's blurb.
     std::string BoonName(Boon b)
     {
         switch (b)
@@ -56,6 +62,11 @@ namespace Gauntlet
             case Boon::BonusMoney:      return "Avaricious";
             case Boon::BonusMaxHealth:  return "Stalwart";
             case Boon::BonusRegen:      return "Renewing";
+            case Boon::BonusAvoidance:  return "Evasive";
+            case Boon::BonusCooldown:   return "Relentless";
+            case Boon::BonusAbility:    return "Honed";
+            case Boon::BonusPetDamage:  return "Savage";
+            case Boon::SecondLife:      return "Deathless";
             default:                    return "";
         }
     }

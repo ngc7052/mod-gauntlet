@@ -51,9 +51,35 @@ namespace Gauntlet
     // ---------------------------------------------------------------------
     // Boons: the upside paired with a curse. One fixed type per mechanic in
     // the redesign; magnitude comes from the rank.
+    //
+    // The enum is append-only and its values are stored in
+    // gauntlet_affix.boon, so nothing here may ever be renumbered, reordered
+    // or removed. Appending is only safe because GauntletLegacy.cpp froze
+    // generator 1's boon range as the literal LEGACY_BOON_MAX = 8: the legacy
+    // roll drew its boon from [1, Boon::MAX - 1], so a value appended while
+    // that bound still tracked the enum would silently rewrite every affix a
+    // migrated character is carrying.
+    //
+    // It has two halves, and the split is load-bearing.
+    //
+    // The first eight are *generic*: they name a stat any character has, they
+    // have a magnitude row in the generator's BoonTable, a sentence in
+    // Scalars.cpp's BoonClause and -- for three of them -- an AggregateKind.
+    // A Scalar mechanic carries no fixed boon (design section 5 pairs a
+    // standalone scalar with a boon but does not say which), so the generator
+    // rolls one out of this half and nothing else.
+    //
+    // Everything after BonusRegen is *fixed by the registry*: each one names
+    // an upside that only makes sense attached to the mechanic that grants it
+    // -- which ability's cooldown, whose pet, what the bespoke buff does --
+    // and the blurb is what tells the player. None of them may be rolled onto
+    // a Scalar: there is no ability to shorten, no pet to strengthen, and a
+    // second life handed out with a random Exposed would quietly end hardcore.
+    // BonusRegen is therefore the last value the roll may reach.
     // ---------------------------------------------------------------------
     enum class Boon : uint8
     {
+        // Generic; the Scalar boon roll draws from these.
         None,
         BonusDamage,
         BonusHealing,
@@ -62,8 +88,23 @@ namespace Gauntlet
         BonusMoney,
         BonusMaxHealth,
         BonusRegen,
+
+        // Fixed by the registry; never rolled. See the note above.
+        BonusAvoidance,   // you are harder to hit (C15's +5% dodge)
+        BonusCooldown,    // one named ability comes back sooner
+        BonusAbility,     // a bespoke buff to one ability; the blurb says which
+        BonusPetDamage,   // your pet or demon hits harder, not you
+        SecondLife,       // a death you walk away from (B1, C43, C44)
         MAX
     };
+
+    // The last boon the generator's Scalar roll may produce. Everything above
+    // it belongs to a mechanic that names its own boon, and handing one to a
+    // Scalar would produce an affix that is named for an upside it does not
+    // have. Kept beside the enum rather than inside it so that iterating
+    // 0..Boon::MAX -- which the addon exporter and the tests both do -- still
+    // walks real values only.
+    constexpr Boon LastRolledBoon = Boon::BonusRegen;
 
     // The player-facing adjective for a condition ("Desperate") and for a boon
     // ("Wrathful"), shared by both models and defined in GauntletNames.cpp.
@@ -105,7 +146,7 @@ namespace Gauntlet
     // The generator version folded into the offer stream. Bump whenever the
     // registry table, the family weights or the offer algorithm change; runs
     // created under an older version keep their stored columns untouched.
-    constexpr uint16 GeneratorVersion = 2;
+    constexpr uint16 GeneratorVersion = 3;
 
     constexpr uint8 MAX_RANK = 3;
 
