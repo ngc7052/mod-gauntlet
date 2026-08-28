@@ -7,6 +7,7 @@
 #define MOD_GAUNTLET_MGR_H
 
 #include "Gauntlet.h"
+#include "Player.h"
 #include <unordered_map>
 #include <vector>
 
