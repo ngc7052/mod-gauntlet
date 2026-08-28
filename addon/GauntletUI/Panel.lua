@@ -441,8 +441,19 @@ local function OnSystem(raw)
     end
 
     if msg:find("You bear") then
-        chooser:Hide(); offers, mode, pendingOffer = {}, nil, false
-        if main:IsShown() then RefreshMain() end
+        chooser:Hide(); offers, pendingOffer = {}, false
+
+        -- The scraped carried list is only ever rebuilt from a .gauntlet status,
+        -- so without asking for a fresh one the affix just picked does not show
+        -- up until the panel is opened again. Only worth the round trip while
+        -- the window is actually up.
+        if main:IsShown() then
+            affixes, mode = {}, "status"
+            SendChatMessage(".gauntlet status", "SAY")
+        else
+            mode = nil
+        end
+        RefreshMain()
     end
 end
 
@@ -494,7 +505,10 @@ GauntletProtocol.On("AFFIX_END", function()
     -- merge, since the server may resend this after login, a pick or a swap.
     affixes, carriedBySlot = pendingCarried, pendingCarriedBySlot
     pendingCarried, pendingCarriedBySlot = {}, {}
-    if main:IsShown() then RefreshMain() end
+    -- Unconditional: RefreshMain only writes text and textures, so running it
+    -- while the window is hidden costs nothing, and gating it on IsShown() was
+    -- how a freshly picked affix failed to appear until the panel was reopened.
+    RefreshMain()
 end)
 
 local pendingOffers = {}
@@ -591,7 +605,9 @@ end)
 minimapBtn:SetScript("OnLeave", function() mmGlow:Hide(); GameTooltip:Hide() end)
 minimapBtn:SetScript("OnClick", function()
     if main:IsShown() then main:Hide() return end
-    if GauntletProtocol.mode ~= "protocol" then
+    if GauntletProtocol.mode == "protocol" then
+        if run.tier == 0 and not next(affixes) then GauntletProtocol.SendSync() end
+    else
         affixes, mode = {}, "status"
         SendChatMessage(".gauntlet status", "SAY")
     end
