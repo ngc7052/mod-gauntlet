@@ -1,0 +1,92 @@
+/*
+ * mod-gauntlet - deterministic offer builder
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+#ifndef MOD_GAUNTLET_GENERATOR_H
+#define MOD_GAUNTLET_GENERATOR_H
+
+#include "Gauntlet.h"
+#include "GauntletLegacy.h"
+
+#include <vector>
+
+namespace Gauntlet
+{
+    // ---------------------------------------------------------------------
+    // The roll stream.
+    //
+    // splitmix64, byte-identical on every platform, so a seed reproduces a run
+    // anywhere. It lives in a header because generator 1 and generator 2 must
+    // draw from the same arithmetic: the legacy roll is frozen against a
+    // fixture, and a second copy of these four lines is a second thing that
+    // can drift. Deliberately not std::rand, and deliberately not seeded from
+    // anything the world can change.
+    // ---------------------------------------------------------------------
+    namespace Stream
+    {
+        inline uint64 Mix(uint64 x)
+        {
+            x += 0x9E3779B97F4A7C15ULL;
+            x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ULL;
+            x = (x ^ (x >> 27)) * 0x94D049BB133111EBULL;
+            return x ^ (x >> 31);
+        }
+
+        inline uint32 RollIn(uint64& state, uint32 lo, uint32 hi)
+        {
+            state = Mix(state);
+            return lo + static_cast<uint32>(state % (hi - lo + 1));
+        }
+    }
+
+    // A view of the registry the offer builder may draw from. The live one
+    // hides MF_NotImplemented entries; the tests use one that does not, so the
+    // invariants exercise the whole 73-entry table rather than the four
+    // mechanics Phase 0 happens to implement.
+    struct RegistryView
+    {
+        bool includeUnimplemented = false;
+    };
+
+    // Why the builder had to relax a rule; empty when it did not.
+    //
+    // The ladder is fixed and is walked in this order (plan §5.1 cannot hold
+    // on a four-mechanic pool, so the degradation is defined rather than
+    // accidental): keep every rule; then allow a family a sibling slot already
+    // used; then allow a mechanic another slot already offered, preferring a
+    // condition it has not been offered with; and only then fall back to the
+    // scalar pool with every structural rule dropped.
+    enum GeneratorRelaxation : uint32
+    {
+        GR_None             = 0,
+        GR_RepeatedFamily   = 1u << 0,
+        GR_RepeatedMechanic = 1u << 1,
+
+        // Set when a slot could not be filled from any family and was drawn
+        // from the scalar pool instead, and also when the "one reward-shaped
+        // offer per tier" guarantee found no reward-shaped candidate at all --
+        // which is the same failure (nothing eligible) seen from the other
+        // end, and the enum is frozen, so it does not get a bit of its own.
+        GR_FellBackToScalar = 1u << 2
+    };
+
+    struct OfferSet
+    {
+        std::vector<Offer> offers;
+        uint32 relaxations = GR_None;
+    };
+
+    // Deterministic in (seed, tier, view, carried, count, reg,
+    // GeneratorVersion) and in nothing else: no clock, no rand(), no pointer
+    // value, no unordered container on a path that feeds a roll. The offers
+    // are never stored -- they are rebuilt from the seed every time the tier
+    // prompt is shown -- so anything that changes the table, the weights or
+    // this algorithm must bump GeneratorVersion, which is folded into the
+    // stream. A pick, once taken, is stored in columns and never regenerated.
+    OfferSet BuildOffers(uint32 seed, uint8 tier, IPlayerView const& view,
+                         std::vector<AffixInstance> const& carried,
+                         uint32 count = 3, RegistryView reg = {});
+}
+
+#endif // MOD_GAUNTLET_GENERATOR_H
