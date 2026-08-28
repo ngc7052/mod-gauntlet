@@ -1,11 +1,11 @@
 /*
- * mod-gauntlet - dumps every Gauntlet::Roll() output for a fixed seed/tier/i
+ * mod-gauntlet - dumps every Gauntlet::LegacyRoll() output for a fixed seed/tier/i
  * cross product as JSON, so the redesign's LegacyRoll can be checked against
  * what the shipped generator actually produced.
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-#include "Gauntlet.h"
+#include "GauntletLegacy.h"
 #include <array>
 #include <cstdio>
 #include <string>
@@ -46,7 +46,7 @@ int main()
         {
             for (uint32 i = 0; i < ROLLS_PER_TIER; ++i)
             {
-                Gauntlet::Affix a = Gauntlet::Roll(seed, tier, i);
+                Gauntlet::Affix a = Gauntlet::LegacyRoll(seed, tier, i);
 
                 if (!firstRow)
                     std::printf(",\n");

@@ -97,6 +97,47 @@ namespace
 
 namespace Gauntlet
 {
+    // Moved verbatim from GauntletAffix.cpp by the switchover. These two are
+    // the only *Name functions that came with the legacy vocabulary; the
+    // shared ConditionName and BoonName live in GauntletNames.cpp. The
+    // strings are load-bearing -- tests/fixtures/legacy_rolls.json records
+    // them -- so they are copied character for character.
+    std::string EffectName(Effect e)
+    {
+        switch (e)
+        {
+            case Effect::MaxHealth:        return "Brittle";
+            case Effect::DamageTaken:      return "Exposed";
+            case Effect::DamageDone:       return "Feeble";
+            case Effect::HealingReceived:  return "Withering";
+            case Effect::HealingDone:      return "Faithless";
+            case Effect::MoveSpeed:        return "Leaden";
+            case Effect::AttackSpeed:      return "Sluggish";
+            case Effect::CastSpeed:        return "Stammering";
+            case Effect::ManaPool:         return "Hollow";
+            case Effect::HealthRegen:      return "Festering";
+            case Effect::ExperienceGain:   return "Forgetful";
+            case Effect::MoneyGain:        return "Impoverished";
+            case Effect::DurabilityLoss:   return "Corroding";
+            case Effect::ThreatGeneration: return "Hunted";
+            default:                       return "Unknown";
+        }
+    }
+
+    std::string SeverityName(Severity s)
+    {
+        switch (s)
+        {
+            case Severity::Trivial:  return "Trivial";
+            case Severity::Minor:    return "Minor";
+            case Severity::Moderate: return "Moderate";
+            case Severity::Major:    return "Major";
+            case Severity::Severe:   return "Severe";
+            case Severity::Dire:     return "Dire";
+            default:                 return "Unknown";
+        }
+    }
+
     Affix LegacyRoll(uint32 seed, uint32 tier, uint32 rollIndex)
     {
         using Stream::Mix;

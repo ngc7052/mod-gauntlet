@@ -18,33 +18,10 @@
 
 namespace Gauntlet
 {
-    // =====================================================================
-    // Legacy vocabulary (generator version 1).
-    //
-    // Kept verbatim so pre-redesign runs can be migrated. Effect/Severity
-    // and the Affix struct move to GauntletLegacy.h once the new dispatch
-    // replaces them; Condition and Boon below are shared by both models.
-    // =====================================================================
-    enum class Effect : uint8
-    {
-        MaxHealth,          // -% maximum health
-        DamageTaken,        // +% damage taken
-        DamageDone,         // -% damage dealt
-        HealingReceived,    // -% healing received
-        HealingDone,        // -% healing dealt
-        MoveSpeed,          // -% movement speed
-        AttackSpeed,        // -% attack speed
-        CastSpeed,          // -% cast speed
-        ManaPool,           // -% maximum mana
-        HealthRegen,        // -% out-of-combat health regeneration
-        ExperienceGain,     // -% experience gained
-        MoneyGain,          // -% money looted
-        DurabilityLoss,     // +% durability loss on death/hit
-        ThreatGeneration,   // +% threat generated
-        MAX
-    };
-
-    enum class Severity : uint8 { Trivial, Minor, Moderate, Major, Severe, Dire, MAX };
+    // The legacy vocabulary that used to open this header -- Effect, Severity
+    // and the free-form Affix generator 1 rolled -- now lives in
+    // GauntletLegacy.h and exists only for the one-shot storage migration.
+    // Condition and Boon stayed behind because both models share them.
 
     // ---------------------------------------------------------------------
     // Conditions: WHEN an affix applies. Shared by the legacy scalars and by
@@ -88,33 +65,12 @@ namespace Gauntlet
         MAX
     };
 
-    struct Affix
-    {
-        Effect    effect      = Effect::MaxHealth;
-        Condition condition   = Condition::Always;
-        Boon      boon        = Boon::None;
-        Severity  severity    = Severity::Minor;
-        uint32    magnitude   = 0;   // percent, curse side
-        uint32    boonMagnitude = 0; // percent, boon side
-        uint32    id          = 0;   // deterministic id derived from the roll
-
-        std::string Name() const;
-        std::string Describe() const;
-    };
-
-    // Only effects and conditions with a working implementation are rolled.
-    bool IsImplemented(Effect e);
-    bool IsImplemented(Condition c);
-
-    // Deterministic: the same (seed, tier) always yields the same affix.
-    Affix Roll(uint32 seed, uint32 tier, uint32 rollIndex);
-
-    uint32 VariationCount();
-
-    std::string EffectName(Effect e);
+    // The player-facing adjective for a condition ("Desperate") and for a boon
+    // ("Wrathful"), shared by both models and defined in GauntletNames.cpp.
+    // Both are load-bearing strings: the offer and pick chat lines are built
+    // from them and tests/fixtures/legacy_rolls.json records them.
     std::string ConditionName(Condition c);
     std::string BoonName(Boon b);
-    std::string SeverityName(Severity s);
 
     // =====================================================================
     // Redesign vocabulary (generator version 2).
@@ -187,6 +143,69 @@ namespace Gauntlet
         uint8     boonMag   = 0;
         OfferKind kind      = OfferKind::New;
         uint8     swapSlot  = 0;           // meaningful only when kind == Swap
+    };
+
+    // Everything one character's run is, and the sole owner of the IMechanic
+    // behind each carried affix.
+    //
+    // AffixInstance is a plain copyable struct with a raw `impl` in it, which
+    // is exactly the shape that gets an owning pointer deleted twice. The
+    // ownership is therefore pinned here rather than on the instance: the copy
+    // constructor and copy assignment are deleted outright, the destructor
+    // frees every impl exactly once, and the only ways in and out are Attach
+    // and DetachSlot, which create and destroy the implementation with the
+    // instance. A moved-from run is left with an empty vector and nothing to
+    // free. The one implementation the module builds outside a RunState is the
+    // throwaway an offer line is described through, and it is held in a
+    // unique_ptr for the length of that line. The members are defined in
+    // GauntletMgr.cpp, where IMechanic is complete.
+    struct RunState
+    {
+        uint32 seed        = 0;
+        uint32 tier        = 0;
+        bool   dead        = false;        // hardcore: the run is over
+        uint16 genVersion  = GeneratorVersion;
+        uint8  playerClass = 0;            // CLASS_WARRIOR ...; 0 until first login
+
+        std::vector<AffixInstance> affixes;
+
+        // The offers currently on the table and the tier they were built for.
+        // They are never stored: BuildOffers rebuilds them from the seed.
+        std::vector<Offer> pending;
+        uint32 pendingTier = 0;
+
+        // Death is no longer instant (plan section 6, decision 5): dying arms
+        // this timer, releasing or letting it run out ends the run, and a
+        // Phase 3 bargain charge is what will cancel it.
+        bool   pendingDeath = false;
+        uint32 deathTimerMs = 0;
+
+        // Set by anything that changes a column of gauntlet_run, cleared by
+        // Save, so a logout does not rewrite a row nothing touched.
+        bool   dirty = false;
+
+        RunState() = default;
+        ~RunState();
+
+        RunState(RunState const&)            = delete;
+        RunState& operator=(RunState const&) = delete;
+        RunState(RunState&& other) noexcept;
+        RunState& operator=(RunState&& other) noexcept;
+
+        // Adds a carried affix and gives it its implementation, which may be
+        // null for a mechanic this build does not implement. Returns the
+        // stored instance so the caller can hand it to IMechanic::OnAttach.
+        AffixInstance& Attach(AffixInstance instance);
+
+        // Destroys the affix in `slot`, implementation included. False when
+        // the slot holds nothing.
+        bool DetachSlot(uint8 slot);
+
+        // Destroys every carried affix. Called by the destructor.
+        void Clear();
+
+        AffixInstance* Find(uint16 mechanic);
+        AffixInstance* AtSlot(uint8 slot);
     };
 
     // What Mgr::Aggregate can be asked for. Every kind is a multiplier
