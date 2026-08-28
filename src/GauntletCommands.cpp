@@ -8,6 +8,8 @@
 #include "GauntletMechanic.h"
 #include "GauntletMgr.h"
 #include "GauntletRegistry.h"
+#include "GauntletScheduler.h"
+#include "GauntletSummons.h"
 #include "Chat.h"
 #include "ChatCommand.h"
 #include "Config.h"
@@ -509,9 +511,11 @@ public:
             // only be refreshed from inside the game.
             { "export-addon", HandleDebugExportAddon, SEC_GAMEMASTER, Console::Yes },
 
-            // Plan section 5.2 names three more. They need the scheduler and
-            // the state store, which Phase 1 brings; they are present and
-            // answer plainly rather than absent, so a game master reading the
+            // Plan section 5.2 names three more. The scheduler and the state
+            // store they need exist now, but none of the three is wired: `fire`
+            // would need a Scheduler entry point this task does not own, and
+            // the other two were not asked for. They are present and answer
+            // plainly rather than absent, so a game master reading the
             // subtree's help sees the whole surface and is told which parts of
             // it are not wired up yet instead of wondering what is broken.
             { "fire",         HandleDebugFire,        SEC_GAMEMASTER, Console::No },
@@ -688,12 +692,14 @@ public:
         instance.legacyMag  = 0;
 
         AffixInstance& stored = st->Attach(instance);
+
+        // The carried set moved, so the scheduler's event budget did too, and
+        // it has to move before OnAttach arms anything.
+        sGauntlet->SyncTimedAffixCount(p);
+
         if (stored.impl)
         {
-            Ctx ctx;
-            ctx.player = p;
-            ctx.run    = st;
-            ctx.self   = &stored;
+            Ctx ctx = sGauntlet->MakeCtx(p, st, &stored);
             stored.impl->OnAttach(ctx);
         }
 
@@ -751,13 +757,11 @@ public:
         // the affix was carried.
         if (a->impl)
         {
-            Ctx ctx;
-            ctx.player = p;
-            ctx.run    = st;
-            ctx.self   = a;
+            Ctx ctx = sGauntlet->MakeCtx(p, st, a);
             a->impl->OnDetach(ctx);
         }
         st->DetachSlot(slot);
+        sGauntlet->SyncTimedAffixCount(p);
 
         uint32 const low = p->GetGUID().GetCounter();
         CharacterDatabase.Execute("DELETE FROM `gauntlet_affix` WHERE `guid` = {} AND `slot` = {}",
@@ -823,6 +827,97 @@ public:
         return true;
     }
 
+    // The three sections plan section 5.4 asks a dump to show and Phase 0 had
+    // nothing to show for. They are the only window on the framework there is:
+    // nobody can watch a scheduler queue from inside the game any other way.
+    static void PrintScheduler(ChatHandler* handler, Player* p, RunState const& st)
+    {
+        Scheduler const* sched = sGauntlet->ClockFor(p);
+        if (!sched)
+        {
+            handler->PSendSysMessage("  scheduler: no clock for this run.");
+            return;
+        }
+
+        uint32 const now = sched->NowMs();
+        handler->PSendSysMessage("  scheduler: now {} ms | budget x{:.2f} | grace {} ms | queue {}",
+                                 now, sched->Budget(), st.graceMs,
+                                 static_cast<uint32>(sched->Queue().size()));
+
+        for (ScheduledEvent const& ev : sched->Queue())
+        {
+            MechanicDef const* def = FindMechanic(ev.mechanic);
+
+            // dueMs is absolute on the scheduler's own clock, so the useful
+            // number is the difference. A negative one means the event is due
+            // and something is holding it -- a suppression, or the spacing --
+            // which is exactly the state this dump exists to show.
+            int64 const inMs = static_cast<int64>(ev.dueMs) - static_cast<int64>(now);
+            handler->PSendSysMessage("    {} id {} | {} | in {} ms",
+                                     def ? def->key : "<not in this registry>",
+                                     ev.id,
+                                     ev.kind == EventKind::Warn ? "warn" : "fire",
+                                     inMs);
+        }
+
+        // What the run last blamed. It is what KILLBY would name if the
+        // character died now.
+        if (st.lastActor != Gauntlet::MECHANIC_NONE)
+        {
+            MechanicDef const* def = FindMechanic(st.lastActor);
+            handler->PSendSysMessage("  last actor: {} (for another {} ms)",
+                                     def ? def->key : "<not in this registry>", st.lastActorMs);
+        }
+        else
+        {
+            handler->PSendSysMessage("  last actor: none");
+        }
+    }
+
+    static void PrintSummons(ChatHandler* handler, Player* p)
+    {
+        // Summons exposes a count, a stalker flag and per-creature lookups, and
+        // no way to walk one owner's list; adding one would mean editing
+        // GauntletSummons.h, which this task does not own. The two numbers are
+        // what there is. See the report.
+        handler->PSendSysMessage("  summons: {} alive (cap {}) | stalker {}",
+                                 sGauntletSummons->AliveFor(p),
+                                 static_cast<uint32>(SUMMON_CAP_TOTAL),
+                                 sGauntletSummons->HasStalker(p) ? "yes" : "no");
+    }
+
+    static void PrintState(ChatHandler* handler, Player* p, RunState const& st)
+    {
+        // gauntlet_state is the enumerable half: State itself has no iterator,
+        // so the keys come from the table and the live value beside each one
+        // comes from the map. A key that has been set this session and never
+        // saved therefore does not appear -- which the line says, rather than
+        // leaving a reader to think the map is empty.
+        uint32 const low = p->GetGUID().GetCounter();
+        handler->PSendSysMessage("  per-player state (saved rows, live value beside; unsaved new keys are not "
+                                 "listed): dirty {}", st.state.Dirty() ? "yes" : "no");
+
+        QueryResult r = CharacterDatabase.Query("SELECT `k`, `v` FROM `gauntlet_state` WHERE `guid` = {} "
+                                                "ORDER BY `k` ASC", low);
+        if (!r)
+        {
+            handler->PSendSysMessage("    (no rows)");
+            return;
+        }
+
+        do
+        {
+            Field* f = r->Fetch();
+            std::string const key = f[0].Get<std::string>();
+            int32 const saved     = f[1].Get<int32>();
+            int32 const live      = st.state.Get(key, saved);
+            if (live == saved)
+                handler->PSendSysMessage("    {} = {}", key, saved);
+            else
+                handler->PSendSysMessage("    {} = {} (saved {})", key, live, saved);
+        } while (r->NextRow());
+    }
+
     static bool HandleDebugDump(ChatHandler* handler)
     {
         if (!DebugAllowed(handler))
@@ -863,15 +958,9 @@ public:
         }
 
         PrintProducts(handler, p);
-
-        // The three the plan asks a dump to show that Phase 0 has nothing to
-        // show for. Said out loud rather than left out, because a dump with a
-        // section silently missing reads as a dump of an empty section.
-        handler->PSendSysMessage("  scheduler queue: not until Phase 1 - no Scheduler exists yet "
-                                 "(Ctx::clock is always null).");
-        handler->PSendSysMessage("  summons: not until Phase 1 - no mechanic in this build summons anything.");
-        handler->PSendSysMessage("  per-player state: not until Phase 1 - gauntlet_state has its schema but no "
-                                 "writer (Ctx::state is always null).");
+        PrintScheduler(handler, p, *st);
+        PrintSummons(handler, p);
+        PrintState(handler, p, *st);
         return true;
     }
 
@@ -1062,8 +1151,9 @@ public:
         if (!DebugAllowed(handler))
             return false;
 
-        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r `fire` arrives with Phase 1: it skips a scheduled "
-                                 "event's clock, and Phase 0 has no scheduler to skip.");
+        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r `fire` is still not wired: releasing a queued event "
+                                 "early needs a Scheduler entry point that does not exist. "
+                                 "`.gauntlet debug dump` shows the queue.");
         return true;
     }
 
@@ -1072,8 +1162,8 @@ public:
         if (!DebugAllowed(handler))
             return false;
 
-        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r `set` arrives with Phase 1: it writes a mechanic's "
-                                 "state key, and nothing in Phase 0 writes gauntlet_state.");
+        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r `set` is still not wired. gauntlet_state has live "
+                                 "writers now and `.gauntlet debug dump` reads them back.");
         return true;
     }
 
@@ -1082,8 +1172,8 @@ public:
         if (!DebugAllowed(handler))
             return false;
 
-        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r `events` arrives with Phase 1: it suspends the event "
-                                 "scheduler, and Phase 0 has none.");
+        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r `events` is still not wired. The realm-wide switch is "
+                                 "Gauntlet.Events.Enable in mod_gauntlet.conf, which the scheduler now reads.");
         return true;
     }
 };
