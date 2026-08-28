@@ -52,3 +52,206 @@ Gauntlet.Announce = 1
 #        Default:     1 - (players only)
 
 Gauntlet.PlayersOnly = 1
+
+#
+#    Gauntlet.Family.Spawn.Enable
+#        Description: Master switch for the Spawn family: mechanics that spawn
+#                     a creature to hunt or ambush you (the Shade, Echo,
+#                     Ambush, Reinforcements and similar). Disabling a family
+#                     removes it from future offers; anything a character
+#                     already carries keeps working.
+#        Default:     1 - (enabled)
+
+Gauntlet.Family.Spawn.Enable = 1
+
+#
+#    Gauntlet.Family.Enemy.Enable
+#        Description: Master switch for the Enemy family: mechanics that change
+#                     how ordinary enemies behave rather than adding new ones
+#                     (Champions, Frenzy, Keen-nosed and similar). Disabling a
+#                     family removes it from future offers; anything a
+#                     character already carries keeps working.
+#        Default:     1 - (enabled)
+
+Gauntlet.Family.Enemy.Enable = 1
+
+#
+#    Gauntlet.Family.Tempo.Enable
+#        Description: Master switch for the Tempo family: mechanics about
+#                     position and pacing rather than raw damage (Falling Sky,
+#                     Falter and similar). Disabling a family removes it from
+#                     future offers; anything a character already carries keeps
+#                     working.
+#        Default:     1 - (enabled)
+
+Gauntlet.Family.Tempo.Enable = 1
+
+#
+#    Gauntlet.Family.Attrition.Enable
+#        Description: Master switch for the Attrition family: mechanics with a
+#                     built-in counterplay button rather than a flat tax (Deep
+#                     Wounds, Blood Magic, Exposed, Feeble). Disabling a family
+#                     removes it from future offers; anything a character
+#                     already carries keeps working.
+#        Default:     1 - (enabled)
+
+Gauntlet.Family.Attrition.Enable = 1
+
+#
+#    Gauntlet.Family.Rules.Enable
+#        Description: Master switch for the Rules family: mechanics that change
+#                     what the character is allowed to do rather than a number
+#                     (Self-found, Lone Wolf, Iron Purse). Disabling a family
+#                     removes it from future offers; anything a character
+#                     already carries keeps working.
+#        Default:     1 - (enabled)
+
+Gauntlet.Family.Rules.Enable = 1
+
+#
+#    Gauntlet.Family.Bargain.Enable
+#        Description: Master switch for the Bargain family: a curse taken on
+#                     purpose for a reward attached to it (Last Rites, Cursed
+#                     Hoard). Disabling a family removes it from future offers;
+#                     anything a character already carries keeps working.
+#        Default:     1 - (enabled)
+
+Gauntlet.Family.Bargain.Enable = 1
+
+#
+#    Gauntlet.Family.Class.Enable
+#        Description: Master switch for the Class family: curses relevant to
+#                     one class only, or to mana users generally. Disabling a
+#                     family removes it from future offers; anything a
+#                     character already carries keeps working.
+#        Default:     1 - (enabled)
+
+Gauntlet.Family.Class.Enable = 1
+
+#
+#    Gauntlet.Events.Enable
+#        Description: Master switch for the per-player event scheduler that
+#                     will drive timed and triggered mechanics (the Shade's
+#                     hunt, Echo, Ambush, Falling Sky, Falter and similar). Not
+#                     yet read by any code; ships now with its Phase 1 default
+#                     so the key exists ahead of the mechanics that will use
+#                     it.
+#        Default:     1 - (enabled)
+
+Gauntlet.Events.Enable = 1
+
+#
+#    Gauntlet.Events.MinSpacing
+#        Description: Minimum seconds enforced between two scheduled events for
+#                     the same player, so unrelated timers cannot land in the
+#                     same second. Not yet read by any code; ships now with its
+#                     Phase 1 default.
+#        Default:     12
+
+Gauntlet.Events.MinSpacing = 12
+
+#
+#    Gauntlet.Events.BudgetStep
+#        Description: Fraction the effective interval between events stretches
+#                     for each additional timed affix a player carries beyond
+#                     the first, so event pressure per minute rises with tier
+#                     instead of piling up. Not yet read by any code; ships now
+#                     with its Phase 1 default.
+#        Default:     0.25
+
+Gauntlet.Events.BudgetStep = 0.25
+
+#
+#    Gauntlet.Caps.DamageTaken
+#        Description: Ceiling on the damage-taken multiplier after every active
+#                     mechanic's contribution is multiplied together; the clamp
+#                     applies to that aggregate product, never to any one
+#                     mechanic alone. No combination of affixes can push damage
+#                     taken past this multiple of normal.
+#        Default:     2.0
+
+Gauntlet.Caps.DamageTaken = 2.0
+
+#
+#    Gauntlet.Caps.DamageDone
+#        Description: Floor on the damage-dealt multiplier after every active
+#                     mechanic's contribution is multiplied together; the clamp
+#                     applies to that aggregate product, never to any one
+#                     mechanic alone. Damage dealt cannot be pushed below this
+#                     fraction of normal.
+#        Default:     0.6
+
+Gauntlet.Caps.DamageDone = 0.6
+
+#
+#    Gauntlet.Caps.HealTaken
+#        Description: Floor on the healing-received multiplier after every
+#                     active mechanic's contribution is multiplied together;
+#                     the clamp applies to that aggregate product, never to any
+#                     one mechanic alone. Healing received cannot be pushed
+#                     below this fraction of normal.
+#        Default:     0.5
+
+Gauntlet.Caps.HealTaken = 0.5
+
+#
+#    Gauntlet.Caps.MaxHealth
+#        Description: Floor on the maximum-health multiplier after every active
+#                     mechanic's contribution (wounds included) is multiplied
+#                     together; the clamp applies to that aggregate product,
+#                     never to any one mechanic alone. Max health cannot be
+#                     pushed below this fraction of base.
+#        Default:     0.6
+
+Gauntlet.Caps.MaxHealth = 0.6
+
+#
+#    Gauntlet.Caps.EnemySpeed
+#        Description: Ceiling on the run-speed multiplier granted to gauntlet-
+#                     affected creatures after every contributing mechanic is
+#                     multiplied together; the clamp applies to that aggregate
+#                     product, never to any one mechanic alone.
+#        Default:     1.4
+
+Gauntlet.Caps.EnemySpeed = 1.4
+
+#
+#    Gauntlet.Summons.MaxAlive
+#        Description: Maximum creatures spawned by affixes that may be alive
+#                     for one player at once, across every spawn mechanic
+#                     combined. Not yet read by any code; ships now with its
+#                     Phase 1 default.
+#        Default:     4
+
+Gauntlet.Summons.MaxAlive = 4
+
+#
+#    Gauntlet.Summons.XpRate
+#        Description: Experience multiplier for kills on a creature spawned or
+#                     empowered by an affix, so summons cannot be farmed for
+#                     normal experience. Not yet read by any code; ships now
+#                     with its Phase 1 default.
+#        Default:     0.5
+
+Gauntlet.Summons.XpRate = 0.5
+
+#
+#    Gauntlet.Grace.Seconds
+#        Description: Seconds after login or zone-in during which no timed or
+#                     triggered event may fire, so a character is never
+#                     ambushed before the player has taken control. Not yet
+#                     read by any code; ships now with its Phase 1 default.
+#        Default:     60
+
+Gauntlet.Grace.Seconds = 60
+
+#
+#    Gauntlet.Debug.Enable
+#        Description: Compiles in the .gauntlet debug subtree (give, remove and
+#                     rank affixes, dump run state, force an event, export the
+#                     addon's data table) so it exists on every build and can
+#                     be switched off on a public realm without a recompile.
+#                     The commands stay restricted to game masters either way.
+#        Default:     0 - (disabled)
+
+Gauntlet.Debug.Enable = 0
