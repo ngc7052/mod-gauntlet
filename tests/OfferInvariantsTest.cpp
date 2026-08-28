@@ -679,11 +679,16 @@ TEST(OfferInvariants, LiveRegistryView)
     RegistryView const live;   // includeUnimplemented defaults to false
     ASSERT_FALSE(live.includeUnimplemented);
 
-    constexpr uint32 EXPECTED = GR_RepeatedFamily | GR_RepeatedMechanic | GR_FellBackToScalar;
-
     uint64 sets = 0;
     uint64 wrongRelaxations = 0;
     std::string firstWrong;
+
+    // Counted rather than asserted: the pool is six mechanics across four
+    // families now and how often each bit is forced is a tuning signal, not a
+    // rule. Printed at the end.
+    uint64 relaxedFamily = 0;
+    uint64 relaxedMechanic = 0;
+    uint64 relaxedScalar = 0;
 
     for (uint32 seed = 1; seed <= SMALL_SEEDS; ++seed)
         for (size_t ci = 0; ci < CLASSES.size(); ++ci)
@@ -707,6 +712,14 @@ TEST(OfferInvariants, LiveRegistryView)
                 q.set = &set;
 
                 ASSERT_EQ(set.offers.size(), 3u) << Describe(q);
+
+                std::array<uint32, static_cast<size_t>(Family::MAX)> familyCount = {};
+                std::array<uint16, 3> seenId = {};
+                size_t seenCount = 0;
+                bool rewardShaped = false;
+                bool repeatedFamily = false;
+                bool repeatedMechanic = false;
+
                 for (Offer const& offer : set.offers)
                 {
                     ASSERT_NE(offer.mechanic, MECHANIC_NONE) << Describe(q);
@@ -728,9 +741,47 @@ TEST(OfferInvariants, LiveRegistryView)
                     }
                     if (def->classMask != 0)
                         ASSERT_NE(def->classMask & view.GetClassMask(), 0u) << Describe(q);
+
+                    if (def->flags & MF_RewardShaped)
+                        rewardShaped = true;
+                    if (familyCount[static_cast<size_t>(def->family)]++ > 0)
+                        repeatedFamily = true;
+                    for (size_t k = 0; k < seenCount; ++k)
+                        if (seenId[k] == offer.mechanic)
+                            repeatedMechanic = true;
+                    seenId[seenCount++] = offer.mechanic;
                 }
 
-                if (set.relaxations != EXPECTED)
+                if (set.relaxations & GR_RepeatedFamily)
+                    ++relaxedFamily;
+                if (set.relaxations & GR_RepeatedMechanic)
+                    ++relaxedMechanic;
+                if (set.relaxations & GR_FellBackToScalar)
+                    ++relaxedScalar;
+
+                // The relaxation word must describe the set it came back with,
+                // which is the same rule the full-table sweep applies and the
+                // only one that survives the pool changing size. It replaces
+                // the flat "always exactly GR_RepeatedFamily |
+                // GR_RepeatedMechanic | GR_FellBackToScalar" this test asserted
+                // while the offerable pool was two plain scalars in one family:
+                // with six mechanics across four families all three bits are
+                // situational, and pinning the word to a constant would only
+                // measure how many mechanics happen to be implemented.
+                //
+                // GR_FellBackToScalar is asserted in one direction only. It
+                // carries two meanings -- a slot drawn from the scalar pool of
+                // last resort, and the reward-shaped guarantee finding no
+                // candidate -- and on a pool this small the first really does
+                // happen, so only "no reward-shaped offer implies the bit" is a
+                // rule.
+                bool const wordFits = repeatedFamily   == bool(set.relaxations & GR_RepeatedFamily)
+                                   && repeatedMechanic == bool(set.relaxations & GR_RepeatedMechanic)
+                                   && (rewardShaped || (set.relaxations & GR_FellBackToScalar))
+                                   && !(set.relaxations
+                                        & ~uint32(GR_RepeatedFamily | GR_RepeatedMechanic | GR_FellBackToScalar));
+
+                if (!wordFits)
                 {
                     ++wrongRelaxations;
                     if (firstWrong.empty())
@@ -744,8 +795,14 @@ TEST(OfferInvariants, LiveRegistryView)
 
     EXPECT_EQ(sets, uint64(SMALL_SEEDS) * CLASSES.size() * TIERS);
     EXPECT_EQ(wrongRelaxations, 0u)
-        << wrongRelaxations << " of " << sets << " live-view sets did not relax exactly "
-        << "GR_RepeatedFamily | GR_RepeatedMechanic | GR_FellBackToScalar. Phase 0 has two "
-           "offerable mechanics, both plain scalars in one family, so all three are forced; "
-           "anything else means the offerable pool changed.\n  first: " << firstWrong;
+        << wrongRelaxations << " of " << sets << " live-view sets came back with a relaxation "
+           "word that does not describe the set it was returned with. A caller that trusts "
+           "GR_None would go on believing the three offers are distinct.\n  first: " << firstWrong;
+
+    std::printf("[ live     ] %llu sets: repeated family %llu, repeated mechanic %llu, "
+                "no reward-shaped or scalar fallback %llu\n",
+                static_cast<unsigned long long>(sets),
+                static_cast<unsigned long long>(relaxedFamily),
+                static_cast<unsigned long long>(relaxedMechanic),
+                static_cast<unsigned long long>(relaxedScalar));
 }

@@ -55,12 +55,20 @@ namespace
     // S1-S5 = 1-5, E1-E8 = 6-13, T1-T5 = 14-18, A1-A4 = 19-22, R1-R3 = 23-25,
     // B1-B2 = 26-27, C1-C44 = 28-71, Withering = 72, Forgetful = 73.
     //
-    // Only Exposed (21) and Feeble (22) lack MF_NotImplemented. Withering
-    // (72) and Forgetful (73) do have working mechanics -- migrated runs
-    // still carry them and must keep functioning -- but they are cut from
-    // the pool (design section 5), and MF_NotImplemented is what the offer
-    // builder filters on, so they carry it too. IsImplemented() is therefore
-    // an "may this be offered" question, not "does code exist".
+    // Six rows lack MF_NotImplemented: Phase 0's two scalars, Exposed (21) and
+    // Feeble (22), and Phase 1's vertical slice -- The Shade (1), Champions
+    // (6), Falling Sky (14) and Deep Wounds (19). Withering (72) and Forgetful
+    // (73) do have working mechanics -- migrated runs still carry them and must
+    // keep functioning -- but they are cut from the pool (design section 5),
+    // and MF_NotImplemented is what the offer builder filters on, so they carry
+    // it too. IsImplemented() is therefore a "may this be offered" question,
+    // not "does code exist".
+    //
+    // Clearing the flag is the last switch of a phase and nothing else: it is
+    // what puts a mechanic into a live player's offers, so it is thrown only
+    // once the dispatch behind it is wired. Until step 5 there was no scheduler
+    // tick, no state store and no anchor, and all four of these would have been
+    // offered and done nothing.
     //
     // Boons: the first eight values in Gauntlet.h are effect categories, and
     // BonusRegen is read here as the resource boon generally (rage, mana,
@@ -91,7 +99,7 @@ namespace
 
         // --- Family S: things that spawn -------------------------------
         { 1, "shade", "The Shade", Family::Spawn, 0, 4, 16, 3,
-          MF_Timed | MF_Stalker | MF_NotImplemented, "stalker", Boon::BonusExperience, 0, 0,
+          MF_Timed | MF_Stalker, "stalker", Boon::BonusExperience, 0, 0,
           "A Shade rises behind you every few minutes and hunts you until you kill it or leave it behind." },
 
         { 2, "echo", "Echo", Family::Spawn, 0, 6, 14, 3,
@@ -112,7 +120,7 @@ namespace
 
         // --- Family E: enemies that behave differently -----------------
         { 6, "champions", "Champions", Family::Enemy, 0, 1, 16, 3,
-          MF_RewardShaped | MF_NotImplemented, "", Boon::BonusExperience, 0, 0,
+          MF_RewardShaped, "", Boon::BonusExperience, 0, 0,
           "Every 8th fight you start opens against a Champion: twice the health, harder hits, double the reward." },
 
         { 7, "craven", "Craven", Family::Enemy, 0, 4, 12, 3,
@@ -147,7 +155,7 @@ namespace
         // TODO(design): the card only floats the boon -- "a small speed reward for a
         // clean dodge is worth testing" -- so BonusMoveSpeed is a reading, not a value.
         { 14, "falling_sky", "Falling Sky", Family::Tempo, 0, 5, 16, 3,
-          MF_Timed | MF_NotImplemented, "", Boon::BonusMoveSpeed, 0, 0,
+          MF_Timed, "", Boon::BonusMoveSpeed, 0, 0,
           "In combat, every 20 seconds the sky marks your spot; three seconds later it strikes." },
 
         { 15, "frenzy", "Frenzy", Family::Tempo, 0, 3, 16, 3,
@@ -168,7 +176,7 @@ namespace
 
         // --- Family A: attrition with counterplay -----------------------
         { 19, "deep_wounds", "Deep Wounds", Family::Attrition, 0, 4, 12, 3,
-          MF_NotImplemented, "", Boon::None, 0, 0,
+          MF_None, "", Boon::None, 0, 0,
           "A third of the damage you take becomes a wound that only rest can heal." },
 
         { 20, "blood_magic", "Blood Magic", Family::Attrition, CM_MANA_USERS, 5, 12, 3,

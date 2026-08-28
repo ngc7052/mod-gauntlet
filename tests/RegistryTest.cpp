@@ -26,11 +26,18 @@ namespace
     constexpr size_t TABLE_SIZE = 73;
     constexpr uint8  MAX_TIER   = 16;
 
-    // The two mechanics Phase 0 may offer. Withering (72) and Forgetful (73)
-    // have working implementations but are MF_NotImplemented on purpose --
-    // IsImplemented() answers "may the generator offer this", not "does code
-    // exist" -- so they are absent here. CONTRACT.md section 8.
-    constexpr std::array<uint16, 2> OFFERABLE = { 21, 22 };
+    // The mechanics the generator may offer: Phase 0's two scalars, Exposed
+    // (21) and Feeble (22), and Phase 1's vertical slice -- The Shade (1),
+    // Champions (6), Falling Sky (14) and Deep Wounds (19). Withering (72) and
+    // Forgetful (73) have working implementations but are MF_NotImplemented on
+    // purpose -- IsImplemented() answers "may the generator offer this", not
+    // "does code exist" -- so they are absent here. CONTRACT.md section 8.
+    //
+    // This list is the switch a phase is finished by, so it is asserted exactly
+    // rather than as a count: a row that gains the flag by accident, or loses
+    // it before its dispatch is wired, is an affix offered to a live hardcore
+    // character that silently does nothing.
+    constexpr std::array<uint16, 6> OFFERABLE = { 1, 6, 14, 19, 21, 22 };
 
     // CONTRACT.md section 8's id ranges, which are fixed forever: an id is
     // never reused, so a retired mechanic keeps its number and gains
@@ -146,7 +153,7 @@ TEST(Registry, FamiliesAreInRangeAndMatchTheIdRanges)
     EXPECT_EQ(counted[static_cast<size_t>(Family::Class)], 44u);
 }
 
-TEST(Registry, OnlyExposedAndFeebleMayBeOffered)
+TEST(Registry, OnlyTheImplementedMechanicsMayBeOffered)
 {
     std::set<uint16> implemented;
     for (MechanicDef const& def : AllMechanics())
@@ -155,8 +162,9 @@ TEST(Registry, OnlyExposedAndFeebleMayBeOffered)
 
     std::set<uint16> const expected(OFFERABLE.begin(), OFFERABLE.end());
     EXPECT_EQ(implemented, expected)
-        << "CONTRACT.md section 9 sizes the whole Phase 0 offer-pool argument on this set; "
-           "changing it changes what the invariant sweep can assert";
+        << "CONTRACT.md section 9 sizes the whole offer-pool argument on this set, and "
+           "OfferInvariants.LiveRegistryView measures against it; changing it changes what "
+           "the invariant sweep can assert";
 
     for (MechanicDef const& def : AllMechanics())
         EXPECT_EQ(IsImplemented(def), (def.flags & MF_NotImplemented) == 0)
