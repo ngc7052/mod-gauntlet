@@ -5,6 +5,12 @@
 
 #include "GauntletState.h"
 #include "DatabaseEnv.h"
+// DatabaseEnv.h forward-declares ResultSet but does not define it, and
+// QueryResult is a shared_ptr to one, so Fetch() and NextRow() need this
+// too. GauntletMgr.cpp gets away without it only because Player.h drags
+// the definition in behind its back.
+#include "QueryResult.h"
+#include "Field.h"
 
 // The only two functions in this translation unit are the ones that touch a
 // database, which is exactly why it needs the core's full include set and why
