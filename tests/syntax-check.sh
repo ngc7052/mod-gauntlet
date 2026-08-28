@@ -2,7 +2,8 @@
 # mod-gauntlet - fast per-file syntax check for the Player-free module sources
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# Runs `g++ -fsyntax-only` over every src/*.cpp that does not include a core
+# Runs `g++ -fsyntax-only` over every .cpp under src/ (recursively, so the
+# mechanics tree is covered) that does not include a core
 # game header (Player.h and friends), so the fast loop stays honest as new
 # Player-free files land beside GauntletAffix.cpp. Files that do include one
 # of those headers need the core's full include set and cannot be checked
@@ -20,7 +21,7 @@ CORE_HEADER_PATTERN='#include[[:space:]]*"(Player\.h|ScriptMgr\.h|Chat\.h|Databa
 fail=0
 checked=0
 
-for src in "$ROOT"/src/*.cpp; do
+for src in $(find "$ROOT/src" -name "*.cpp" | sort); do
   [ -e "$src" ] || continue
   name="$(basename "$src")"
 
