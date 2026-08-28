@@ -503,7 +503,11 @@ public:
             { "dump",         HandleDebugDump,        SEC_GAMEMASTER, Console::No },
             { "offers",       HandleDebugOffers,      SEC_GAMEMASTER, Console::No },
             { "seed",         HandleDebugSeed,        SEC_GAMEMASTER, Console::No },
-            { "export-addon", HandleDebugExportAddon, SEC_GAMEMASTER, Console::No },
+            // Console::Yes: this one reads the registry and writes a file. It
+            // needs no player, and requiring a logged-in game master to
+            // regenerate a build artefact would mean the addon table could
+            // only be refreshed from inside the game.
+            { "export-addon", HandleDebugExportAddon, SEC_GAMEMASTER, Console::Yes },
 
             // Plan section 5.2 names three more. They need the scheduler and
             // the state store, which Phase 1 brings; they are present and
