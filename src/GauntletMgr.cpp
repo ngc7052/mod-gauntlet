@@ -10,6 +10,7 @@
 #include "Group.h"
 #include "Map.h"
 #include "World.h"
+#include "WorldSessionMgr.h"
 #include "GameTime.h"
 
 namespace Gauntlet
@@ -132,7 +133,7 @@ namespace Gauntlet
             "|cffff2020[Gauntlet]|r You bear |cffffff00{}|r. {}", chosen.Name(), chosen.Describe());
 
         if (_announce)
-            sWorld->SendServerMessage(SERVER_MSG_STRING,
+            sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING,
                 Acore::StringFormat("[Gauntlet] {} reached tier {} and took {}.",
                                     player->GetName(), st->tier, chosen.Name()));
         return true;
@@ -154,7 +155,7 @@ namespace Gauntlet
             low, player->GetName(), st->tier, player->GetLevel(), cause);
 
         if (_announce)
-            sWorld->SendServerMessage(SERVER_MSG_STRING,
+            sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING,
                 Acore::StringFormat("[Gauntlet] {} has fallen at level {} on tier {} ({}).",
                                     player->GetName(), player->GetLevel(), st->tier, cause));
     }
