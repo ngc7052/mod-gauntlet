@@ -336,6 +336,45 @@ namespace Gauntlet
                 CharacterDatabase.Execute("UPDATE `gauntlet_run` SET `class` = {} WHERE `guid` = {}",
                                           static_cast<uint32>(st.playerClass), low);
             }
+
+            // A run that cannot belong to the character now holding this GUID.
+            // The core reuses the GUIDs of deleted characters, so a run whose
+            // class does not match, or whose tier is further than this
+            // character's level could ever have reached, belonged to a previous
+            // occupant. Purging on delete is the real fix; this catches the rows
+            // already orphaned before that existed, and any the delete missed.
+            bool const wrongClass = st.playerClass != 0 && st.playerClass != player->getClass();
+            // Fewer levels than tiers is impossible under any TierInterval of 1
+            // or more, so this stays true if an admin ever retunes the interval.
+            // A stricter level * interval test would purge every legitimate run
+            // the day someone raised it.
+            bool const impossibleTier = st.tier > 0 && player->GetLevel() < st.tier;
+
+            if (wrongClass || impossibleTier)
+            {
+                LOG_INFO("module.gauntlet",
+                         "Gauntlet: discarding a stale run on guid {} ({}), it belonged to a character that no "
+                         "longer exists; starting a fresh run for {}.",
+                         low, wrongClass ? "class does not match" : "tier is beyond this character's level",
+                         player->GetName());
+
+                CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+                PurgeCharacter(low, trans);
+                CharacterDatabase.CommitTransaction(trans);
+
+                st = RunState();
+                st.seed = static_cast<uint32>(low * 2654435761u)
+                        ^ static_cast<uint32>(GameTime::GetGameTime().count());
+                st.genVersion  = GeneratorVersion;
+                st.playerClass = player->getClass();
+                CharacterDatabase.Execute(
+                    "INSERT INTO `gauntlet_run` (`guid`, `seed`, `tier`, `dead`, `gen_version`, `class`) "
+                    "VALUES ({}, {}, 0, 0, {}, {})",
+                    low, st.seed, static_cast<uint32>(st.genVersion), static_cast<uint32>(st.playerClass));
+
+                _runs[player->GetGUID()] = std::move(st);
+                return;
+            }
         }
         else
         {
@@ -433,6 +472,15 @@ namespace Gauntlet
         CharacterDatabase.Execute("UPDATE `gauntlet_run` SET `tier` = {}, `dead` = {} WHERE `guid` = {}",
                                   st->tier, st->dead ? 1 : 0, player->GetGUID().GetCounter());
         st->dirty = false;
+    }
+
+    void Mgr::PurgeCharacter(uint32 lowGuid, CharacterDatabaseTransaction trans)
+    {
+        // The core hands out the GUIDs of deleted characters again. Without
+        // this the next character created on the same GUID inherits the run:
+        // its retired flag, its tier and every affix it carried.
+        for (char const* table : { "gauntlet_run", "gauntlet_affix", "gauntlet_affix_log", "gauntlet_state" })
+            trans->Append(Acore::StringFormat("DELETE FROM `{}` WHERE `guid` = {}", table, lowGuid).c_str());
     }
 
     void Mgr::Forget(ObjectGuid guid)

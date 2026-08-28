@@ -8,6 +8,7 @@
 
 #include "Gauntlet.h"
 #include "GauntletAggregate.h"
+#include "DatabaseEnv.h"
 #include "Player.h"
 #include <string>
 #include <unordered_map>
@@ -28,6 +29,13 @@ namespace Gauntlet
         void Load(Player* player);
         void Save(Player* player);
         void Forget(ObjectGuid guid);
+
+        // Everything this module stores about one character, deleted. The core
+        // reuses the GUIDs of deleted characters, and a run keyed on the GUID
+        // alone would otherwise be inherited by whoever is created next --
+        // retired flag, affixes and all. Called from OnPlayerDeleteFromDB so it
+        // rides the same transaction the character's own rows are deleted in.
+        void PurgeCharacter(uint32 lowGuid, CharacterDatabaseTransaction trans);
 
         RunState* Get(Player* player);
 

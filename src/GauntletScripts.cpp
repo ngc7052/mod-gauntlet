@@ -94,6 +94,16 @@ public:
         }
     }
 
+    // The core reuses the GUIDs of deleted characters, so a run keyed on the
+    // GUID alone is inherited by whoever is created next -- retired flag,
+    // tier and every affix. Fired from Player::DeleteFromDB
+    // (Player.cpp:4384) inside the same transaction that removes the
+    // character's own rows, so the two cannot come apart.
+    void OnPlayerDeleteFromDB(CharacterDatabaseTransaction trans, uint32 guid) override
+    {
+        sGauntlet->PurgeCharacter(guid, trans);
+    }
+
     void OnPlayerLogout(Player* player) override
     {
         // Unconditional and first: the addon's per-player state is keyed by
