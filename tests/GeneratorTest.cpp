@@ -1,34 +1,25 @@
 /*
- * mod-gauntlet - the legacy golden fixture and the generator's determinism
+ * mod-gauntlet - the offer builder is a pure function of its inputs
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-// Two jobs.
+// One job. The offers are never stored -- they are rebuilt from the seed every
+// time the tier prompt is shown -- so a query that is not a pure function of
+// its inputs shows a player one set of offers and gives them another.
 //
-// The first is the golden test, and it is the reason this file exists: every
-// character already playing has affixes that were never stored, only the
-// (tier, roll index) that produced them, so the migration rebuilds them by
-// calling LegacyRoll. tests/fixtures/legacy_rolls.json is what the shipped
-// generator actually produced, captured before the rewrite. If LegacyRoll
-// drifts by one arithmetic step, a live hardcore character silently starts
-// playing a different run -- so this test names the exact row and field that
-// diverged rather than reporting a count.
-//
-// The second is determinism: the offers are never stored, they are rebuilt
-// from the seed every time the tier prompt is shown, so a query that is not a
-// pure function of its inputs shows a player one set of offers and gives them
-// another.
+// This file also used to carry the legacy golden test, which held LegacyRoll to
+// a 288-row fixture captured before the Phase 0 rewrite so that a live
+// character's affixes could be rebuilt during the one-shot migration. Phase 2
+// deleted the migration, LegacyRoll, the fixture and the tool that wrote it:
+// there is nothing left on any realm that was rolled by generator 1.
 
 #include "GauntletGenerator.h"
-#include "GauntletLegacy.h"
 #include "GauntletRegistry.h"
 
 #include <gtest/gtest.h>
 
 #include <array>
 #include <cstdint>
-#include <cstdlib>
-#include <fstream>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -36,10 +27,6 @@
 namespace
 {
     using namespace Gauntlet;
-
-    // The cross product tests/tools/dump_legacy_rolls.cpp walks: six seeds,
-    // sixteen tiers, three roll indices.
-    constexpr size_t FIXTURE_ROWS = 288;
 
     constexpr std::array<uint8, 10> CLASSES = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 11 };
 
@@ -57,303 +44,6 @@ namespace
         uint8 _class;
         uint8 _tree;
     };
-
-    // =================================================================
-    // A JSON reader just large enough for the fixture.
-    //
-    // The fixture is an array of flat objects whose values are unsigned
-    // integers and strings. Adding a JSON dependency to a core module to read
-    // one file the module itself writes would be the wrong trade, so this is
-    // hand-rolled -- and deliberately strict: an unknown key, a missing key or
-    // a value of the wrong shape is a parse error, because a fixture that has
-    // quietly changed shape is exactly the thing this test exists to notice.
-    // =================================================================
-    struct Row
-    {
-        uint32 seed = 0, tier = 0, index = 0;
-        uint32 effect = 0, condition = 0, severity = 0;
-        uint32 magnitude = 0, boon = 0, boonMagnitude = 0, id = 0;
-        std::string effectName, conditionName, severityName, boonName;
-        uint32 seen = 0;
-    };
-
-    // One bit per key, so a row missing a field is caught rather than compared
-    // against a default-constructed zero.
-    enum RowField : uint32
-    {
-        F_SEED = 1u << 0, F_TIER = 1u << 1, F_INDEX = 1u << 2,
-        F_EFFECT = 1u << 3, F_EFFECT_NAME = 1u << 4,
-        F_CONDITION = 1u << 5, F_CONDITION_NAME = 1u << 6,
-        F_SEVERITY = 1u << 7, F_SEVERITY_NAME = 1u << 8,
-        F_MAGNITUDE = 1u << 9, F_BOON = 1u << 10, F_BOON_NAME = 1u << 11,
-        F_BOON_MAGNITUDE = 1u << 12, F_ID = 1u << 13,
-        F_ALL = (1u << 14) - 1
-    };
-
-    class Scanner
-    {
-    public:
-        explicit Scanner(std::string const& text) : _text(text) { }
-
-        std::string const& Error() const { return _error; }
-
-        bool ParseRows(std::vector<Row>& out)
-        {
-            if (!Expect('['))
-                return false;
-
-            SkipSpace();
-            if (Peek() == ']')
-                return Fail("the fixture holds no rows");
-
-            for (;;)
-            {
-                Row row;
-                if (!ParseRow(row))
-                    return false;
-                out.push_back(row);
-
-                SkipSpace();
-                if (Eat(','))
-                    continue;
-                if (Eat(']'))
-                    break;
-                return Fail("expected ',' or ']' between rows");
-            }
-
-            SkipSpace();
-            if (_at != _text.size())
-                return Fail("trailing content after the closing ']'");
-            return true;
-        }
-
-    private:
-        bool ParseRow(Row& row)
-        {
-            if (!Expect('{'))
-                return false;
-
-            for (;;)
-            {
-                std::string key;
-                if (!ParseString(key))
-                    return false;
-                if (!Expect(':'))
-                    return false;
-                if (!Assign(row, key))
-                    return false;
-
-                SkipSpace();
-                if (Eat(','))
-                    continue;
-                if (Eat('}'))
-                    break;
-                return Fail("expected ',' or '}' after the value of \"" + key + "\"");
-            }
-
-            if (row.seen != F_ALL)
-                return Fail("a row is missing one of the fourteen fields");
-            return true;
-        }
-
-        bool Assign(Row& row, std::string const& key)
-        {
-            if (key == "seed")           return Number(row.seed,          row, F_SEED);
-            if (key == "tier")           return Number(row.tier,          row, F_TIER);
-            if (key == "i")              return Number(row.index,         row, F_INDEX);
-            if (key == "effect")         return Number(row.effect,        row, F_EFFECT);
-            if (key == "condition")      return Number(row.condition,     row, F_CONDITION);
-            if (key == "severity")       return Number(row.severity,      row, F_SEVERITY);
-            if (key == "magnitude")      return Number(row.magnitude,     row, F_MAGNITUDE);
-            if (key == "boon")           return Number(row.boon,          row, F_BOON);
-            if (key == "boonMagnitude")  return Number(row.boonMagnitude, row, F_BOON_MAGNITUDE);
-            if (key == "id")             return Number(row.id,            row, F_ID);
-            if (key == "effectName")     return Text(row.effectName,    row, F_EFFECT_NAME);
-            if (key == "conditionName")  return Text(row.conditionName, row, F_CONDITION_NAME);
-            if (key == "severityName")   return Text(row.severityName,  row, F_SEVERITY_NAME);
-            if (key == "boonName")       return Text(row.boonName,      row, F_BOON_NAME);
-            return Fail("unknown key \"" + key + "\"");
-        }
-
-        bool Number(uint32& out, Row& row, uint32 bit)
-        {
-            SkipSpace();
-            size_t const start = _at;
-            uint64 value = 0;
-            while (_at < _text.size() && _text[_at] >= '0' && _text[_at] <= '9')
-            {
-                value = value * 10u + static_cast<uint64>(_text[_at] - '0');
-                if (value > 0xFFFFFFFFull)
-                    return Fail("a number does not fit in 32 bits");
-                ++_at;
-            }
-            if (_at == start)
-                return Fail("expected an unsigned number");
-
-            out = static_cast<uint32>(value);
-            row.seen |= bit;
-            return true;
-        }
-
-        bool Text(std::string& out, Row& row, uint32 bit)
-        {
-            if (!ParseString(out))
-                return false;
-            row.seen |= bit;
-            return true;
-        }
-
-        bool ParseString(std::string& out)
-        {
-            if (!Expect('"'))
-                return false;
-
-            out.clear();
-            while (_at < _text.size())
-            {
-                char const c = _text[_at++];
-                if (c == '"')
-                    return true;
-                if (c != '\\')
-                {
-                    out += c;
-                    continue;
-                }
-                if (_at == _text.size())
-                    break;
-
-                char const esc = _text[_at++];
-                switch (esc)
-                {
-                    case '"':  out += '"';  break;
-                    case '\\': out += '\\'; break;
-                    case '/':  out += '/';  break;
-                    case 'n':  out += '\n'; break;
-                    case 't':  out += '\t'; break;
-                    // The dumper escapes only '"' and '\\'; anything else is a
-                    // fixture written by something this reader does not know.
-                    default:   return Fail("unsupported escape in a string");
-                }
-            }
-            return Fail("unterminated string");
-        }
-
-        void SkipSpace()
-        {
-            while (_at < _text.size())
-            {
-                char const c = _text[_at];
-                if (c == ' ' || c == '\t' || c == '\r' || c == '\n')
-                    ++_at;
-                else
-                    break;
-            }
-        }
-
-        char Peek() { SkipSpace(); return _at < _text.size() ? _text[_at] : '\0'; }
-
-        bool Eat(char c)
-        {
-            SkipSpace();
-            if (_at < _text.size() && _text[_at] == c)
-            {
-                ++_at;
-                return true;
-            }
-            return false;
-        }
-
-        bool Expect(char c)
-        {
-            if (Eat(c))
-                return true;
-            return Fail(std::string("expected '") + c + "'");
-        }
-
-        bool Fail(std::string const& what)
-        {
-            if (_error.empty())
-                _error = what + " at byte " + std::to_string(_at);
-            return false;
-        }
-
-        std::string const& _text;
-        size_t             _at = 0;
-        std::string        _error;
-    };
-
-    // The test binary's working directory differs between the local harness
-    // (the repo root) and the core's unit_tests (its own build directory), so
-    // the fixture is found relative to this translation unit instead. Both
-    // build paths hand the compiler an absolute path for __FILE__ -- the
-    // harness because it globs "$ROOT"/tests/*.cpp, the core because
-    // mod-gauntlet.cmake registers ${CMAKE_CURRENT_LIST_DIR}/tests/*.cpp --
-    // and the working-directory candidates below cover a build that does not.
-    std::vector<std::string> FixtureCandidates()
-    {
-        std::vector<std::string> out;
-
-        // The last resort, for a build that gives the compiler a relative path
-        // and then runs the binary from somewhere else again. Nothing in this
-        // tree sets it; it exists so that a build nobody anticipated can be
-        // pointed at the fixture without editing this file.
-        if (char const* fromEnv = std::getenv("GAUNTLET_FIXTURE_DIR"))
-            out.push_back(std::string(fromEnv) + "/legacy_rolls.json");
-
-        std::string const self = __FILE__;
-        size_t const cut = self.find_last_of("/\\");
-        if (cut != std::string::npos)
-            out.push_back(self.substr(0, cut + 1) + "fixtures/legacy_rolls.json");
-
-        out.push_back("tests/fixtures/legacy_rolls.json");
-        out.push_back("fixtures/legacy_rolls.json");
-        out.push_back("../../modules/mod-gauntlet/tests/fixtures/legacy_rolls.json");
-        return out;
-    }
-
-    bool LoadFixture(std::string& text, std::string& whereFrom, std::string& tried)
-    {
-        for (std::string const& path : FixtureCandidates())
-        {
-            std::ifstream in(path, std::ios::binary);
-            if (in)
-            {
-                std::ostringstream buffer;
-                buffer << in.rdbuf();
-                text = buffer.str();
-                whereFrom = path;
-                return true;
-            }
-            tried += "\n  " + path;
-        }
-        return false;
-    }
-
-    // Field-by-field comparison of one row. Every mismatch names the row, the
-    // exact (seed, tier, i) that reproduces it, and the field, because "288
-    // rows, 4 mismatches" tells whoever broke it nothing at all.
-    struct Divergence
-    {
-        size_t      row = 0;
-        Row const*  fixture = nullptr;
-        char const* field = "";
-        std::string expected;
-        std::string actual;
-    };
-
-    void CompareUInt(std::vector<Divergence>& out, size_t index, Row const& row,
-                     char const* field, uint32 expected, uint32 actual)
-    {
-        if (expected != actual)
-            out.push_back({ index, &row, field, std::to_string(expected), std::to_string(actual) });
-    }
-
-    void CompareText(std::vector<Divergence>& out, size_t index, Row const& row,
-                     char const* field, std::string const& expected, std::string const& actual)
-    {
-        if (expected != actual)
-            out.push_back({ index, &row, field, "\"" + expected + "\"", "\"" + actual + "\"" });
-    }
 
     bool SameOffer(Offer const& a, Offer const& b)
     {
@@ -416,97 +106,6 @@ namespace
         }
         return carried;
     }
-}
-
-// =====================================================================
-// The golden test.
-// =====================================================================
-
-TEST(LegacyGolden, ReproducesEveryFixtureRowFieldForField)
-{
-    std::string text;
-    std::string whereFrom;
-    std::string tried;
-    ASSERT_TRUE(LoadFixture(text, whereFrom, tried))
-        << "tests/fixtures/legacy_rolls.json is the record of what every live character is "
-           "carrying and this test is worthless without it. Tried:" << tried;
-
-    std::vector<Row> rows;
-    Scanner scanner(text);
-    ASSERT_TRUE(scanner.ParseRows(rows)) << whereFrom << ": " << scanner.Error();
-    ASSERT_EQ(rows.size(), FIXTURE_ROWS)
-        << whereFrom << " holds " << rows.size() << " rows; tests/tools/dump_legacy_rolls.cpp "
-        << "writes " << FIXTURE_ROWS << " (6 seeds x 16 tiers x 3 rolls)";
-
-    std::vector<Divergence> divergences;
-    for (size_t i = 0; i < rows.size(); ++i)
-    {
-        Row const& row = rows[i];
-        Affix const got = LegacyRoll(row.seed, row.tier, row.index);
-
-        CompareUInt(divergences, i, row, "effect", row.effect, static_cast<uint32>(got.effect));
-        CompareUInt(divergences, i, row, "condition", row.condition, static_cast<uint32>(got.condition));
-        CompareUInt(divergences, i, row, "severity", row.severity, static_cast<uint32>(got.severity));
-        CompareUInt(divergences, i, row, "magnitude", row.magnitude, got.magnitude);
-        CompareUInt(divergences, i, row, "boon", row.boon, static_cast<uint32>(got.boon));
-        CompareUInt(divergences, i, row, "boonMagnitude", row.boonMagnitude, got.boonMagnitude);
-        CompareUInt(divergences, i, row, "id", row.id, got.id);
-
-        CompareText(divergences, i, row, "effectName", row.effectName, EffectName(got.effect));
-        CompareText(divergences, i, row, "conditionName", row.conditionName, ConditionName(got.condition));
-        CompareText(divergences, i, row, "severityName", row.severityName, SeverityName(got.severity));
-        CompareText(divergences, i, row, "boonName", row.boonName, BoonName(got.boon));
-    }
-
-    if (divergences.empty())
-        return;
-
-    // Twenty is enough to see the pattern; a wholesale divergence would
-    // otherwise bury the summary under three thousand lines.
-    constexpr size_t SHOWN = 20;
-    for (size_t i = 0; i < divergences.size() && i < SHOWN; ++i)
-    {
-        Divergence const& d = divergences[i];
-        ADD_FAILURE() << "LegacyRoll(seed=" << d.fixture->seed << ", tier=" << d.fixture->tier
-                      << ", i=" << d.fixture->index << ") [fixture row " << d.row << "] field \""
-                      << d.field << "\": fixture has " << d.expected << ", LegacyRoll gives "
-                      << d.actual;
-    }
-
-    ADD_FAILURE() << divergences.size() << " field(s) across " << rows.size()
-                  << " rows diverge from " << whereFrom
-                  << ". The fixture is the record of what live characters are carrying: fix "
-                     "LegacyRoll, do not regenerate the fixture.";
-}
-
-TEST(LegacyGolden, FixtureCoversTheDocumentedCrossProduct)
-{
-    std::string text;
-    std::string whereFrom;
-    std::string tried;
-    ASSERT_TRUE(LoadFixture(text, whereFrom, tried)) << "tried:" << tried;
-
-    std::vector<Row> rows;
-    Scanner scanner(text);
-    ASSERT_TRUE(scanner.ParseRows(rows)) << whereFrom << ": " << scanner.Error();
-
-    // Every tier and every roll index must actually appear, or a fixture that
-    // had quietly lost half its rows would still pass the comparison above.
-    std::array<size_t, 17> perTier = {};
-    std::array<size_t, 3>  perIndex = {};
-    for (Row const& row : rows)
-    {
-        ASSERT_GE(row.tier, 1u);
-        ASSERT_LE(row.tier, 16u);
-        ASSERT_LT(row.index, 3u);
-        perTier[row.tier]++;
-        perIndex[row.index]++;
-    }
-
-    for (uint32 tier = 1; tier <= 16; ++tier)
-        EXPECT_EQ(perTier[tier], 18u) << "tier " << tier << " is under-represented in the fixture";
-    for (uint32 i = 0; i < 3; ++i)
-        EXPECT_EQ(perIndex[i], 96u) << "roll index " << i << " is under-represented in the fixture";
 }
 
 // =====================================================================
@@ -625,23 +224,49 @@ TEST(GeneratorDeterminism, DifferentSeedsGiveDifferentOffers)
 
     ASSERT_EQ(pairs, 80000u);
 
-    // Measured against the table and algorithm of steps 2d and 3: 78 of the
-    // 80,000 pairs collide, 0.0975%, and 61 of those 78 sit at tier 1 or tier
-    // 15 where the eligible pool is at its thinnest. The ceiling is set at
-    // half a percent -- five times the measured rate -- so that a registry
-    // edit can move the number without failing the build, while a generator
-    // that stopped reading the seed would land near 100% and fail loudly.
-    constexpr size_t CEILING_PER_MILLE = 5;
+    // Measured after Phase 2: 428 of the 80,000 pairs collide, 0.535%, against
+    // 78 (0.0975%) before it. The rise is arithmetic and has two named causes,
+    // both of them the deletion rather than the generator.
+    //
+    // The four flat scalars are gone, and with them the condition axis. A
+    // Scalar offer used to carry one of thirteen conditions rolled from the
+    // stream, which multiplied the number of distinct sets a tier could
+    // produce by more than an order of magnitude; nothing rolls a condition
+    // now. And the four rows themselves had windows of 1-16, so every tier lost
+    // four candidates.
+    //
+    // The collisions concentrate exactly where the pool is thinnest: 180 of the
+    // 428 at tier 1, where the whole eligible table is seven mechanics across
+    // four families, and 166 at tiers 15 and 16, where seventeen rows reach the
+    // window and a run carries most of them. Tiers 4, 6, 7, 8, 9 and 12 collide
+    // not at all.
+    //
+    // Two bounds rather than one. The global ceiling is 1% -- twice the
+    // measured rate -- and no single tier may pass 10%, so a band that
+    // collapsed to a handful of possible sets fails here even if the total
+    // stayed small. A generator that stopped reading the seed lands near 100%
+    // on both and fails loudly.
+    constexpr size_t CEILING_PER_MILLE  = 10;
+    constexpr double CEILING_TIER_PCT   = 10.0;
     size_t const ceiling = pairs * CEILING_PER_MILLE / 1000;
 
     EXPECT_LE(identical, ceiling)
         << identical << " of " << pairs << " adjacent seed pairs produced identical offers";
 
+    size_t const perTier = pairs / 16;
+    for (uint8 tier = 1; tier <= 16; ++tier)
+    {
+        double const rate = 100.0 * double(identicalPerTier[tier]) / double(perTier);
+        EXPECT_LE(rate, CEILING_TIER_PCT)
+            << "tier " << unsigned(tier) << ": " << identicalPerTier[tier] << " of " << perTier
+            << " adjacent seed pairs (" << rate << "%) produced identical offers";
+    }
+
     if (identical > ceiling)
         for (uint8 tier = 1; tier <= 16; ++tier)
             if (identicalPerTier[tier] != 0)
                 ADD_FAILURE() << "  tier " << unsigned(tier) << ": " << identicalPerTier[tier]
-                              << " identical pairs of " << (pairs / 16);
+                              << " identical pairs of " << perTier;
 }
 
 TEST(GeneratorDeterminism, GeneratorVersionIsFoldedIntoTheStream)

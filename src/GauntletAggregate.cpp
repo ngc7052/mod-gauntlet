@@ -12,35 +12,6 @@ namespace Gauntlet
 {
     namespace
     {
-        // Does a curse of this kind multiply the base up or down? Only two
-        // kinds are bad when they are large.
-        bool Raises(AggregateKind k)
-        {
-            return k == AggregateKind::DamageTaken || k == AggregateKind::EnemySpeed;
-        }
-
-        // Which aggregate, if any, a boon offsets. Mgr::Multiplier paired each
-        // Boon with the Effect it cancelled and this keeps those pairings, so a
-        // migrated Wrathful Feeble still buys its damage back.
-        //
-        // Four boons are missing on purpose. BonusHealing offset HealingDone,
-        // which is not HealingReceived and never was: a Mending Withering did
-        // not soften its own curse before the redesign and does not now.
-        // BonusMoveSpeed, BonusMoney and BonusRegen offset effects the redesign
-        // has no AggregateKind for at all. All four are inert today because the
-        // effects they name were never rolled, and they stay inert here rather
-        // than quietly becoming stronger on a live character.
-        bool BoonOffsets(Boon b, AggregateKind k)
-        {
-            switch (b)
-            {
-                case Boon::BonusDamage:     return k == AggregateKind::DamageDone;
-                case Boon::BonusExperience: return k == AggregateKind::Experience;
-                case Boon::BonusMaxHealth:  return k == AggregateKind::MaxHealth;
-                default:                    return false;
-            }
-        }
-
         // Plan section 2.5. Experience is the one kind with no ceiling and no
         // floor; the design never gives it one and inventing one here would be
         // a balance decision rather than an implementation.
@@ -48,15 +19,6 @@ namespace Gauntlet
         // The floor is applied after the ceiling so that a configuration whose
         // min exceeds its max resolves to the min: taking less than base damage
         // is the outcome the cap exists to prevent, so the floor must win.
-        // A mechanic whose boon the generator rolled, rather than one the
-        // registry names for it. Only these have their boon paid by the
-        // aggregate; see the call site.
-        bool IsScalar(uint16 mechanic)
-        {
-            MechanicDef const* def = FindMechanic(mechanic);
-            return def && (def->flags & MF_Scalar) != 0;
-        }
-
         float ClampProduct(float v, AggregateKind k, AggregateCaps const& caps)
         {
             switch (k)
@@ -92,26 +54,17 @@ namespace Gauntlet
             if (!in.conditionActive[static_cast<size_t>(a.condition)])
                 continue;
 
-            product *= a.impl->AggregateFactor(a, in.kind);
-
-            // The boon rides the same condition as the curse it pays for, as it
-            // did in Mgr::Multiplier. It is a factor of its own rather than a
-            // subtraction from the curse's percentage, which is what turning a
-            // sum into a product means.
+            // Curse and boon in one call. The aggregate pays no boon of its
+            // own any more: until Phase 2 it paid the generically-rolled boon a
+            // Scalar carried, and with the Scalars deleted every boon is named
+            // by MechanicDef::boon and delivered by the mechanic that names it
+            // -- several of them by returning BoonFactor() from exactly this
+            // callback (src/mechanics/Boons.h).
             //
-            // Only for a Scalar. A Scalar's boon is rolled generically by the
-            // generator and has nowhere else to be applied, so the aggregate
-            // owns it. Every other mechanic's boon is named by its registry row
-            // and delivered by the mechanic itself -- the Shade's is
-            // Vindication, five minutes of extra experience for killing it --
-            // and paying it here as well would hand the player a permanent
-            // multiplier the card never promised, on top of the reward it did.
-            if (a.boon != Boon::None && a.boonMag != 0 && IsScalar(a.mechanic)
-                && BoonOffsets(a.boon, in.kind))
-            {
-                float const pct = static_cast<float>(a.boonMag) / 100.0f;
-                product *= Raises(in.kind) ? std::max(0.0f, 1.0f - pct) : (1.0f + pct);
-            }
+            // The consequence is that a mechanic's whole contribution to one
+            // AggregateKind, upside and downside together, is one number, and
+            // the clamp below is applied once to the product of all of them.
+            product *= a.impl->AggregateFactor(a, in.kind);
         }
 
         return ClampProduct(product, in.kind, caps);

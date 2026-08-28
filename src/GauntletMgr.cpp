@@ -6,7 +6,6 @@
 #include "GauntletMgr.h"
 #include "GauntletAddon.h"
 #include "GauntletGenerator.h"
-#include "GauntletLegacy.h"
 #include "GauntletMechanic.h"
 #include "GauntletRegistry.h"
 #include "GauntletSummons.h"
@@ -192,40 +191,6 @@ namespace Gauntlet
                 case 2:  return "II";
                 case 3:  return "III";
                 default: return std::to_string(static_cast<uint32>(rank));
-            }
-        }
-
-        // Generator 1 rolled a free percentage; the redesign has three ranks.
-        // The exact percentage survives in legacy_mag and is what the mechanic
-        // actually uses, so this only decides what the affix is *called* --
-        // but it is written to a column and shown to the player, so it is
-        // chosen rather than defaulted. Severity is generator 1's own notion
-        // of strength and already has six steps, so two fold into each rank.
-        uint8 RankFromSeverity(Severity severity)   // TODO(design)
-        {
-            switch (severity)
-            {
-                case Severity::Trivial:
-                case Severity::Minor:    return 1;
-                case Severity::Moderate:
-                case Severity::Major:    return 2;
-                default:                 return 3;
-            }
-        }
-
-        // Plan section 3.6 fixes this map, and CONTRACT section 8 the ids:
-        // the four effects generator 1 ever rolled are the four mechanics
-        // Phase 0 implements. Anything else means the row did not come from
-        // LegacyRoll and must not be guessed at.
-        uint16 MechanicForEffect(Effect effect)
-        {
-            switch (effect)
-            {
-                case Effect::DamageTaken:     return 21;   // A3 Exposed
-                case Effect::DamageDone:      return 22;   // A4 Feeble
-                case Effect::HealingReceived: return MECHANIC_WITHERING;
-                case Effect::ExperienceGain:  return MECHANIC_FORGETFUL;
-                default:                      return MECHANIC_NONE;
             }
         }
 
@@ -426,11 +391,19 @@ namespace Gauntlet
         // naming it badly.
         std::string name = def ? std::string(def->name) : ("#" + std::to_string(static_cast<uint32>(mechanic)));
 
-        // Affix::Name() built "Wrathful Desperate Exposed" out of the boon,
-        // the condition and the effect. The shape is kept because the addon's
-        // chat fallback and every screenshot of the module depend on it; only
-        // the last word now comes from the registry instead of an Effect.
-        name = ConditionName(condition) + " " + name;
+        // Affix::Name() built "Wrathful Desperate Exposed" out of the boon, the
+        // condition and the effect, and the shape is kept: the addon's chat
+        // fallback matches on it, and the boon adjective is how a player reads
+        // at a glance that an offer comes with an upside.
+        //
+        // Condition::Always no longer contributes a word. It used to -- every
+        // affix printed as "Everlasting Something" -- and that was harmless
+        // only while the Scalars existed to make the axis mean something. With
+        // them deleted every offer carries Always, so the adjective would be on
+        // every name in the game and would say nothing at all. A real condition
+        // still prints, because the axis itself is kept for a later phase.
+        if (condition != Condition::Always)
+            name = ConditionName(condition) + " " + name;
         if (boon != Boon::None)
             name = BoonName(boon) + " " + name;
         return name;
@@ -470,8 +443,18 @@ namespace Gauntlet
         live.tickMs      = 0;
         live.stateSaveMs = 0;
 
+        // The character's own creation date, as a unix timestamp, which is the
+        // one fact about a guid that cannot be inherited: a character created
+        // into a recycled guid has a new one. Read once here rather than joined
+        // into the run query, because a fresh run needs it too.
+        uint32 charCreated = 0;
         if (QueryResult r = CharacterDatabase.Query(
-                "SELECT `seed`, `tier`, `dead`, `gen_version`, `class` FROM `gauntlet_run` WHERE `guid` = {}", low))
+                "SELECT UNIX_TIMESTAMP(`creation_date`) FROM `characters` WHERE `guid` = {}", low))
+            charCreated = r->Fetch()[0].Get<uint32>();
+
+        if (QueryResult r = CharacterDatabase.Query(
+                "SELECT `seed`, `tier`, `dead`, `gen_version`, `class`, `char_created` "
+                "FROM `gauntlet_run` WHERE `guid` = {}", low))
         {
             Field* f       = r->Fetch();
             st.seed        = f[0].Get<uint32>();
@@ -479,6 +462,16 @@ namespace Gauntlet
             st.dead        = f[2].Get<uint8>() != 0;
             st.genVersion  = f[3].Get<uint16>();
             st.playerClass = f[4].Get<uint8>();
+
+            uint32 const storedCreated = f[5].Get<uint32>();
+
+            // A run that predates the column, or one whose character row could
+            // not be read, has no evidence either way. Backfill it and move on:
+            // purging a live hardcore run on no evidence is worse than keeping
+            // one that should have gone, and the class test below still stands.
+            if (storedCreated == 0 && charCreated != 0)
+                CharacterDatabase.Execute("UPDATE `gauntlet_run` SET `char_created` = {} WHERE `guid` = {}",
+                                          charCreated, low);
 
             // Every run that predates the redesign has class 0, because the
             // column did not exist when it was created. The generator filters
@@ -491,25 +484,36 @@ namespace Gauntlet
                                           static_cast<uint32>(st.playerClass), low);
             }
 
-            // A run that cannot belong to the character now holding this GUID.
-            // The core reuses the GUIDs of deleted characters, so a run whose
-            // class does not match, or whose tier is further than this
-            // character's level could ever have reached, belonged to a previous
-            // occupant. Purging on delete is the real fix; this catches the rows
-            // already orphaned before that existed, and any the delete missed.
-            bool const wrongClass = st.playerClass != 0 && st.playerClass != player->getClass();
-            // Fewer levels than tiers is impossible under any TierInterval of 1
-            // or more, so this stays true if an admin ever retunes the interval.
-            // A stricter level * interval test would purge every legitimate run
-            // the day someone raised it.
-            bool const impossibleTier = st.tier > 0 && player->GetLevel() < st.tier;
+            // A run that cannot belong to the character now holding this guid.
+            // The core reuses the guids of deleted characters, so a run keyed on
+            // the guid alone is inherited by whoever is created next -- retired
+            // flag, tier and every affix. Purging on delete is the real fix
+            // (OnPlayerDeleteFromDB, below); this catches the rows already
+            // orphaned before that existed, and any the delete missed.
+            //
+            // The test is the character's creation date, and it replaces Phase
+            // 0's "fewer levels than tiers" heuristic outright. That heuristic
+            // could not tell real guid reuse from deliberate testing: a game
+            // master who levels a character *down* to test an affix at level 10
+            // produces exactly the shape it purged, and every character built
+            // with `.gauntlet debug` was being eaten on its next login. A
+            // creation date is evidence rather than an inference -- it is a
+            // fact about the character, not about the state of its run -- so a
+            // character may now be levelled anywhere at all and keep its run.
+            //
+            // Both sides have to be known for the comparison to mean anything.
+            // Zero on either is "cannot say", and cannot-say is not a mismatch.
+            bool const wrongClass   = st.playerClass != 0 && st.playerClass != player->getClass();
+            bool const wrongCharacter = storedCreated != 0 && charCreated != 0
+                                     && storedCreated != charCreated;
 
-            if (wrongClass || impossibleTier)
+            if (wrongClass || wrongCharacter)
             {
                 LOG_INFO("module.gauntlet",
                          "Gauntlet: discarding a stale run on guid {} ({}), it belonged to a character that no "
                          "longer exists; starting a fresh run for {}.",
-                         low, wrongClass ? "class does not match" : "tier is beyond this character's level",
+                         low, wrongCharacter ? "the character was created at a different time"
+                                             : "class does not match",
                          player->GetName());
 
                 CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
@@ -522,9 +526,11 @@ namespace Gauntlet
                 st.genVersion  = GeneratorVersion;
                 st.playerClass = player->getClass();
                 CharacterDatabase.Execute(
-                    "INSERT INTO `gauntlet_run` (`guid`, `seed`, `tier`, `dead`, `gen_version`, `class`) "
-                    "VALUES ({}, {}, 0, 0, {}, {})",
-                    low, st.seed, static_cast<uint32>(st.genVersion), static_cast<uint32>(st.playerClass));
+                    "INSERT INTO `gauntlet_run` "
+                    "(`guid`, `seed`, `tier`, `dead`, `char_created`, `gen_version`, `class`) "
+                    "VALUES ({}, {}, 0, 0, {}, {}, {})",
+                    low, st.seed, charCreated, static_cast<uint32>(st.genVersion),
+                    static_cast<uint32>(st.playerClass));
 
                 st.graceMs = _graceMs;
 
@@ -544,9 +550,11 @@ namespace Gauntlet
             st.genVersion  = GeneratorVersion;
             st.playerClass = player->getClass();
             CharacterDatabase.Execute(
-                "INSERT INTO `gauntlet_run` (`guid`, `seed`, `tier`, `dead`, `gen_version`, `class`) "
-                "VALUES ({}, {}, 0, 0, {}, {})",
-                low, st.seed, static_cast<uint32>(st.genVersion), static_cast<uint32>(st.playerClass));
+                "INSERT INTO `gauntlet_run` "
+                "(`guid`, `seed`, `tier`, `dead`, `char_created`, `gen_version`, `class`) "
+                "VALUES ({}, {}, 0, 0, {}, {}, {})",
+                low, st.seed, charCreated, static_cast<uint32>(st.genVersion),
+                static_cast<uint32>(st.playerClass));
         }
 
         // What was picked, read straight out of the columns. Nothing is
@@ -554,7 +562,7 @@ namespace Gauntlet
         // exists to fix, because it meant a change to the generator rewrote
         // every live run.
         if (QueryResult r = CharacterDatabase.Query(
-                "SELECT `slot`, `mechanic`, `rank`, `cond`, `boon`, `boon_mag`, `legacy_mag`, `gen_version` "
+                "SELECT `slot`, `mechanic`, `rank`, `cond`, `boon`, `boon_mag`, `gen_version` "
                 "FROM `gauntlet_affix` WHERE `guid` = {} ORDER BY `slot` ASC", low))
         {
             do
@@ -568,8 +576,7 @@ namespace Gauntlet
                 a.condition  = static_cast<Condition>(f[3].Get<uint8>());
                 a.boon       = static_cast<Boon>(f[4].Get<uint8>());
                 a.boonMag    = f[5].Get<uint8>();
-                a.legacyMag  = f[6].Get<uint16>();
-                a.genVersion = f[7].Get<uint16>();
+                a.genVersion = f[6].Get<uint16>();
 
                 // A row the migration could not convert, or one written by a
                 // future generator this build does not understand. Skipping it
@@ -818,7 +825,6 @@ namespace Gauntlet
             instance.boonMag    = chosen.boonMag;
             instance.slot       = slot;
             instance.genVersion = GeneratorVersion;
-            instance.legacyMag  = 0;   // generator 2: the rank is the strength
 
             AffixInstance& stored = st->Attach(instance);
 
@@ -837,8 +843,8 @@ namespace Gauntlet
             // the (guid, slot) key and losing the affix entirely.
             trans->Append(
                 "REPLACE INTO `gauntlet_affix` "
-                "(`guid`, `slot`, `mechanic`, `rank`, `cond`, `boon`, `boon_mag`, `legacy_mag`, `gen_version`) "
-                "VALUES ({}, {}, {}, {}, {}, {}, {}, 0, {})",
+                "(`guid`, `slot`, `mechanic`, `rank`, `cond`, `boon`, `boon_mag`, `gen_version`) "
+                "VALUES ({}, {}, {}, {}, {}, {}, {}, {})",
                 low, static_cast<uint32>(slot), static_cast<uint32>(chosen.mechanic),
                 static_cast<uint32>(chosen.rank), static_cast<uint32>(chosen.condition),
                 static_cast<uint32>(chosen.boon), static_cast<uint32>(chosen.boonMag),
@@ -1397,7 +1403,8 @@ namespace Gauntlet
             if (sGauntletSummons->IsGauntletSummon(creature))
                 amount = static_cast<uint32>(static_cast<float>(amount) * _summonXpRate);
 
-        // And last the aggregate, which is where a migrated Forgetful lives.
+        // And last the aggregate, which is where an affix reporting an
+        // Experience factor lands -- Hubris's boon among them.
         amount = static_cast<uint32>(static_cast<float>(amount) * Aggregate(player, AggregateKind::Experience));
     }
 
@@ -1560,121 +1567,5 @@ namespace Gauntlet
         }
 
         sched->SetTimedAffixCount(timed);
-    }
-
-    // =====================================================================
-    // The one-shot migration (plan section 3.6).
-    // =====================================================================
-    void Mgr::MigrateLegacyRuns()
-    {
-        // The SQL update adds the redesign's columns and re-keys the table but
-        // deliberately leaves `roll` and `tier` behind, because unrolling a
-        // legacy affix needs splitmix and SQL cannot run it. The surviving
-        // `roll` column is therefore the marker for "this install has not been
-        // converted yet", and dropping it at the end is what makes this a
-        // no-op on every later start.
-        QueryResult marker = CharacterDatabase.Query(
-            "SELECT COUNT(*) FROM information_schema.COLUMNS "
-            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'gauntlet_affix' AND COLUMN_NAME = 'roll'");
-        if (!marker || marker->Fetch()[0].Get<uint64>() == 0)
-            return;
-
-        // A row whose run is gone cannot be unrolled: the seed is half of
-        // LegacyRoll's input. Counting those first, rather than carrying an
-        // IS NULL through the join, keeps the loop below reading only rows it
-        // can actually convert -- and the count is what stops the legacy
-        // columns being dropped while anything is still unreadable.
-        uint32 unresolved = 0;
-        if (QueryResult orphans = CharacterDatabase.Query(
-                "SELECT COUNT(*) FROM `gauntlet_affix` a LEFT JOIN `gauntlet_run` r ON r.`guid` = a.`guid` "
-                "WHERE a.`mechanic` = 0 AND r.`guid` IS NULL"))
-        {
-            unresolved = static_cast<uint32>(orphans->Fetch()[0].Get<uint64>());
-            if (unresolved != 0)
-                LOG_ERROR("server.loading",
-                          "Gauntlet: {} legacy affix row(s) have no gauntlet_run and cannot be unrolled.",
-                          unresolved);
-        }
-
-        QueryResult rows = CharacterDatabase.Query(
-            "SELECT a.`guid`, a.`slot`, a.`tier`, a.`roll`, r.`seed` "
-            "FROM `gauntlet_affix` a JOIN `gauntlet_run` r ON r.`guid` = a.`guid` "
-            "WHERE a.`mechanic` = 0");
-
-        uint32 converted = 0;
-
-        if (rows)
-        {
-            CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
-            do
-            {
-                Field* f = rows->Fetch();
-                uint32 const guid    = f[0].Get<uint32>();
-                uint32 const slot    = f[1].Get<uint32>();
-                uint32 const tier    = f[2].Get<uint32>();
-                uint32 const roll    = f[3].Get<uint32>();
-                uint32 const seed    = f[4].Get<uint32>();
-
-                // The affix this character has actually been playing with,
-                // reproduced by the frozen generator-1 roll.
-                Affix const a = LegacyRoll(seed, tier, roll);
-
-                uint16 const mechanic = MechanicForEffect(a.effect);
-                if (mechanic == MECHANIC_NONE)
-                {
-                    ++unresolved;
-                    LOG_ERROR("server.loading",
-                              "Gauntlet: affix row (guid {}, slot {}) unrolled to effect {}, which has no "
-                              "registry id; left unconverted.",
-                              guid, slot, static_cast<uint32>(a.effect));
-                    continue;
-                }
-
-                // legacy_mag is the whole point of the migration: generator 1's
-                // magnitude is a free percentage in 2..115 and rounding it onto
-                // the three-step rank ladder would change a live hardcore run.
-                // The mechanics read it in preference to the rank (step 4a), so
-                // the number the player has been playing with survives exactly.
-                uint32 const legacyMag = std::min<uint32>(a.magnitude, 65535u);
-                uint32 const boonMag   = std::min<uint32>(a.boonMagnitude, 255u);
-
-                // Idempotent on its own: the `mechanic` = 0 predicate means a
-                // second pass over the same row updates nothing. That is what
-                // makes an interrupted migration safe to resume rather than
-                // needing the transaction to have committed.
-                trans->Append(
-                    "UPDATE `gauntlet_affix` SET `mechanic` = {}, `rank` = {}, `cond` = {}, `boon` = {}, "
-                    "`boon_mag` = {}, `legacy_mag` = {}, `gen_version` = 1 "
-                    "WHERE `guid` = {} AND `slot` = {} AND `mechanic` = 0",
-                    static_cast<uint32>(mechanic), static_cast<uint32>(RankFromSeverity(a.severity)),
-                    static_cast<uint32>(a.condition), static_cast<uint32>(a.boon),
-                    boonMag, legacyMag, guid, slot);
-                ++converted;
-            } while (rows->NextRow());
-
-            // Synchronous: the ALTER below must not overtake these, and MySQL
-            // commits implicitly before DDL anyway.
-            CharacterDatabase.DirectCommitTransaction(trans);
-        }
-
-        if (unresolved != 0)
-        {
-            LOG_ERROR("server.loading",
-                      "Gauntlet: converted {} legacy affix row(s), but {} could not be unrolled. "
-                      "gauntlet_affix.roll and .tier are kept so this can be retried; look at the rows "
-                      "with mechanic = 0 by hand.",
-                      converted, unresolved);
-            return;
-        }
-
-        // Only now, with every row carrying a mechanic, do the legacy columns
-        // go. Dropping them is what makes the table byte-identical to the one
-        // base/gauntlet.sql builds on a fresh install, and what makes this
-        // routine a no-op from the next start on.
-        CharacterDatabase.DirectExecute("ALTER TABLE `gauntlet_affix` DROP COLUMN `roll`, DROP COLUMN `tier`");
-
-        LOG_INFO("server.loading",
-                 "Gauntlet: migrated {} legacy affix row(s) to the redesign schema and dropped "
-                 "gauntlet_affix.roll and .tier.", converted);
     }
 }

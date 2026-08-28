@@ -133,8 +133,6 @@ namespace Gauntlet
             { 15, "Interface\\Icons\\Spell_Shadow_UnholyFrenzy"   },   // Frenzy
             { 17, "Interface\\Icons\\INV_Misc_PocketWatch_01"     },   // Falter
             { 19, "Interface\\Icons\\Ability_BackStab"            },   // Deep Wounds
-            { 21, "Interface\\Icons\\Ability_Warrior_ShieldBash"  },   // Exposed
-            { 22, "Interface\\Icons\\Ability_Warrior_Disarm"      },   // Feeble
             { 24, "Interface\\Icons\\Ability_Hunter_Pet_Wolf"     },   // Lone Wolf
             { 25, "Interface\\Icons\\INV_Misc_Coin_01"            },   // Iron Purse
             { 26, "Interface\\Icons\\Spell_Holy_LayOnHands"       },   // Last Rites
@@ -156,8 +154,6 @@ namespace Gauntlet
             { 64, "Interface\\Icons\\Ability_Racial_BearForm"     },   // Bound Skin
             { 67, "Interface\\Icons\\Ability_Druid_CatForm"       },   // Two Faces
             { 70, "Interface\\Icons\\Spell_Nature_Reincarnation"  },   // Ankh Pact
-            { 72, "Interface\\Icons\\Spell_Shadow_LifeDrain"      },   // Withering
-            { 73, "Interface\\Icons\\INV_Misc_Book_09"            },   // Forgetful
         };
 
         char const* IconForMechanic(MechanicDef const& def)
@@ -689,7 +685,6 @@ public:
         instance.boonMag    = 0;
         instance.slot       = slot;
         instance.genVersion = GeneratorVersion;
-        instance.legacyMag  = 0;
 
         AffixInstance& stored = st->Attach(instance);
 
@@ -706,8 +701,8 @@ public:
         uint32 const low = p->GetGUID().GetCounter();
         CharacterDatabase.Execute(
             "REPLACE INTO `gauntlet_affix` "
-            "(`guid`, `slot`, `mechanic`, `rank`, `cond`, `boon`, `boon_mag`, `legacy_mag`, `gen_version`) "
-            "VALUES ({}, {}, {}, {}, {}, 0, 0, 0, {})",
+            "(`guid`, `slot`, `mechanic`, `rank`, `cond`, `boon`, `boon_mag`, `gen_version`) "
+            "VALUES ({}, {}, {}, {}, {}, 0, 0, {})",
             low, static_cast<uint32>(slot), static_cast<uint32>(def->id), rank,
             static_cast<uint32>(condition), static_cast<uint32>(GeneratorVersion));
 
@@ -950,8 +945,8 @@ public:
                                      static_cast<uint32>(a.rank), static_cast<uint32>(a.condition),
                                      ConditionName(a.condition), static_cast<uint32>(a.boon),
                                      BoonName(a.boon), static_cast<uint32>(a.boonMag));
-            handler->PSendSysMessage("           legacyMag {} | generator {} | impl {} | offerable {}",
-                                     static_cast<uint32>(a.legacyMag), static_cast<uint32>(a.genVersion),
+            handler->PSendSysMessage("           generator {} | impl {} | offerable {}",
+                                     static_cast<uint32>(a.genVersion),
                                      a.impl ? "yes" : "none",
                                      def ? (IsImplemented(*def) ? "yes" : "no") : "unknown");
             handler->PSendSysMessage("           {}", sGauntlet->DescribeOf(a));
@@ -1027,18 +1022,16 @@ public:
                                          : std::string());
         }
 
-        // Which rules the builder had to drop to fill the set. In Phase 0 this
-        // is never empty on the live registry: four implemented mechanics in
-        // one family cannot satisfy "three offers, three families" (worker
-        // contract section 9), and the point of printing it is that the
-        // degradation is visible rather than inferred.
+        // Which rules the builder had to drop to fill the set. The point of
+        // printing it is that the degradation is visible rather than inferred:
+        // the pool thins out at the last tiers of a long run, and this says so.
         std::string relaxed;
         if (set.relaxations & GR_RepeatedFamily)
             relaxed += relaxed.empty() ? "repeated family" : ", repeated family";
         if (set.relaxations & GR_RepeatedMechanic)
             relaxed += relaxed.empty() ? "repeated mechanic" : ", repeated mechanic";
-        if (set.relaxations & GR_FellBackToScalar)
-            relaxed += relaxed.empty() ? "fell back to the scalar pool" : ", fell back to the scalar pool";
+        if (set.relaxations & GR_NoCandidate)
+            relaxed += relaxed.empty() ? "no candidate" : ", no candidate";
 
         handler->PSendSysMessage("  relaxations: {}", relaxed.empty() ? "none" : relaxed);
         return true;

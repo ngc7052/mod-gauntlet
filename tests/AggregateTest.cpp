@@ -11,12 +11,12 @@
 // way in, and that an affix this build cannot run contributes nothing at all
 // rather than crashing or leaking its boon.
 //
-// The contributions come from test stubs rather than from the real Exposed
-// and Feeble. Two reasons: the local harness compiles src/*.cpp only, so
-// src/mechanics/attrition/*.cpp -- where MakeMechanic lives -- is not linked
-// into it, and a cap test written against the mechanics' own percentages
-// would fail every time somebody tuned them. What is under test here is the
-// arithmetic Aggregate() does with whatever factors it is handed.
+// The contributions come from test stubs rather than from real mechanics. Two
+// reasons: every mechanic in the tree now needs Player.h and so is not linked
+// into the local harness at all, and a cap test written against a mechanic's
+// own percentages would fail every time somebody tuned them. What is under
+// test here is the arithmetic Aggregate() does with whatever factors it is
+// handed.
 
 #include "GauntletAggregate.h"
 #include "GauntletMechanic.h"
@@ -82,7 +82,10 @@ namespace
     AffixInstance Carrying(IMechanic* impl, Condition condition = Condition::Always)
     {
         AffixInstance instance;
-        instance.mechanic  = 21;
+        // Any live id will do; 6 is Champions. It used to be 21, Exposed, which
+        // Phase 2 deleted -- and the id matters only in that Aggregate must not
+        // consult the registry about it.
+        instance.mechanic  = 6;
         instance.condition = condition;
         instance.impl      = impl;
         return instance;
@@ -185,7 +188,7 @@ TEST(Aggregate, AConditionOutsideTheEnumIsIgnored)
     EXPECT_FLOAT_EQ(Aggregate(carried, Everything(AggregateKind::DamageTaken), caps), 1.0f);
 }
 
-TEST(Aggregate, AnUnimplementedMechanicIsIgnoredWholeBoonIncluded)
+TEST(Aggregate, AnUnimplementedMechanicIsIgnoredEntirely)
 {
     // A run migrated from a newer registry, or a family switched off in
     // config, legitimately carries an id this build has no code for:
@@ -318,72 +321,37 @@ TEST(Aggregate, AKindWithNoContributorsIsUntouchedByTheOthers)
     }
 }
 
-TEST(Aggregate, ABoonOffsetsTheEffectItIsPairedAgainst)
+TEST(Aggregate, TheAggregatePaysNoBoonOfItsOwn)
 {
+    // Until Phase 2 this function also paid a carried affix's boon, because a
+    // Scalar's boon was rolled generically and had nowhere else to go. With the
+    // Scalars deleted every boon is named by MechanicDef::boon and delivered by
+    // the mechanic that names it -- several of them by returning BoonFactor()
+    // from AggregateFactor, which is the one number this function sees.
+    //
+    // So a boon on the instance must move nothing at all. If it did, a mechanic
+    // that already pays its own would be paying it twice: exactly the bug
+    // commit 04570c9 took out of the Shade, which handed out a permanent
+    // experience multiplier on top of the Vindication its card promises.
     AggregateCaps const caps;
 
-    struct Pairing
-    {
-        Boon          boon;
-        AggregateKind kind;
-    };
-
-    // The three pairings Mgr::Multiplier carried over. BonusHealing offset
-    // HealingDone, which is not HealingReceived, and BonusMoveSpeed,
-    // BonusMoney and BonusRegen name effects the redesign has no
-    // AggregateKind for at all; none of the four offsets anything here, and
-    // that is checked below rather than assumed.
-    constexpr std::array<Pairing, 3> OFFSETTING = { {
-        { Boon::BonusDamage,     AggregateKind::DamageDone },
-        { Boon::BonusExperience, AggregateKind::Experience },
-        { Boon::BonusMaxHealth,  AggregateKind::MaxHealth }
-    } };
-
-    for (Pairing const& pairing : OFFSETTING)
-    {
-        FixedFactor curse(pairing.kind, 0.9f);
-        AffixInstance instance = Carrying(&curse);
-        instance.boon    = pairing.boon;
-        instance.boonMag = 20;
-
-        std::vector<AffixInstance> const carried = { instance };
-        // 0.9 * 1.20, one factor each way, not a subtraction of percentages.
-        EXPECT_FLOAT_EQ(Aggregate(carried, Everything(pairing.kind), caps), 0.9f * 1.2f)
-            << KindName(pairing.kind);
-
-        // A boon with no magnitude buys nothing.
-        AffixInstance flat = instance;
-        flat.boonMag = 0;
-        std::vector<AffixInstance> const unpaid = { flat };
-        EXPECT_FLOAT_EQ(Aggregate(unpaid, Everything(pairing.kind), caps), 0.9f);
-    }
-
-    for (Boon boon : { Boon::BonusHealing, Boon::BonusMoveSpeed, Boon::BonusMoney, Boon::BonusRegen })
+    for (uint8 b = 1; b < static_cast<uint8>(Boon::MAX); ++b)
         for (AggregateKind kind : KINDS)
         {
             FixedFactor curse(kind, 0.9f);
             AffixInstance instance = Carrying(&curse);
-            instance.boon    = boon;
+            instance.boon    = static_cast<Boon>(b);
             instance.boonMag = 30;
 
             std::vector<AffixInstance> const carried = { instance };
             EXPECT_FLOAT_EQ(Aggregate(carried, Everything(kind), caps),
                             ExpectedClamp(0.9f, kind))
-                << "boon " << unsigned(static_cast<uint8>(boon)) << " on " << KindName(kind)
-                << " offsets something it never offset before the redesign";
+                << "boon " << unsigned(b) << " moved the product on " << KindName(kind)
+                << "; the aggregate pays no boon, the mechanic does";
         }
-}
 
-TEST(Aggregate, ABoonOnARaisingKindSubtractsInstead)
-{
-    // Damage taken and enemy speed are the two kinds where a larger number is
-    // worse, so a boon there has to pull the product down. None of the three
-    // offsetting boons pairs with either kind today, so this is checked
-    // through a kind that does raise and a boon that offsets it -- there is
-    // none -- which means the branch is unreachable in Phase 0. Assert the
-    // reachable half: neither raising kind is offset by any boon.
-    AggregateCaps const caps;
-
+    // And the same on a kind where a larger number is worse, where a boon
+    // paid here would have had to pull the product down.
     for (AggregateKind kind : { AggregateKind::DamageTaken, AggregateKind::EnemySpeed })
         for (uint8 b = 1; b < static_cast<uint8>(Boon::MAX); ++b)
         {

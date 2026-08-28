@@ -36,7 +36,13 @@ namespace
 
 TEST(HarnessSmoke, CommittedConstants)
 {
-    EXPECT_EQ(Gauntlet::GeneratorVersion, 3);
+    EXPECT_EQ(Gauntlet::GeneratorVersion, 4);
+
+    // 72 and 73 were Withering and Forgetful. Both were deleted from the
+    // registry in Phase 2 and the constants stay behind as reservations: the
+    // ids are never reused, so nothing may ever be given these numbers.
+    // Registry.TheDeletedScalarIdsAreGoneAndStayGone is what enforces that;
+    // this only pins the numbers themselves.
     EXPECT_EQ(Gauntlet::MECHANIC_WITHERING, 72);
     EXPECT_EQ(Gauntlet::MECHANIC_FORGETFUL, 73);
     EXPECT_EQ(Gauntlet::MAX_RANK, 3);

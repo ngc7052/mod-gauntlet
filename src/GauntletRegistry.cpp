@@ -48,38 +48,42 @@ namespace
     // ------------------------------------------------------------------
     // The table.
     //
-    // Ids are stable forever and are never reused: a stored gauntlet_affix
-    // row from any past run must still resolve to the same mechanic, so a
-    // retired mechanic keeps its id and gains MF_NotImplemented rather than
-    // leaving a hole for a later one to fill. The ranges are the design's:
-    // S1-S5 = 1-5, E1-E8 = 6-13, T1-T5 = 14-18, A1-A4 = 19-22, R1-R3 = 23-25,
-    // B1-B2 = 26-27, C1-C44 = 28-71, Withering = 72, Forgetful = 73.
+    // Ids are stable forever and are never reused: a stored gauntlet_affix row
+    // from any past run must still resolve to the same mechanic. A retired
+    // mechanic therefore leaves a hole rather than being renumbered, and
+    // nothing may ever fill one. The ranges are the design's: S1-S5 = 1-5,
+    // E1-E8 = 6-13, T1-T5 = 14-18, A1-A4 = 19-22, R1-R3 = 23-25, B1-B2 = 26-27,
+    // C1-C44 = 28-71. Ids 21, 22, 72 and 73 -- Exposed, Feeble, Withering and
+    // Forgetful -- were the four flat scalars and were deleted in Phase 2, so
+    // 69 rows carry 71 ids and the table is not contiguous.
     //
-    // Six rows lack MF_NotImplemented: Phase 0's two scalars, Exposed (21) and
-    // Feeble (22), and Phase 1's vertical slice -- The Shade (1), Champions
-    // (6), Falling Sky (14) and Deep Wounds (19). Withering (72) and Forgetful
-    // (73) do have working mechanics -- migrated runs still carry them and must
-    // keep functioning -- but they are cut from the pool (design section 5),
-    // and MF_NotImplemented is what the offer builder filters on, so they carry
-    // it too. IsImplemented() is therefore a "may this be offered" question,
-    // not "does code exist".
+    // Twenty-three rows lack MF_NotImplemented: Phase 1's vertical slice --
+    // The Shade (1), Champions (6), Falling Sky (14) and Deep Wounds (19) --
+    // and Phase 2's fifteen, which is everything left in families S, E and T.
+    // What still carries the flag is families R, B and C, which are Phase 3
+    // and Phase 4.
     //
     // Clearing the flag is the last switch of a phase and nothing else: it is
     // what puts a mechanic into a live player's offers, so it is thrown only
-    // once the dispatch behind it is wired. Until step 5 there was no scheduler
-    // tick, no state store and no anchor, and all four of these would have been
-    // offered and done nothing.
+    // once the dispatch behind it is wired and the file is anchored in
+    // GauntletScripts.cpp. tests/compile-check.sh audits the second half of
+    // that; RegistryTest's OFFERABLE list audits the first.
     //
     // Boons: the first eight values in Gauntlet.h are effect categories, and
     // BonusRegen is read here as the resource boon generally (rage, mana,
     // runic power, energy, soul shards). Phase 1 appended five more for the
     // cards those eight could not express -- BonusAvoidance, BonusCooldown,
-    // BonusAbility, BonusPetDamage and SecondLife -- which is what closed the
-    // eighteen rows that used to carry Boon::None with a TODO(design) beside
-    // them. The five are fixed by this table and are never rolled; see the
-    // note on the enum. What still has no boon here is R3 Iron Purse, whose
-    // card names none at all, and the rows in families S, E, T and A whose
-    // cards do not promise one.
+    // BonusAbility, BonusPetDamage and SecondLife.
+    //
+    // Every implemented row now names one, and the mechanic behind it pays it:
+    // with the scalars gone there is no generically-rolled boon left anywhere,
+    // so GauntletAggregate.cpp pays none of them and each mechanic answers for
+    // its own (see src/mechanics/Boons.h). Eleven of the fifteen Phase 2 cards
+    // name no boon at all, so those are chosen and each is justified in
+    // docs/phase-2-report.md; four -- Echo, Carrion, Frenzy and Hubris -- have
+    // the boon written into the card itself. What still has no boon here is
+    // R3 Iron Purse, whose card names none, and A1 Deep Wounds, whose card is
+    // pure attrition.
     //
     // Where a boon is bespoke -- "Consecration doubled and halved",
     // "Polymorph is instant" -- the type says only that it is bespoke and the
@@ -103,19 +107,29 @@ namespace
           "A Shade rises behind you every few minutes and hunts you until you kill it or leave it behind." },
 
         { 2, "echo", "Echo", Family::Spawn, 0, 6, 14, 3,
-          MF_Timed | MF_Stalker | MF_RewardShaped | MF_NotImplemented, "stalker", Boon::BonusExperience, 0, 0,
+          MF_Timed | MF_Stalker | MF_RewardShaped, "stalker", Boon::BonusExperience, 0, 0,
           "Every 25th enemy you kill returns as an echo of yourself." },
 
         { 3, "carrion", "Carrion", Family::Spawn, 0, 1, 10, 3,
-          MF_Timed | MF_OnKill | MF_RewardShaped | MF_NotImplemented, "", Boon::BonusMoney, 0, 0,
+          MF_Timed | MF_OnKill | MF_RewardShaped, "", Boon::BonusMoney, 0, 0,
           "Every 4th corpse you loot draws scavengers." },
 
         { 4, "reinforcements", "Reinforcements", Family::Spawn, 0, 5, 14, 3,
-          MF_Timed | MF_NotImplemented, "", Boon::None, 0, 0,
+          MF_Timed, "", Boon::BonusDamage, 0, 0,
           "Fights longer than 30 seconds draw another enemy every 15 seconds." },
 
-        { 5, "ambush", "Ambush", Family::Spawn, 0, 3, 9, 3,
-          MF_Timed | MF_NotImplemented, "", Boon::None, 0, 0,
+        // TODO(design): the card says tiers 3-9 and section 4.6 puts Ambush in
+        // the 3-5 band. Moved to 2. Phase 2 deleted the conditional Exposed
+        // that band named, and the Rules family that would have filled the gap
+        // is Phase 3, so tiers 1-2 were left with exactly one mechanic per
+        // family and no variety at all. The band's own rule for what may be
+        // there is "no interrupts, silences or stalkers": Ambush is none of the
+        // three -- it is not one of section 4.1's stalkers, which is S1 xor S2
+        // and is what the registry's "stalker" exclusive key holds -- and its
+        // counterplay is standing up and moving three steps, which needs no
+        // button, no cooldown and no crowd control. Tier 2 is level 10.
+        { 5, "ambush", "Ambush", Family::Spawn, 0, 2, 9, 3,
+          MF_Timed | MF_Stalker, "", Boon::BonusMaxHealth, 0, 0,
           "Resting in the wild attracts an ambush." },
 
         // --- Family E: enemies that behave differently -----------------
@@ -124,31 +138,35 @@ namespace
           "Every 8th fight you start opens against a Champion: twice the health, harder hits, double the reward." },
 
         { 7, "craven", "Craven", Family::Enemy, 0, 4, 12, 3,
-          MF_NotImplemented, "", Boon::None, 0, 0,
+          MF_None, "", Boon::BonusDamage, 0, 0,
           "Enemies flee at 25% health, and come back with friends." },
 
         { 8, "call_to_arms", "Call to Arms", Family::Enemy, 0, 5, 13, 3,
-          MF_OnKill | MF_NotImplemented, "", Boon::None, 0, 0,
+          MF_OnKill, "", Boon::BonusExperience, 0, 0,
           "Killing an enemy alerts its nearest kin." },
 
         { 9, "death_rattle", "Death Rattle", Family::Enemy, CM_MELEE, 4, 12, 3,
-          MF_Timed | MF_OnKill | MF_NotImplemented, "onkill-positional", Boon::None, 0, 0,
+          MF_Timed | MF_OnKill, "onkill-positional", Boon::BonusMoney, 0, 0,
           "Corpses burst two seconds after death, hurting anyone within five yards." },
 
         { 10, "grudge", "Grudge", Family::Enemy, CM_MELEE, 3, 10, 3,
-          MF_OnKill | MF_NotImplemented, "onkill-positional", Boon::None, 0, 0,
+          MF_OnKill, "onkill-positional", Boon::BonusHealing, 0, 0,
           "The dead linger: standing where an enemy died saps you." },
 
         { 11, "nimble", "Nimble", Family::Enemy, 0, 6, 14, 3,
-          MF_NotImplemented, "", Boon::None, 0, 0,
+          MF_None, "", Boon::BonusMaxHealth, 0, 0,
           "Enemies move 30% faster." },
 
         { 12, "cunning", "Cunning", Family::Enemy, CM_CAST_TIME, 6, 14, 3,
-          MF_RoleTax | MF_NotImplemented, "roletax", Boon::None, 0, 0,
+          MF_RoleTax, "roletax", Boon::BonusDamage, 0, 0,
           "Enemies in melee range kick the spell you are casting, once every 12 seconds each." },
 
-        { 13, "keen_nosed", "Keen-nosed", Family::Enemy, 0, 3, 11, 3,
-          MF_NotImplemented, "", Boon::None, 0, 0,
+        // TODO(design): the card says tiers 3-11. Moved to 2, for the reason
+        // above and on the same test: Keen-nosed is a routing rule, answered by
+        // hugging the edge of a path and pulling singles, and a level-10
+        // character can do both.
+        { 13, "keen_nosed", "Keen-nosed", Family::Enemy, 0, 2, 11, 3,
+          MF_None, "", Boon::BonusMoney, 0, 0,
           "Enemies notice you from further away." },
 
         // --- Family T: tempo and position ------------------------------
@@ -159,23 +177,39 @@ namespace
           "In combat, every 20 seconds the sky marks your spot; three seconds later it strikes." },
 
         { 15, "frenzy", "Frenzy", Family::Tempo, 0, 3, 16, 3,
-          MF_RewardShaped | MF_NotImplemented, "", Boon::BonusDamage, 0, 0,
+          MF_RewardShaped, "", Boon::BonusDamage, 0, 0,
           "Each kill within 8 seconds of the last stacks Frenzy: +6% damage dealt and +6% damage taken per stack." },
 
-        { 16, "overextended", "Overextended", Family::Tempo, 0, 3, 12, 3,
-          MF_NotImplemented, "", Boon::None, 0, 0,
+        // TODO(design): the card says tiers 3-12. Moved to 1, and this is the
+        // largest of the three window changes. Section 4.6 gives the tiers 1-2
+        // band "conditional Exposed" -- a scalar the player can play around --
+        // and Phase 2 deleted it; section 5 names Overextended, in the same
+        // sentence as Frenzy, as the shape a scalar takes when it earns its
+        // place ("count-based, not flat ... scalars whose value the player
+        // controls each pull"). So this is what fills the hole the deletion
+        // left, it is the design's own candidate for it, and its counterplay --
+        // pull one at a time -- needs no button at all.
+        { 16, "overextended", "Overextended", Family::Tempo, 0, 1, 12, 3,
+          MF_None, "", Boon::BonusHealing, 0, 0,
           "Each enemy attacking you beyond the first increases the damage you take by 20%." },
 
         { 17, "falter", "Falter", Family::Tempo, 0, 5, 13, 3,
-          MF_Timed | MF_RoleTax | MF_NotImplemented, "roletax", Boon::None, 0, 0,
+          MF_Timed | MF_RoleTax, "roletax", Boon::BonusMaxHealth, 0, 0,
           "Every 45 seconds in combat your hands fail you for three seconds." },
 
         { 18, "hubris", "Hubris", Family::Tempo, 0, 1, 10, 3,
-          MF_RewardShaped | MF_NotImplemented, "", Boon::BonusExperience, 0, 0,
+          MF_RewardShaped, "", Boon::BonusExperience, 0, 0,
           "Enemies below your level give no experience; enemies above give 40% more." },
 
         // --- Family A: attrition with counterplay -----------------------
-        { 19, "deep_wounds", "Deep Wounds", Family::Attrition, 0, 4, 12, 3,
+        // TODO(design): the card says tiers 4-12; section 4.6's tier table puts
+        // Deep Wounds in the 3-5 band, and the two disagree. The band wins
+        // here, because tier 3 is the one tier where only three families exist
+        // and every one of them is thin -- the Attrition family is empty until
+        // this row opens, and with it open tier 3 has four families like every
+        // tier above it. Nothing about the mechanic changes: it is answered by
+        // taking less damage, which a level-15 character can already do.
+        { 19, "deep_wounds", "Deep Wounds", Family::Attrition, 0, 3, 12, 3,
           MF_None, "", Boon::None, 0, 0,
           "A third of the damage you take becomes a wound that only rest can heal." },
 
@@ -183,20 +217,12 @@ namespace
           MF_NotImplemented, "", Boon::BonusDamage, 0, 0,
           "Spells cost 3% of your maximum health in addition to mana." },
 
-        // Exposed and Feeble are the only two mechanics Phase 0 offers. Both
-        // are scalars: the generator draws their condition from the condition
-        // axis and their boon with it, which is why the boon here is None
-        // rather than a fixed type (design section 5, "always a trade").
-        // TODO(design): no tier range on the card; section 4.6 puts conditional
-        // Exposed at tiers 1-2 and both are evergreen, so the window is 1-16.
-        { 21, "exposed", "Exposed", Family::Attrition, 0, 1, 16, 3,
-          MF_Scalar, "", Boon::None, 0, 0,
-          "You take more damage." },
-
-        // TODO(design): as Exposed -- no tier range on the card, evergreen here.
-        { 22, "feeble", "Feeble", Family::Attrition, 0, 1, 16, 3,
-          MF_Scalar, "", Boon::None, 0, 0,
-          "You deal less damage." },
+        // Ids 21 and 22 were Exposed and Feeble, the last two flat scalars, and
+        // 72 and 73 were Withering and Forgetful. All four were deleted in
+        // Phase 2 (see docs/phase-2-report.md): a coefficient with a condition
+        // bolted on is still a tax, which is the shape the whole redesign
+        // exists to remove. None of the four ids is ever reused, so the table
+        // is no longer contiguous and nothing may fill the holes.
 
         // --- Family R: rules -------------------------------------------
         { 23, "self_found", "Self-found", Family::Rules, 0, 1, 4, 1,
@@ -465,20 +491,6 @@ namespace
         { 71, "c44_stone_of_the_damned", "Stone of the Damned", Family::Class, CM_WARLOCK, 8, 16, 3,
           MF_RewardShaped | MF_NotImplemented, "classcurse", Boon::SecondLife, 693, 0,
           "A Soulstone will bring you back once, and whoever kills you will be waiting." },
-
-        // --- Legacy scalars, kept for migrated runs only -----------------
-        // Cut from the pool by design section 5 but still implemented, so a
-        // run that already carries one keeps working. TODO(design): neither
-        // has a design letter or a tier window; Attrition and 1-16 are chosen
-        // because that is where the other two legacy scalars sit and because
-        // the values are inert while MF_NotImplemented holds.
-        { 72, "withering", "Withering", Family::Attrition, 0, 1, 16, 3,
-          MF_Scalar | MF_NotImplemented, "", Boon::None, 0, 0,
-          "Healing on you is less effective." },
-
-        { 73, "forgetful", "Forgetful", Family::Attrition, 0, 1, 16, 3,
-          MF_Scalar | MF_NotImplemented, "", Boon::None, 0, 0,
-          "You gain less experience." },
 
         };
     }

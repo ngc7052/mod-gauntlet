@@ -26,9 +26,9 @@
 namespace Gauntlet
 {
     // The legacy vocabulary that used to open this header -- Effect, Severity
-    // and the free-form Affix generator 1 rolled -- now lives in
-    // GauntletLegacy.h and exists only for the one-shot storage migration.
-    // Condition and Boon stayed behind because both models share them.
+    // and the free-form Affix generator 1 rolled -- was deleted in Phase 2
+    // along with the migration that was its only remaining caller. Condition
+    // and Boon stayed behind; see below.
 
     // ---------------------------------------------------------------------
     // Conditions: WHEN an affix applies. Shared by the legacy scalars and by
@@ -61,28 +61,23 @@ namespace Gauntlet
     //
     // The enum is append-only and its values are stored in
     // gauntlet_affix.boon, so nothing here may ever be renumbered, reordered
-    // or removed. Appending is only safe because GauntletLegacy.cpp froze
-    // generator 1's boon range as the literal LEGACY_BOON_MAX = 8: the legacy
-    // roll drew its boon from [1, Boon::MAX - 1], so a value appended while
-    // that bound still tracked the enum would silently rewrite every affix a
-    // migrated character is carrying.
+    // or removed. Appending is now unconditionally safe: nothing rolls a boon
+    // at all since Phase 2 deleted the Scalars, so no stored affix can be
+    // rewritten by a value added at the end.
     //
-    // It has two halves, and the split is load-bearing.
+    // It has two halves, and the split used to be load-bearing.
     //
     // The first eight are *generic*: they name a stat any character has, they
-    // have a magnitude row in the generator's BoonTable, a sentence in
-    // Scalars.cpp's BoonClause and -- for three of them -- an AggregateKind.
-    // A Scalar mechanic carries no fixed boon (design section 5 pairs a
-    // standalone scalar with a boon but does not say which), so the generator
-    // rolls one out of this half and nothing else.
+    // have a magnitude row in the generator's BoonTable and a sentence in
+    // mechanics/Boons.cpp's BoonClause. Until Phase 2 a Scalar mechanic carried
+    // no fixed boon and the generator rolled one out of this half; with the
+    // Scalars deleted, nothing is rolled at all -- every boon is named by
+    // MechanicDef::boon and delivered by the mechanic that names it.
     //
-    // Everything after BonusRegen is *fixed by the registry*: each one names
-    // an upside that only makes sense attached to the mechanic that grants it
-    // -- which ability's cooldown, whose pet, what the bespoke buff does --
-    // and the blurb is what tells the player. None of them may be rolled onto
-    // a Scalar: there is no ability to shorten, no pet to strengthen, and a
-    // second life handed out with a random Exposed would quietly end hardcore.
-    // BonusRegen is therefore the last value the roll may reach.
+    // Everything after BonusRegen is *fixed by the registry* and always was:
+    // each one names an upside that only makes sense attached to the mechanic
+    // that grants it -- which ability's cooldown, whose pet, what the bespoke
+    // buff does -- and the blurb is what tells the player.
     // ---------------------------------------------------------------------
     enum class Boon : uint8
     {
@@ -105,13 +100,12 @@ namespace Gauntlet
         MAX
     };
 
-    // The last boon the generator's Scalar roll may produce. Everything above
-    // it belongs to a mechanic that names its own boon, and handing one to a
-    // Scalar would produce an affix that is named for an upside it does not
-    // have. Kept beside the enum rather than inside it so that iterating
-    // 0..Boon::MAX -- which the addon exporter and the tests both do -- still
-    // walks real values only.
-    constexpr Boon LastRolledBoon = Boon::BonusRegen;
+    // The last of the generic half. Nothing rolls a boon any more, so this is
+    // no longer a bound on a roll; it is what tells the tests, the addon
+    // exporter and a future generator where the generic categories stop and
+    // the mechanic-specific ones begin. Kept beside the enum rather than inside
+    // it so that iterating 0..Boon::MAX still walks real values only.
+    constexpr Boon LastGenericBoon = Boon::BonusRegen;
 
     // The player-facing adjective for a condition ("Desperate") and for a boon
     // ("Wrathful"), shared by both models and defined in GauntletNames.cpp.
@@ -135,7 +129,10 @@ namespace Gauntlet
         MF_OnKill       = 1u << 1,   // family cap "on-kill"
         MF_Stalker      = 1u << 2,   // family cap "stalker": one per run
         MF_RoleTax      = 1u << 3,   // cap: one per run (Cunning, Falter)
-        MF_Scalar       = 1u << 4,   // takes a Condition from the condition axis
+        // 1 << 4 was MF_Scalar, "takes a Condition from the condition axis".
+        // Phase 2 deleted the last four Scalars and the flag with them; the bit
+        // is left unused rather than reassigned, because a stored row from any
+        // past run must never be reinterpreted by a flag that changed meaning.
         MF_RewardShaped = 1u << 5,   // satisfies "one reward-shaped offer per tier"
         MF_NotImplemented = 1u << 31
     };
@@ -146,14 +143,30 @@ namespace Gauntlet
     // Reserved: no mechanic. Registry ids start at 1.
     constexpr uint16 MECHANIC_NONE = 0;
 
-    // Registry ids that survive only for migrated legacy runs.
+    // Reservations, not mechanics. Withering and Forgetful were the last two
+    // legacy scalars and Phase 2 deleted their registry rows along with
+    // Exposed (21) and Feeble (22). An id is never reused -- a stored
+    // gauntlet_affix row written for one must never resolve to something else
+    // -- so these two are kept spelled out here, and 21 and 22 with them in
+    // the registry's own comment, to say that the numbers are spent.
     constexpr uint16 MECHANIC_WITHERING = 72;
     constexpr uint16 MECHANIC_FORGETFUL = 73;
 
     // The generator version folded into the offer stream. Bump whenever the
     // registry table, the family weights or the offer algorithm change; runs
     // created under an older version keep their stored columns untouched.
-    constexpr uint16 GeneratorVersion = 3;
+    //
+    // 4 is Phase 2: four registry rows deleted, fifteen made offerable, four
+    // tier windows widened, the condition and boon rolls removed from the
+    // stream, and the slot loop taught to prefer a rank-up in an unused family
+    // over a new mechanic in one already on the table. Any one of those alone
+    // would have required it.
+    //
+    // Addon::Version is this number and Protocol.lua's PROTOCOL_VERSION must
+    // match it, because Data.lua is generated from the registry: the change
+    // that moves a mechanic id is exactly the change that must invalidate the
+    // addon's table.
+    constexpr uint16 GeneratorVersion = 4;
 
     constexpr uint8 MAX_RANK = 3;
 
@@ -170,13 +183,6 @@ namespace Gauntlet
         uint8      boonMag   = 0;
         uint8      slot      = 0;          // the tier at which it was taken
         uint16     genVersion = 0;         // generator version that produced it
-
-        // Generator 1 expressed a curse as a free percentage (2..115); the
-        // redesign has only a three-step rank. A migrated affix keeps its exact
-        // number here rather than being rounded onto a rank, which would change
-        // a live player's run. 0 means "take the strength from the rank", which
-        // is every generator 2 row. Mirrors gauntlet_affix.legacy_mag.
-        uint16     legacyMag = 0;
 
         IMechanic* impl      = nullptr;    // owned by RunState
     };

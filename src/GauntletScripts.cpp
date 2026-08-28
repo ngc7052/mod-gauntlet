@@ -43,28 +43,6 @@ public:
     {
         sGauntlet->LoadConfig();
     }
-
-    // Where the one-shot migration hangs. Three hooks can see a live database
-    // and only one of them is right:
-    //
-    //   OnAfterConfigLoad is called from World::LoadConfigSettings
-    //   (World.cpp:301), which also runs on `.reload config` -- a conversion
-    //   that may happen twice is not a one-shot conversion.
-    //
-    //   OnStartup is called once, from Main.cpp:390, but that is *after*
-    //   StartWorldNetwork (Main.cpp:355) has opened the listening socket, so
-    //   there is a window, however small, in which a session could exist while
-    //   the affix table is mid-conversion.
-    //
-    //   OnBeforeWorldInitialized is called once, from World.cpp:1022, inside
-    //   SetInitialWorldSettings (Main.cpp:310) -- after StartDB (Main.cpp:280)
-    //   has opened the databases and run the SQL updater that adds the
-    //   redesign's columns, and before the network is listening. Nobody can be
-    //   logged in, and it cannot fire twice.
-    void OnBeforeWorldInitialized() override
-    {
-        sGauntlet->MigrateLegacyRuns();
-    }
 };
 
 class GauntletPlayerScript : public PlayerScript
@@ -513,13 +491,6 @@ static void GauntletSummonChanged(ObjectGuid ownerGuid, uint16 mechanic, uint32 
 // invokes the macro, and the macro defines the anchor wherever it is invoked.
 namespace Gauntlet
 {
-    // Phase 0's four scalars, declared through GAUNTLET_MECHANIC_FN, so the
-    // name carries the factory function rather than the class.
-    void AddSC_gauntlet_mechanic_MakeExposed();
-    void AddSC_gauntlet_mechanic_MakeFeeble();
-    void AddSC_gauntlet_mechanic_MakeWithering();
-    void AddSC_gauntlet_mechanic_MakeForgetful();
-
     // Phase 1's four, declared through GAUNTLET_MECHANIC, so the name carries
     // the class. Registry ids 1, 6, 14 and 19.
     void AddSC_gauntlet_mechanic_Shade();
@@ -550,11 +521,6 @@ namespace Gauntlet
 
 static void AnchorMechanics()
 {
-    AddSC_gauntlet_mechanic_MakeExposed();
-    AddSC_gauntlet_mechanic_MakeFeeble();
-    AddSC_gauntlet_mechanic_MakeWithering();
-    AddSC_gauntlet_mechanic_MakeForgetful();
-
     AddSC_gauntlet_mechanic_Shade();
     AddSC_gauntlet_mechanic_Champions();
     AddSC_gauntlet_mechanic_FallingSky();

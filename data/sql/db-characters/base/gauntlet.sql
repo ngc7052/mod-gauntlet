@@ -23,6 +23,14 @@ CREATE TABLE IF NOT EXISTS `gauntlet_run` (
     `seed`        INT UNSIGNED NOT NULL,
     `tier`        INT UNSIGNED NOT NULL DEFAULT 0,
     `dead`        TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    -- UNIX_TIMESTAMP(characters.creation_date) for the character this run was
+    -- created for, and the module's answer to GUID reuse. The core hands out
+    -- the guids of deleted characters again, so a run keyed on the guid alone
+    -- is inherited by whoever is created next; a creation date cannot be
+    -- inherited, because a new character has a new one. 0 means "unknown",
+    -- which is every row written before this column existed and is treated as
+    -- "cannot say" rather than as a mismatch. See GauntletMgr::Load.
+    `char_created` INT UNSIGNED NOT NULL DEFAULT 0,
     -- The generator the run was created under; informational. The default is 1
     -- because every row that predates this schema was rolled by generator 1 --
     -- a new run must write Gauntlet::GeneratorVersion explicitly.
@@ -45,12 +53,13 @@ CREATE TABLE IF NOT EXISTS `gauntlet_affix` (
     `cond`        TINYINT UNSIGNED NOT NULL DEFAULT 0,
     `boon`        TINYINT UNSIGNED NOT NULL DEFAULT 0,
     `boon_mag`    TINYINT UNSIGNED NOT NULL DEFAULT 0,
-    -- Generator 1 expressed a curse as a percentage drawn from a severity band
-    -- and scaled by the condition, so it lands anywhere in 1..115 and does not
-    -- fit the redesign's three-step rank ladder. Migrated rows keep the exact
-    -- number here rather than being rounded onto a rank; 0 means "no legacy
-    -- magnitude, take the strength from `rank`", which is every generator 2 row.
-    `legacy_mag`  SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    -- `legacy_mag` was here until Phase 2. It carried the free percentage
+    -- generator 1 rolled, so that a migrated affix kept its exact strength
+    -- instead of being rounded onto the redesign's three-step rank ladder.
+    -- The last generator-1 row was converted in Phase 0 and the four mechanics
+    -- that read the column were deleted in Phase 2, so the column went with
+    -- them; updates/2026_08_29_00_gauntlet.sql drops it from an existing
+    -- install.
     `gen_version` SMALLINT UNSIGNED NOT NULL DEFAULT 1,
     `picked_at`   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`guid`, `slot`)

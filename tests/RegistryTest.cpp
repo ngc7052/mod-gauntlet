@@ -14,6 +14,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <set>
 #include <string>
@@ -23,27 +24,36 @@ namespace
 {
     using namespace Gauntlet;
 
-    constexpr size_t TABLE_SIZE = 73;
+    // Sixty-nine rows carrying ids 1..71 with four holes in them. Phase 2
+    // deleted Exposed (21), Feeble (22), Withering (72) and Forgetful (73) --
+    // the four flat scalars -- and an id is never reused, so the holes stay.
+    constexpr size_t TABLE_SIZE = 69;
     constexpr uint8  MAX_TIER   = 16;
 
-    // The mechanics the generator may offer: Phase 0's two scalars, Exposed
-    // (21) and Feeble (22), and Phase 1's vertical slice -- The Shade (1),
-    // Champions (6), Falling Sky (14) and Deep Wounds (19). Withering (72) and
-    // Forgetful (73) have working implementations but are MF_NotImplemented on
-    // purpose -- IsImplemented() answers "may the generator offer this", not
-    // "does code exist" -- so they are absent here. CONTRACT.md section 8.
+    // The four ids that were removed and may never come back. Asserting their
+    // absence is what stops a later phase quietly filling a hole: a stored
+    // gauntlet_affix row from any past run must never resolve to a different
+    // mechanic than the one it was written for.
+    constexpr std::array<uint16, 4> DELETED = { 21, 22, 72, 73 };
+
+    // The mechanics the generator may offer: Phase 1's vertical slice -- The
+    // Shade (1), Champions (6), Falling Sky (14) and Deep Wounds (19) -- and
+    // Phase 2's fifteen, which is everything else in families S, E and T.
+    // Families R, B and C are Phase 3 and Phase 4 and stay MF_NotImplemented.
     //
     // This list is the switch a phase is finished by, so it is asserted exactly
     // rather than as a count: a row that gains the flag by accident, or loses
     // it before its dispatch is wired, is an affix offered to a live hardcore
     // character that silently does nothing.
-    constexpr std::array<uint16, 6> OFFERABLE = { 1, 6, 14, 19, 21, 22 };
+    constexpr std::array<uint16, 19> OFFERABLE = {
+        1, 2, 3, 4, 5,           // S1 Shade, S2 Echo, S3 Carrion, S4 Reinforcements, S5 Ambush
+        6, 7, 8, 9, 10, 11, 12, 13,  // E1 Champions .. E8 Keen-nosed
+        14, 15, 16, 17, 18,      // T1 Falling Sky .. T5 Hubris
+        19                       // A1 Deep Wounds
+    };
 
-    // CONTRACT.md section 8's id ranges, which are fixed forever: an id is
-    // never reused, so a retired mechanic keeps its number and gains
-    // MF_NotImplemented rather than leaving a hole. Withering and Forgetful
-    // are attrition scalars, which is why that family has six entries and not
-    // the four the A1-A4 range alone would give.
+    // CONTRACT.md section 8's id ranges, which are fixed forever. The Attrition
+    // range is 19-22 and holds two rows, not four, because 21 and 22 are gone.
     struct Range
     {
         uint16 first;
@@ -56,21 +66,40 @@ namespace
         {  1,  5, Family::Spawn,      5 },
         {  6, 13, Family::Enemy,      8 },
         { 14, 18, Family::Tempo,      5 },
-        { 19, 22, Family::Attrition,  6 },   // 19-22 plus Withering (72) and Forgetful (73)
+        { 19, 22, Family::Attrition,  2 },   // 21 and 22 deleted; 19 and 20 remain
         { 23, 25, Family::Rules,      3 },
         { 26, 27, Family::Bargain,    2 },
         { 28, 71, Family::Class,     44 }
     } };
 }
 
-TEST(Registry, HoldsSeventyThreeEntriesInIdOrder)
+TEST(Registry, HoldsSixtyNineEntriesInAscendingIdOrder)
 {
     auto const& all = AllMechanics();
     ASSERT_EQ(all.size(), TABLE_SIZE);
 
-    for (size_t i = 0; i < all.size(); ++i)
-        EXPECT_EQ(all[i].id, static_cast<uint16>(i + 1))
-            << "entry " << i << " breaks the 1..73 id sequence; ids are contiguous and never reused";
+    // Ascending and unique, but no longer contiguous: the table has four holes
+    // where the deleted scalars were, and every lookup, the addon exporter and
+    // the debug commands all walk it in this order.
+    for (size_t i = 1; i < all.size(); ++i)
+        EXPECT_LT(all[i - 1].id, all[i].id)
+            << "entry " << i << " (id " << all[i].id << ") does not follow entry " << (i - 1)
+            << " (id " << all[i - 1].id << ") in ascending order";
+
+    EXPECT_EQ(all.front().id, 1u);
+    EXPECT_EQ(all.back().id, 71u) << "the table must still end at C44, id 71";
+}
+
+TEST(Registry, TheDeletedScalarIdsAreGoneAndStayGone)
+{
+    for (uint16 id : DELETED)
+        EXPECT_EQ(FindMechanic(id), nullptr)
+            << "id " << id << " was one of the four flat scalars Phase 2 deleted. An id is never "
+               "reused: a stored gauntlet_affix row written for it must never resolve to something "
+               "else. If a mechanic needs this number, it needs a different number.";
+
+    for (std::string_view key : { "exposed", "feeble", "withering", "forgetful" })
+        EXPECT_EQ(FindMechanic(key), nullptr) << "key '" << key << "' is still in the table";
 }
 
 TEST(Registry, KeysAreUniqueAndPrintable)
@@ -121,23 +150,24 @@ TEST(Registry, FamiliesAreInRangeAndMatchTheIdRanges)
     for (MechanicDef const& def : AllMechanics())
         EXPECT_LT(static_cast<uint8>(def.family), static_cast<uint8>(Family::MAX)) << "id " << def.id;
 
-    // Withering and Forgetful are legacy attrition scalars sitting above the
-    // C-range, so they are checked by name rather than by a range row.
+    // An id inside a range is either absent -- one of the four deleted scalars
+    // -- or in the family its range fixes. Nothing else is allowed.
     for (Range const& range : RANGES)
         for (uint16 id = range.first; id <= range.last; ++id)
         {
             MechanicDef const* def = FindMechanic(id);
+            bool const deleted = std::find(DELETED.begin(), DELETED.end(), id) != DELETED.end();
+
+            if (deleted)
+            {
+                EXPECT_EQ(def, nullptr) << "id " << id << " was deleted and must stay deleted";
+                continue;
+            }
+
             ASSERT_NE(def, nullptr) << "id " << id << " is missing from the table";
             EXPECT_EQ(def->family, range.family)
                 << "id " << id << " (" << def->key << ") is outside the family its id range fixes";
         }
-
-    for (uint16 id : { MECHANIC_WITHERING, MECHANIC_FORGETFUL })
-    {
-        MechanicDef const* def = FindMechanic(id);
-        ASSERT_NE(def, nullptr) << "id " << id;
-        EXPECT_EQ(def->family, Family::Attrition) << "id " << id;
-    }
 
     std::array<size_t, static_cast<size_t>(Family::MAX)> counted = {};
     for (MechanicDef const& def : AllMechanics())
@@ -162,9 +192,9 @@ TEST(Registry, OnlyTheImplementedMechanicsMayBeOffered)
 
     std::set<uint16> const expected(OFFERABLE.begin(), OFFERABLE.end());
     EXPECT_EQ(implemented, expected)
-        << "CONTRACT.md section 9 sizes the whole offer-pool argument on this set, and "
+        << "this set is what the offer builder may draw from, and "
            "OfferInvariants.LiveRegistryView measures against it; changing it changes what "
-           "the invariant sweep can assert";
+           "a live player is offered";
 
     for (MechanicDef const& def : AllMechanics())
         EXPECT_EQ(IsImplemented(def), (def.flags & MF_NotImplemented) == 0)
@@ -185,7 +215,10 @@ TEST(Registry, LookupsAgreeWithTheTable)
     // one of these is the normal answer for a run migrated from a registry
     // this build has never seen, so nullptr is the contract, not a crash.
     EXPECT_EQ(FindMechanic(static_cast<uint16>(MECHANIC_NONE)), nullptr);
-    EXPECT_EQ(FindMechanic(static_cast<uint16>(TABLE_SIZE + 1)), nullptr);
+    // 72, one past the highest id the table carries. Not TABLE_SIZE + 1: the
+    // ids are no longer contiguous, so the count and the highest id are
+    // different numbers and only the second one bounds a lookup.
+    EXPECT_EQ(FindMechanic(static_cast<uint16>(72)), nullptr);
     EXPECT_EQ(FindMechanic(static_cast<uint16>(0xFFFF)), nullptr);
     EXPECT_EQ(FindMechanic(std::string_view("")), nullptr);
     EXPECT_EQ(FindMechanic(std::string_view("no_such_mechanic")), nullptr);
@@ -197,5 +230,5 @@ TEST(Registry, TableIsStableAcrossCalls)
     // frames, and AffixInstance::impl is created from one. A table rebuilt per
     // call would dangle every one of them.
     EXPECT_EQ(&AllMechanics(), &AllMechanics());
-    EXPECT_EQ(FindMechanic(uint16(21)), FindMechanic(std::string_view("exposed")));
+    EXPECT_EQ(FindMechanic(uint16(6)), FindMechanic(std::string_view("champions")));
 }

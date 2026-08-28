@@ -55,29 +55,13 @@ namespace
     // at tier 6 whatever a card's own minTier says.
     constexpr uint8 BARGAIN_MIN_TIER = 6;
 
-    // The conditions a scalar may be offered with.
-    //
-    // Never Always or InCombat: design §5 keeps damage-taken only "with a state
-    // condition", because a threshold is a decision and a flat coefficient is
-    // weather. Never VersusElites either, and that one is a Phase 0 limit
-    // rather than a design position -- the attacker is not in the ambient stat
-    // callback, so the condition cannot be evaluated until the reworked
-    // scalars land in Phase 2. Put it back then.
-    constexpr std::array<Condition, 13> SCALAR_CONDITIONS = {
-        Condition::OutOfCombat,
-        Condition::BelowHalfHealth,
-        Condition::AboveHalfHealth,
-        Condition::WhileSolo,
-        Condition::WhileGrouped,
-        Condition::InDungeon,
-        Condition::InOpenWorld,
-        Condition::VersusPlayers,
-        Condition::AtNight,
-        Condition::AtDay,
-        Condition::WhileMoving,
-        Condition::WhileStationary,
-        Condition::WhileMounted
-    };
+    // Phase 2 deleted the last four Scalars, so nothing in the table takes a
+    // condition any more and the roll that drew one is gone with them. The
+    // Condition axis itself stays -- the enum, the column, the names and
+    // Mgr::ConditionActive are all still here -- because design §6 keeps it as
+    // "the multiplier on variety" for a later phase to use. Every offer this
+    // generator builds carries Condition::Always, and Mgr::NameOf prints no
+    // adjective for it.
 
     // The rank a mechanic arrives at when it is offered as new.
     //
@@ -102,10 +86,26 @@ namespace
     // for the rows that will want to override it.
     uint32 BoonTable(uint16 mechanic, Boon boon, uint8 rank)
     {
+        uint8 const step = std::clamp<uint8>(rank, 1, MAX_RANK);
+
+        // Two rows state their own boon on the card, so they do not take the
+        // category's magnitude: the number the offer promises has to be the
+        // number the mechanic pays, or the card is lying at the one moment the
+        // player is reading it.
         switch (mechanic)
         {
+            // T2 Frenzy: "+6% damage dealt and +6% damage taken per stack",
+            // 4/6/8 on the ladder. The boon is the damage-dealt half, so it is
+            // per stack and equal to the curse.
+            case 15:
+                return boon == Boon::BonusDamage ? 2u + 2u * step : 0u;
+
+            // T5 Hubris: "enemies above give 40% more", 20/30/40 on the ladder.
+            case 18:
+                return boon == Boon::BonusExperience ? 10u * (step + 1u) : 0u;
+
             default:
-                break;   // no mechanic overrides its category yet
+                break;
         }
 
         uint32 base = 0;
@@ -121,7 +121,7 @@ namespace
             default:                    return 0;           // Boon::None
         }
 
-        return base * std::max<uint32>(1u, rank);
+        return base * step;
     }
 
     // TODO(design): the relevance discount. §3 prices "a curse that is cheap
@@ -286,23 +286,12 @@ namespace
         RegistryView                     reg;
         std::array<bool, FAMILY_COUNT>   familyUsed = {};
         std::vector<uint16>              mechanicUsed;
-        // Conditions already offered per mechanic, so a repeated mechanic can
-        // at least be repeated as a different decision.
-        std::vector<std::pair<uint16, Condition>> conditionUsed;
 
         bool IsFamilyUsed(Family f) const { return familyUsed[static_cast<size_t>(f)]; }
 
         bool IsMechanicUsed(uint16 id) const
         {
             return std::find(mechanicUsed.begin(), mechanicUsed.end(), id) != mechanicUsed.end();
-        }
-
-        bool IsConditionUsed(uint16 id, Condition c) const
-        {
-            for (auto const& used : conditionUsed)
-                if (used.first == id && used.second == c)
-                    return true;
-            return false;
         }
     };
 
@@ -406,87 +395,18 @@ namespace
         return pool[RollIn(state, 0, static_cast<uint32>(pool.size()) - 1)];
     }
 
-    // The scalar pool of last resort: every scalar the player could carry,
-    // with the structural rules -- family, no repeats, not already carried --
-    // all dropped. Plan §2.4's "if all empty: fall back to a Scalar".
-    std::vector<MechanicDef const*> ScalarPool(SlotContext const& ctx)
-    {
-        std::vector<MechanicDef const*> pool;
-        for (MechanicDef const& def : AllMechanics())
-        {
-            if (!(def.flags & MF_Scalar))
-                continue;
-            if (!ctx.reg.includeUnimplemented && !IsImplemented(def))
-                continue;
-            if (ctx.tier < def.minTier || ctx.tier > def.maxTier)
-                continue;
-            if (!RelevantTo(def, *ctx.view))
-                continue;
-            pool.push_back(&def);
-        }
-        return pool;
-    }
-
-    // The condition roll. A scalar takes one from the state axis; everything
-    // else is unconditional and takes none, so the stream is only consumed
-    // where the design says there is a decision to make.
-    Condition RollCondition(uint64& state, MechanicDef const& def, SlotContext const& ctx)
-    {
-        if (!(def.flags & MF_Scalar))
-            return Condition::Always;
-
-        // Prefer a condition this mechanic is not already offered or carried
-        // with: when the pool is too small to avoid repeating a mechanic, two
-        // different thresholds are still two different decisions, which the
-        // same line printed twice is not.
-        std::vector<Condition> pool;
-        for (Condition c : SCALAR_CONDITIONS)
-        {
-            if (ctx.IsConditionUsed(def.id, c))
-                continue;
-
-            bool carriedWith = false;
-            for (AffixInstance const& a : *ctx.carried->set)
-                if (a.mechanic == def.id && a.condition == c)
-                    carriedWith = true;
-
-            if (!carriedWith)
-                pool.push_back(c);
-        }
-
-        if (pool.empty())
-            pool.assign(SCALAR_CONDITIONS.begin(), SCALAR_CONDITIONS.end());
-
-        return pool[RollIn(state, 0, static_cast<uint32>(pool.size()) - 1)];
-    }
-
-    // A mechanic's boon type is fixed by the registry. The two scalars carry
-    // Boon::None there on purpose -- design §5 pairs a standalone scalar with
-    // a boon but does not say which -- so theirs comes from the stream.
-    //
-    // Unlike LegacyRoll, this may follow Boon::MAX: an offer is rebuilt from
-    // the seed every time it is shown and is never stored, and the contract on
-    // GeneratorVersion is that it is bumped whenever the table changes.
-    Boon RollBoon(uint64& state, MechanicDef const& def)
-    {
-        if (def.boon != Boon::None || !(def.flags & MF_Scalar))
-            return def.boon;
-
-        // LastRolledBoon, not Boon::MAX: the enum grew in Phase 1 with values a
-        // mechanic names for itself -- a cooldown reduction, a second life -- and
-        // none of them has a magnitude table, an aggregate kind or an
-        // implementation. Rolling one onto a Scalar would name an affix for an
-        // upside it does not have.
-        return static_cast<Boon>(RollIn(state, 1, static_cast<uint32>(LastRolledBoon)));
-    }
-
     Offer MakeOffer(uint64& state, MechanicDef const& def, SlotContext const& ctx, OfferKind kind)
     {
         Offer offer;
         offer.mechanic  = def.id;
         offer.kind      = kind;
-        offer.condition = RollCondition(state, def, ctx);
-        offer.boon      = RollBoon(state, def);
+        // Every mechanic's boon is named by its registry row and delivered by
+        // the mechanic itself; the condition axis is unused since the scalars
+        // were deleted. Neither consumes the stream any more, so an offer's
+        // roll order is family, mechanic, rank floor, and -- for a swap -- the
+        // slot it replaces.
+        offer.condition = Condition::Always;
+        offer.boon      = def.boon;
 
         AffixInstance const* held = ctx.carried->Find(def.id);
         if (kind == OfferKind::RankUp && held)
@@ -543,7 +463,6 @@ namespace
             ctx.familyUsed[static_cast<size_t>(def->family)] = true;
 
         ctx.mechanicUsed.push_back(offer.mechanic);
-        ctx.conditionUsed.emplace_back(offer.mechanic, offer.condition);
     }
 
     // Walk the relaxation ladder until some family has a pool. Returns the
@@ -635,29 +554,60 @@ namespace Gauntlet
                 }
             }
 
+            // Distinct families outrank the kind of the slot, and this is where
+            // that is decided. §2.4 rolls three *families* first and only then
+            // a mechanic inside one, and §4.1 makes a rank-up a first-class
+            // offer rather than a consolation -- "an affix already carried is
+            // never offered again as a duplicate; it is offered as its next
+            // rank, which replaces it in the same slot". So a New slot that can
+            // only be filled by repeating a family gives way to a rank-up in a
+            // family nothing has used yet.
+            //
+            // Without this the builder took the first thing it could offer as
+            // new, however many families that repeated, and never looked at the
+            // rank-ups sitting in the family it had just exhausted. Measured on
+            // the live view over 160,000 sets, that was the *only* rule being
+            // relaxed below tier 11 -- 30% of tier 3, 37% of tier 10 -- and it
+            // was not a pool problem at all: the offers were there.
+            //
+            // Swap is excluded on purpose. Slot C at tiers 4, 8 and 12 is the
+            // run's one chance to undo an early mistake (§4.4.3), and trading
+            // that away for a tidier family spread is a worse offer, not a
+            // better one.
+            //
+            // The stream is untouched: FirstUsableStep only builds pools, and
+            // Draw below still consumes exactly one family roll and one
+            // mechanic roll per slot whichever branch got here.
+            if (step > RELAX_STRICT && kind == OfferKind::New)
+            {
+                Pools rankPools;
+                if (FirstUsableStep(ctx, OfferKind::RankUp, false, rankPools) == RELAX_STRICT)
+                {
+                    kind  = OfferKind::RankUp;
+                    pools = std::move(rankPools);
+                    step  = RELAX_STRICT;
+                }
+            }
+
             MechanicDef const* def = step != RELAX_COUNT ? Draw(state, pools) : nullptr;
 
             if (!def)
             {
-                std::vector<MechanicDef const*> const scalars = ScalarPool(ctx);
-                if (scalars.empty())
-                {
-                    // Nothing in the table fits this character at this tier.
-                    // An empty offer is honest; an invented one is not.
-                    result.relaxations |= GR_FellBackToScalar;
-                    result.offers.push_back(Offer());
-                    continue;
-                }
-
-                result.relaxations |= GR_FellBackToScalar;
-                def = scalars[RollIn(state, 0, static_cast<uint32>(scalars.size()) - 1)];
-
-                // The scalar pool ignores the carried set, so a fallback can
-                // land on something the player already holds. Offer it as the
-                // rank-up it really is rather than as a new mechanic.
-                AffixInstance const* held = summary.Find(def->id);
-                if (held && kind != OfferKind::RankUp && held->rank < std::min<uint8>(def->maxRank, MAX_RANK))
-                    kind = OfferKind::RankUp;
+                // Plan §2.4's last line was "if all empty: fall back to a
+                // Scalar". Phase 2 deleted the scalars, so there is no pool of
+                // last resort left and nothing to fall back to: every mechanic
+                // in the table is now a named thing that does something, and
+                // there is no such thing as a generic filler affix to invent
+                // one from.
+                //
+                // An empty offer is what is left, and it is the honest answer.
+                // Mgr::OfferTier prints it as "Nothing - no affix is available
+                // to you at this tier" rather than as a numbered line the
+                // player cannot take, and Phase 0 already made MECHANIC_NONE
+                // mean exactly that everywhere.
+                result.relaxations |= GR_NoCandidate;
+                result.offers.push_back(Offer());
+                continue;
             }
 
             Offer offer = MakeOffer(state, *def, ctx, kind);
@@ -694,15 +644,33 @@ namespace Gauntlet
                     Remember(replace, result.offers[i]);
 
             OfferKind kind = OfferKind::New;
-            Pools pools;
-            if (FirstUsableStep(replace, kind, true, pools) == RELAX_COUNT)
+            Pools     pools;
+            uint32    step = FirstUsableStep(replace, kind, true, pools);
+
+            if (step == RELAX_COUNT)
             {
                 // Nothing new is reward-shaped, but something carried may be
                 // one rank short of its ceiling; that still pays the tier its
                 // reward-shaped offer.
                 kind = OfferKind::RankUp;
-                if (FirstUsableStep(replace, kind, true, pools) == RELAX_COUNT)
+                step = FirstUsableStep(replace, kind, true, pools);
+                if (step == RELAX_COUNT)
                     pools = Pools();
+            }
+            else if (step > RELAX_STRICT)
+            {
+                // The same preference the slot loop above applies, for the same
+                // reason: this replacement is measured against its two siblings,
+                // and a reward-shaped rank-up in a family neither of them used
+                // satisfies §4.4.1 and §4.4.5 at once, where a new mechanic in a
+                // family already on the table gives up the first to buy the
+                // second.
+                Pools rankPools;
+                if (FirstUsableStep(replace, OfferKind::RankUp, true, rankPools) == RELAX_STRICT)
+                {
+                    kind  = OfferKind::RankUp;
+                    pools = std::move(rankPools);
+                }
             }
 
             if (AnyPool(pools))
@@ -712,11 +680,10 @@ namespace Gauntlet
             }
             else
             {
-                // No reward-shaped mechanic is eligible at all, which is Phase
-                // 0's normal state: the two mechanics the module implements are
-                // both plain scalars. Recorded on the scalar-fallback bit; see
-                // the note on GR_FellBackToScalar.
-                result.relaxations |= GR_FellBackToScalar;
+                // No reward-shaped mechanic is eligible at all. Recorded on
+                // the same bit as "no candidate", which is what it is: the
+                // eligible pool ran out, seen from the reward-shaped end.
+                result.relaxations |= GR_NoCandidate;
             }
         }
 

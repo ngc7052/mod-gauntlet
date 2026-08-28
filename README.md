@@ -186,10 +186,12 @@ realm.
   visuals — so they carry no native buff icon. `.gauntlet status` always
   shows what you carry; the optional addon additionally shows a custom icon
   per mechanic.
-- Withering (healing received) and Forgetful (experience gained), the
-  effects from the previous version of this module, are never offered on a
-  new pick; a character that already carries one keeps it working exactly
-  as before.
+- The four flat coefficients the module started life as — Exposed (damage
+  taken), Feeble (damage dealt), Withering (healing received) and Forgetful
+  (experience gained) — no longer exist. Every affix you can be offered is a
+  named mechanic that does something you can answer, and every one comes with
+  an upside it names. Deep Wounds replaces Withering and Hubris replaces
+  Forgetful, both with counterplay the originals did not have.
 
 ## License
 

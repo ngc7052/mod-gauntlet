@@ -162,15 +162,36 @@ known_objects() {
     grep -o "^$OBJ_PREFIX/src/[^:]*\.cpp\.o" | sort
 }
 
-# Re-glob when the set of sources on disk no longer matches what ninja holds.
+# Re-glob when the set of sources on disk no longer matches what ninja holds,
+# and delete the objects of sources that are gone.
+#
+# The prune is not tidiness. The container's build tree outlives any single run,
+# so a deleted .cpp leaves its .o behind -- and the partial link below globs the
+# object directory, so it would go on linking code whose source no longer
+# exists and go on reporting its symbols as defined. A file deleted in the
+# working tree has to be deleted here too or the link check is a lie.
 sync_targets() {
-  local want have
+  local want have orphans
   want="$(cd "$ROOT" && find src -name '*.cpp' | sed "s|^|$OBJ_PREFIX/|; s|\$|.o|" | sort)"
   have="$(known_objects)"
+
   if [ "$want" != "$have" ]; then
     echo "==> source set changed; re-running cmake"
     docker exec "$CONTAINER" sh -c "cd /azerothcore/build && cmake . >/tmp/cmake.log 2>&1" ||
       { docker exec "$CONTAINER" tail -30 /tmp/cmake.log; exit 1; }
+  fi
+
+  # Unconditional, and not folded into the branch above: cmake only has to run
+  # again when the *target* set moved, but an orphaned object can outlive that
+  # by a whole invocation -- ninja forgets a deleted source the moment cmake
+  # re-runs, while the .o it built is still sitting on disk.
+  orphans="$(comm -13 <(printf '%s\n' "$want") \
+                      <(docker exec "$CONTAINER" sh -c \
+                          "cd /azerothcore/build && find $OBJ_PREFIX/src -name '*.o' 2>/dev/null" |
+                        sort))"
+  if [ -n "$orphans" ]; then
+    echo "==> pruning $(printf '%s\n' "$orphans" | wc -l) object(s) whose source is gone"
+    docker exec "$CONTAINER" sh -c "cd /azerothcore/build && rm -f $(printf '%s ' $orphans)"
   fi
 }
 

@@ -148,12 +148,6 @@ namespace Gauntlet
         bool AnyPendingDeath() const { return _pendingDeaths != 0; }
         bool IsPendingDeath(Player* player) const;
 
-        // One-shot conversion of a pre-redesign install, run from the
-        // worldserver's OnStartup. Detects the legacy gauntlet_affix.roll
-        // column, unrolls every row through LegacyRoll into the new columns,
-        // then drops roll and tier. A no-op once the column is gone.
-        void MigrateLegacyRuns();
-
         // Bots are Player objects too; the challenge is for real players only.
         bool IsEligible(Player* player) const;
 

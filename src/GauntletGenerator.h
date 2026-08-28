@@ -7,7 +7,6 @@
 #define MOD_GAUNTLET_GENERATOR_H
 
 #include "Gauntlet.h"
-#include "GauntletLegacy.h"
 
 #include <vector>
 
@@ -51,24 +50,27 @@ namespace Gauntlet
 
     // Why the builder had to relax a rule; empty when it did not.
     //
-    // The ladder is fixed and is walked in this order (plan §5.1 cannot hold
-    // on a four-mechanic pool, so the degradation is defined rather than
-    // accidental): keep every rule; then allow a family a sibling slot already
-    // used; then allow a mechanic another slot already offered, preferring a
-    // condition it has not been offered with; and only then fall back to the
-    // scalar pool with every structural rule dropped.
+    // The ladder is fixed and is walked in this order: keep every rule; then
+    // allow a family a sibling slot already used; then allow a mechanic another
+    // slot already offered. Phase 0 had a fourth rung -- fall back to the
+    // scalar pool with every structural rule dropped -- and Phase 2 deleted the
+    // scalars, so there is nothing below the third any more and a slot that
+    // cannot be filled comes back empty instead.
     enum GeneratorRelaxation : uint32
     {
         GR_None             = 0,
         GR_RepeatedFamily   = 1u << 0,
         GR_RepeatedMechanic = 1u << 1,
 
-        // Set when a slot could not be filled from any family and was drawn
-        // from the scalar pool instead, and also when the "one reward-shaped
-        // offer per tier" guarantee found no reward-shaped candidate at all --
-        // which is the same failure (nothing eligible) seen from the other
-        // end, and the enum is frozen, so it does not get a bit of its own.
-        GR_FellBackToScalar = 1u << 2
+        // Set when a slot could not be filled at all and came back as
+        // MECHANIC_NONE, and also when the "one reward-shaped offer per tier"
+        // guarantee found no reward-shaped candidate -- which is the same
+        // failure, nothing eligible, seen from the other end.
+        //
+        // The bit is the one Phase 0 called GR_FellBackToScalar and its value
+        // is unchanged; only the name is, because there is no scalar to fall
+        // back to any more.
+        GR_NoCandidate      = 1u << 2
     };
 
     struct OfferSet

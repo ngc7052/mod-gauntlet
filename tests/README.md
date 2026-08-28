@@ -78,7 +78,7 @@ carrying most of them, so the "new mechanic" pools genuinely empty. Design
 
 What *is* asserted exactly, at every tier, is that the relaxation word
 describes the set it came back with: `GR_RepeatedFamily` iff a family repeats,
-`GR_RepeatedMechanic` iff a mechanic repeats, `GR_FellBackToScalar` iff the set
+`GR_RepeatedMechanic` iff a mechanic repeats, `GR_NoCandidate` iff the set
 has no reward-shaped offer. The test prints a per-tier census so the numbers
 behind its ceilings can be re-read from any run.
 

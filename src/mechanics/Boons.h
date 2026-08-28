@@ -47,7 +47,7 @@ namespace Gauntlet
     //
     // Returns 1.0 for every other boon: BonusMoney is paid at the loot site,
     // BonusHealing through HealTakenMult, BonusMoveSpeed as an aura, and the
-    // five fixed boons above LastRolledBoon belong to phases that have not
+    // five fixed boons above LastGenericBoon belong to phases that have not
     // landed. A mechanic naming one of those must deliver it itself.
     float BoonFactor(AffixInstance const& self, AggregateKind kind);
 

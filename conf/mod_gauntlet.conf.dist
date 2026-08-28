@@ -90,7 +90,7 @@ Gauntlet.Family.Tempo.Enable = 1
 #    Gauntlet.Family.Attrition.Enable
 #        Description: Master switch for the Attrition family: mechanics with a
 #                     built-in counterplay button rather than a flat tax (Deep
-#                     Wounds, Blood Magic, Exposed, Feeble). Disabling a family
+#                     Wounds, Blood Magic). Disabling a family
 #                     removes it from future offers; anything a character
 #                     already carries keeps working.
 #        Default:     1 - (enabled)
