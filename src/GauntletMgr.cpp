@@ -1434,6 +1434,28 @@ namespace Gauntlet
         });
     }
 
+    void Mgr::OnItemRoll(Player const* player, float& chance)
+    {
+        // The const_cast is confined to this line and is what the hook's
+        // signature forces: GlobalScript::OnItemRoll is const because the core
+        // will not let a script move a player, and everything below only reads
+        // the guid to find a run and then hands the mechanics a chance, never
+        // the player.
+        Player* mutablePlayer = const_cast<Player*>(player);
+
+        if (!_enabled || !IsEligible(mutablePlayer))
+            return;
+
+        RunState* st = Get(mutablePlayer);
+        if (!st || st->dead)
+            return;
+
+        ForEachMechanic(mutablePlayer, st, [&chance](Ctx& ctx, AffixInstance& a)
+        {
+            a.impl->OnItemRoll(ctx, chance);
+        });
+    }
+
     void Mgr::OnCreatureDamaged(Player* player, Creature* victim, uint32 damage)
     {
         if (!_enabled || !IsEligible(player) || !victim || damage == 0)

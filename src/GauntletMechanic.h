@@ -116,6 +116,14 @@ namespace Gauntlet
         // BonusMoney boon are paid here and nowhere else.
         virtual void  OnLootMoney(Ctx&, Loot*) {}
 
+        // One item's drop chance, from GlobalScript::OnItemRoll
+        // (LootMgr.cpp:315 and :1276), which passes the chance by reference and
+        // is the only hook in the core that can move a drop rate for one
+        // player. Carrion's card promises "+25% item drop chance on creature
+        // loot" and this is where that is paid; Phase 3's Cursed Hoard and
+        // Self-Found want the same seam.
+        virtual void  OnItemRoll(Ctx&, float& /*chance*/) {}
+
         // A blow this character (or their pet) landed on a creature, from
         // UnitScript::OnDamage (Unit.cpp:999), which runs *before* the health
         // is applied -- so `victim->GetHealth() - damage` is the health the

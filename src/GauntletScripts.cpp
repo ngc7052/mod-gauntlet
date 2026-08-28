@@ -443,6 +443,24 @@ public:
     }
 };
 
+// Loot rolls, for the one boon that is a drop rate rather than an amount.
+// GlobalScript::OnItemRoll is consulted once per candidate item per loot per
+// player (LootMgr.cpp:315 and :1276) and passes the chance by reference; a
+// false return drops the item outright, which this module never wants, so it
+// always answers true.
+class GauntletGlobalScript : public GlobalScript
+{
+public:
+    GauntletGlobalScript() : GlobalScript("GauntletGlobalScript") { }
+
+    bool OnItemRoll(Player const* player, LootStoreItem const* /*item*/, float& chance,
+                    Loot& /*loot*/, LootStore const& /*store*/) override
+    {
+        sGauntlet->OnItemRoll(player, chance);
+        return true;
+    }
+};
+
 // The catch-all for "the owner is no longer where its creature is": a
 // teleport, a dungeon portal, a battleground queue popping, a logout. The
 // summons worker called this the important one, and it is: every other despawn
@@ -514,7 +532,9 @@ namespace Gauntlet
     // anything -- which is the only cheap way to catch the failure this whole
     // apparatus exists for.
     void AddSC_gauntlet_mechanic_Echo();               // 2
+    void AddSC_gauntlet_mechanic_Carrion();            // 3
     void AddSC_gauntlet_mechanic_Reinforcements();     // 4
+    void AddSC_gauntlet_mechanic_Ambush();             // 5
     void AddSC_gauntlet_mechanic_Craven();             // 7
     void AddSC_gauntlet_mechanic_CallToArms();         // 8
     void AddSC_gauntlet_mechanic_DeathRattle();        // 9
@@ -522,6 +542,10 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_Nimble();             // 11
     void AddSC_gauntlet_mechanic_Cunning();            // 12
     void AddSC_gauntlet_mechanic_KeenNosed();          // 13
+    void AddSC_gauntlet_mechanic_Frenzy();             // 15
+    void AddSC_gauntlet_mechanic_Overextended();       // 16
+    void AddSC_gauntlet_mechanic_Falter();             // 17
+    void AddSC_gauntlet_mechanic_Hubris();             // 18
 }
 
 static void AnchorMechanics()
@@ -537,7 +561,9 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_DeepWounds();
 
     AddSC_gauntlet_mechanic_Echo();
+    AddSC_gauntlet_mechanic_Carrion();
     AddSC_gauntlet_mechanic_Reinforcements();
+    AddSC_gauntlet_mechanic_Ambush();
     AddSC_gauntlet_mechanic_Craven();
     AddSC_gauntlet_mechanic_CallToArms();
     AddSC_gauntlet_mechanic_DeathRattle();
@@ -545,6 +571,10 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_Nimble();
     AddSC_gauntlet_mechanic_Cunning();
     AddSC_gauntlet_mechanic_KeenNosed();
+    AddSC_gauntlet_mechanic_Frenzy();
+    AddSC_gauntlet_mechanic_Overextended();
+    AddSC_gauntlet_mechanic_Falter();
+    AddSC_gauntlet_mechanic_Hubris();
 }
 
 void Addmod_gauntletScripts()
@@ -553,6 +583,7 @@ void Addmod_gauntletScripts()
     new GauntletPlayerScript();
     new GauntletUnitScript();
     new GauntletMapScript();
+    new GauntletGlobalScript();
     AddSC_gauntlet_commands();
     AddSC_gauntlet_summons();
     AnchorMechanics();

@@ -79,6 +79,12 @@ namespace Gauntlet
         // purse, and the two hooks fire for the same corpse.
         void OnLootWindow(Player* player, ObjectGuid const& lootGuid, Loot* loot);
 
+        // One item's drop chance, on its way through the loot roll. The core
+        // hands this hook a const Player because it has no business changing
+        // one; the module needs a non-const pointer only to find the run keyed
+        // on its guid, and changes nothing about the player either.
+        void OnItemRoll(Player const* player, float& chance);
+
         // A blow this character or their pet landed on a creature, before
         // the health comes off. Craven watches for the threshold crossing.
         void OnCreatureDamaged(Player* player, Creature* victim, uint32 damage);
