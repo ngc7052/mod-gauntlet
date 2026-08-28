@@ -226,7 +226,16 @@ namespace Gauntlet
         virtual uint8  GetClass() const = 0;               // CLASS_WARRIOR ... CLASS_DRUID
         virtual uint8  GetLevel() const = 0;
         virtual bool   HasSpell(uint32 spellId) const = 0; // Player::HasSpell
-        virtual uint8  GetTalentTree() const = 0;          // Player::GetMostPointsTalentTree
+        // The talent tree the character has actually committed to, encoded as
+        // tabpage + 1: 1/2/3 are the three tabs in client order, and 0 means
+        // "no spec yet". The +1 exists because Player::GetMostPointsTalentTree
+        // returns a raw 0-based tabpage and also returns 0 for a character that
+        // has spent no talent points at all, which would make the first tree of
+        // every class indistinguishable from "untalented". MechanicDef::
+        // requiresTree uses the same encoding, so a spec gate is just
+        // `requiresTree == 0 || requiresTree == GetTalentTree()` and an
+        // untalented character satisfies no gate.
+        virtual uint8  GetTalentTree() const = 0;
 
         // 1 << (class - 1), the core's getClassMask() convention.
         uint32 GetClassMask() const { return 1u << (GetClass() - 1); }
