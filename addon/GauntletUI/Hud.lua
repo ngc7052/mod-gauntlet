@@ -69,6 +69,7 @@ local READINGS = {
     nimble         = { "Nimble",         "%",    true  },
     grudge         = { "Grudge",         "flag", true  },
     lone_wolf      = { "Grouped: half health", "flag", true },
+    blood_magic    = { "Blood Magic",    "%",    true  },
     vindication    = { "Vindication",    "%",    true  },
 }
 

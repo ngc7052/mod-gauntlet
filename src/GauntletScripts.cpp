@@ -639,6 +639,7 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_Falter();             // 17
     void AddSC_gauntlet_mechanic_Hubris();             // 18
 
+    void AddSC_gauntlet_mechanic_BloodMagic();         // 20
     void AddSC_gauntlet_mechanic_SelfFound();          // 23
     void AddSC_gauntlet_mechanic_LoneWolf();           // 24
     void AddSC_gauntlet_mechanic_IronPurse();          // 25
@@ -667,6 +668,7 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_Falter();
     AddSC_gauntlet_mechanic_Hubris();
 
+    AddSC_gauntlet_mechanic_BloodMagic();
     AddSC_gauntlet_mechanic_IronPurse();
     AddSC_gauntlet_mechanic_SelfFound();
     AddSC_gauntlet_mechanic_LoneWolf();

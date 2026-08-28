@@ -214,7 +214,7 @@ namespace
           "A third of the damage you take becomes a wound that only rest can heal." },
 
         { 20, "blood_magic", "Blood Magic", Family::Attrition, CM_MANA_USERS, 5, 12, 3,
-          MF_NotImplemented, "", Boon::BonusDamage, 0, 0,
+          MF_None, "", Boon::BonusDamage, 0, 0,
           "Spells cost 3% of your maximum health in addition to mana." },
 
         // Ids 21 and 22 were Exposed and Feeble, the last two flat scalars, and

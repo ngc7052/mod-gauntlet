@@ -46,11 +46,11 @@ namespace
     // rather than as a count: a row that gains the flag by accident, or loses
     // it before its dispatch is wired, is an affix offered to a live hardcore
     // character that silently does nothing.
-    constexpr std::array<uint16, 22> OFFERABLE = {
+    constexpr std::array<uint16, 23> OFFERABLE = {
         1, 2, 3, 4, 5,           // S1 Shade, S2 Echo, S3 Carrion, S4 Reinforcements, S5 Ambush
         6, 7, 8, 9, 10, 11, 12, 13,  // E1 Champions .. E8 Keen-nosed
         14, 15, 16, 17, 18,      // T1 Falling Sky .. T5 Hubris
-        19,                      // A1 Deep Wounds
+        19, 20,                  // A1 Deep Wounds, A2 Blood Magic
         23, 24, 25               // R1 Self-found, R2 Lone Wolf, R3 Iron Purse
     };
 

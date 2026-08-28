@@ -1502,6 +1502,15 @@ namespace Gauntlet
         if (!st)
             return;
 
+        // Damage this module applied to its own player is not damage the world
+        // did, and the observers must not treat it as such. Blood Magic's
+        // health cost would otherwise become a Deep Wound -- a caster paying
+        // for a spell and then having the payment taxed a second time by an
+        // unrelated affix, which is a tax on a tax and precisely the pattern
+        // design section 3's note on Feeble rejects.
+        if (st->selfDamage)
+            return;
+
         // A creature this module put into the world is the clearest attribution
         // there is: the Shade that killed you is named by name rather than by
         // whatever multiplied the last blow.
