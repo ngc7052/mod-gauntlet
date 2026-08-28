@@ -37,6 +37,10 @@
 using namespace Acore::ChatCommands;
 using namespace Gauntlet;
 
+// The core has its own global `Condition` class (ConditionMgr.h), so an
+// unqualified `Condition` outside `namespace Gauntlet` below is ambiguous
+// and clang rejects it. Qualify it as `Gauntlet::Condition` out here.
+
 namespace Gauntlet
 {
     namespace
@@ -642,12 +646,12 @@ public:
             return false;
         }
 
-        Condition condition = Condition::Always;
+        Gauntlet::Condition condition = Gauntlet::Condition::Always;
         if (condArg && !ParseCondition(*condArg, condition))
         {
             handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r '{}' is not a condition. Give an index 0-{} or an "
                                       "adjective such as 'Desperate'.", *condArg,
-                                      static_cast<uint32>(Condition::MAX) - 1);
+                                      static_cast<uint32>(Gauntlet::Condition::MAX) - 1);
             return false;
         }
 
