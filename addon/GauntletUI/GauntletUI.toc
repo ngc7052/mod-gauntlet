@@ -2,6 +2,8 @@
 ## Title: Gauntlet UI
 ## Notes: Minimap button, affix browser and out-of-combat affix chooser for mod-gauntlet.
 ## Author: ngc7052
-## Version: 2.0
+## Version: 3.0
 ## SavedVariables: GauntletUIDB
-GauntletUI.lua
+Data.lua
+Protocol.lua
+Panel.lua

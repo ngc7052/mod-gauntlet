@@ -1,4 +1,6 @@
--- GauntletUI - client interface for mod-gauntlet
+-- Panel.lua - GauntletUI's main window, chooser, settings panel and minimap
+-- button. Formerly GauntletUI.lua; split so Protocol.lua can own the wire
+-- format while this file only ever reads from it.
 --
 -- Design notes:
 --   * dark flat panels rather than the ornate dialog frame, so the window sits
@@ -10,6 +12,7 @@
 --   * settings live in their own panel, so they can never collide with the list
 
 local offers, affixes = {}, {}
+local carriedBySlot = {}   -- slot -> resolved affix record; for OFFER's swap-name lookup
 local mode, pendingOffer = nil, false
 local run = { seed = "?", tier = 0, state = "alive" }
 
@@ -29,6 +32,10 @@ local BG      = { 0.06, 0.06, 0.07, 0.94 }
 local BORDER  = { 0.20, 0.22, 0.28, 1.00 }
 local ROW_BG  = { 0.10, 0.10, 0.12, 0.60 }
 
+-- ===================================================== fallback-only ====
+-- Chat-scraped affixes have no mechanic id, so severity and icon can only be
+-- guessed from the description text. Kept for when the protocol is not
+-- active (see Protocol.lua) - this is the fallback, not dead code.
 local SEVERITY = {
     trivial  = { 0.62, 0.62, 0.62, "Trivial"  },
     minor    = { 0.35, 0.80, 0.35, "Minor"    },
@@ -60,6 +67,57 @@ end
 local function Body(desc)
     return (desc or ""):gsub("^%[%a+%]%s*", "")
 end
+
+-- ===================================================== protocol-only ====
+-- Names/descriptions/icons for protocol-sourced affixes come from Data.lua,
+-- keyed by mechanic id - never from parsing text.
+local function DataUsable()
+    return GauntletData ~= nil and GauntletData.version == GauntletProtocol.PROTOCOL_VERSION
+end
+
+local function MechInfo(id)
+    id = tonumber(id)
+    if DataUsable() then
+        local m = GauntletData.mechanics and GauntletData.mechanics[id]
+        if m then return m end
+    end
+    -- Data.lua missing, stale (version mismatch treated the same as missing,
+    -- since neither can be trusted) or the id is not in it.
+    return { name = "#" .. tostring(id), family = nil,
+              icon = "Interface\\Icons\\INV_Misc_QuestionMark", desc = "" }
+end
+
+-- TODO(design): family colours - not specified anywhere; picked to keep a
+-- similar spread of hue/intensity to the old [Severity] palette they replace.
+local FAMILY_COLOR = {
+    [0] = { 0.70, 0.55, 0.95, "Spawn"     },
+    [1] = { 1.00, 0.55, 0.10, "Enemy"     },
+    [2] = { 0.95, 0.85, 0.25, "Tempo"     },
+    [3] = { 1.00, 0.25, 0.20, "Attrition" },
+    [4] = { 0.40, 0.70, 1.00, "Rules"     },
+    [5] = { 0.35, 0.80, 0.35, "Bargain"   },
+    [6] = { 0.90, 0.40, 0.75, "Class"     },
+}
+local function FamilyColor(family)
+    return FAMILY_COLOR[family] or { 0.7, 0.7, 0.7, "" }
+end
+
+-- TODO(design): kind-badge colours and labels - likewise not specified.
+local KIND_COLOR = {
+    new     = { 0.35, 0.80, 0.35, "NEW"     },
+    rankup  = { 0.40, 0.70, 1.00, "RANK UP" },
+    swap    = { 1.00, 0.55, 0.10, "SWAP"    },
+    bargain = { 0.90, 0.40, 0.75, "BARGAIN" },
+}
+
+local RANK_PIP = { [1] = "I", [2] = "II", [3] = "III" }
+local function RankText(rank) return RANK_PIP[rank] or "" end
+
+-- Colour/icon for either a fallback record { name, desc } or a protocol
+-- record { name, desc, icon, family, ... } - the two shapes intentionally
+-- share the "name"/"desc" fields so the render code below barely forks.
+local function RowColor(a) return a.family ~= nil and FamilyColor(a.family) or Sev(a.desc) end
+local function RowIcon(a) return a.icon or IconFor(a.desc) end
 
 -- ============================================================== helpers ====
 local function Panel(name, w, h, title)
@@ -140,7 +198,19 @@ for i = 1, 16 do
 
     r.name = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     r.name:SetPoint("LEFT", r.icon, "RIGHT", 7, 0)
-    r.name:SetJustifyH("LEFT"); r.name:SetWidth(230)
+    r.name:SetJustifyH("LEFT"); r.name:SetWidth(150)
+
+    -- Rank pip and condition light: only populated for protocol-sourced rows
+    -- (see RefreshMain); hidden for chat-scraped ones, which have neither.
+    r.rank = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    r.rank:SetPoint("LEFT", r.name, "RIGHT", 6, 0)
+    r.rank:SetWidth(24); r.rank:SetJustifyH("LEFT")
+
+    r.cond = r:CreateTexture(nil, "OVERLAY")
+    r.cond:SetWidth(8); r.cond:SetHeight(8)
+    r.cond:SetPoint("LEFT", r.rank, "RIGHT", 6, 0)
+    r.cond:SetTexture("Interface\\Buttons\\WHITE8X8")
+    r.cond:Hide()
 
     r.tag = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     r.tag:SetPoint("RIGHT", r, "RIGHT", -6, 0)
@@ -152,7 +222,7 @@ for i = 1, 16 do
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(self.data.name, 1, 0.82, 0)
         GameTooltip:AddLine(Body(self.data.desc), 1, 1, 1, true)
-        local s = Sev(self.data.desc)
+        local s = RowColor(self.data)
         GameTooltip:AddLine(s[4], s[1], s[2], s[3])
         GameTooltip:Show()
     end)
@@ -178,12 +248,21 @@ local function RefreshMain()
     for i = 1, 16 do
         local a = affixes[i]
         if a then
-            local s = Sev(a.desc)
+            local s = RowColor(a)
             rows[i].data = a
-            rows[i].icon:SetTexture(IconFor(a.desc))
+            rows[i].icon:SetTexture(RowIcon(a))
             rows[i].name:SetText(a.name)
             rows[i].name:SetTextColor(s[1], s[2], s[3])
             rows[i].tag:SetText(s[4])
+            if a.rank then
+                rows[i].rank:SetText(RankText(a.rank))
+                rows[i].rank:Show()
+                rows[i].cond:Show()
+                rows[i].cond:SetVertexColor(0.4, 0.4, 0.4, 0.55)   -- neutral: COND is a Phase 1 no-op today
+            else
+                rows[i].rank:SetText("")
+                rows[i].cond:Hide()
+            end
             rows[i]:Show(); n = i
         else
             rows[i].data = nil
@@ -258,6 +337,11 @@ for i = 1, 3 do
     b.desc:SetPoint("TOPLEFT", b.name, "BOTTOMLEFT", 0, -3)
     b.desc:SetWidth(330); b.desc:SetJustifyH("LEFT")
 
+    -- Kind badge (new/rankup/swap/bargain); only shown for protocol-sourced offers.
+    b.badge = b:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    b.badge:SetPoint("TOPRIGHT", b, "TOPRIGHT", -8, -6)
+    b.badge:Hide()
+
     AddGlow(b)
     b.index = i
     b:SetScript("OnEnter", function(self)
@@ -271,7 +355,11 @@ for i = 1, 3 do
     end)
     b:SetScript("OnClick", function(self)
         PlaySound("igMainMenuOptionCheckBoxOn")
-        SendChatMessage(".gauntlet pick " .. self.index, "SAY")
+        if GauntletProtocol.mode == "protocol" then
+            GauntletProtocol.SendPick(self.index)
+        else
+            SendChatMessage(".gauntlet pick " .. self.index, "SAY")
+        end
         chooser:Hide(); offers = {}; pendingOffer = false
     end)
     b:Hide()
@@ -284,12 +372,24 @@ local function ShowChooser()
     for i = 1, 3 do
         local o = offers[i]
         if o then
-            local s = Sev(o.desc)
+            local s = RowColor(o)
             cards[i].sev = s
-            cards[i].icon:SetTexture(IconFor(o.desc))
+            cards[i].icon:SetTexture(RowIcon(o))
             cards[i].name:SetText(o.name)
             cards[i].name:SetTextColor(s[1], s[2], s[3])
-            cards[i].desc:SetText(Body(o.desc))
+            local descText = Body(o.desc)
+            if o.kind == "swap" and o.swapName then
+                descText = descText .. "  |cffff8040(swaps out " .. o.swapName .. ")|r"
+            end
+            cards[i].desc:SetText(descText)
+            if o.kind then
+                local k = KIND_COLOR[o.kind] or { 0.7, 0.7, 0.7, o.kind:upper() }
+                cards[i].badge:SetText(k[4])
+                cards[i].badge:SetTextColor(k[1], k[2], k[3])
+                cards[i].badge:Show()
+            else
+                cards[i].badge:Hide()
+            end
             cards[i]:SetBackdropBorderColor(unpack(BORDER))
             cards[i]:Show(); n = n + 1
         else
@@ -304,8 +404,13 @@ local function ShowChooser()
     pendingOffer = false
 end
 
--- ================================================================ parse ====
+-- ========================================================= chat fallback ====
 local function OnSystem(raw)
+    -- The protocol is authoritative once active; ignore chat-scraped state so
+    -- the two sources cannot race or clobber each other. Chat suppression
+    -- below still applies regardless of mode.
+    if GauntletProtocol.mode == "protocol" then return end
+
     local msg = Strip(raw)
 
     local tier = msg:match("Tier (%d+) reached")
@@ -359,6 +464,79 @@ ChatFrame_MessageEventHandler = function(self, event, ...)
     return origHandler(self, event, ...)
 end
 
+-- ============================================================== protocol ====
+-- Everything below reads GNT messages via GauntletProtocol.On and turns them
+-- into the same { name, desc, icon, family, ... } shape the renderers above
+-- already understand.
+
+GauntletProtocol.On("RUN", function(seed, tier, state, class)
+    run.seed = seed
+    run.tier = tonumber(tier) or run.tier
+    run.state = (state or run.state):lower()
+    run.class = class
+    if main:IsShown() then RefreshMain() end
+end)
+
+local pendingCarried, pendingCarriedBySlot = {}, {}
+GauntletProtocol.On("AFFIX", function(slot, id, rank, cond, boon, boonMag)
+    local info = MechInfo(id)
+    local rec = {
+        name = info.name, desc = info.desc, icon = info.icon, family = info.family,
+        rank = tonumber(rank), cond = tonumber(cond), boon = tonumber(boon),
+        boonMag = tonumber(boonMag), slot = tonumber(slot),
+    }
+    tinsert(pendingCarried, rec)
+    pendingCarriedBySlot[rec.slot] = rec
+end)
+
+GauntletProtocol.On("AFFIX_END", function()
+    -- AFFIX_END marks a complete, authoritative snapshot; replace rather than
+    -- merge, since the server may resend this after login, a pick or a swap.
+    affixes, carriedBySlot = pendingCarried, pendingCarriedBySlot
+    pendingCarried, pendingCarriedBySlot = {}, {}
+    if main:IsShown() then RefreshMain() end
+end)
+
+local pendingOffers = {}
+GauntletProtocol.On("OFFER", function(i, id, rank, cond, boon, boonMag, kind, swapSlot)
+    local info = MechInfo(id)
+    local swapName
+    if kind == "swap" then
+        local carried = carriedBySlot[tonumber(swapSlot)]
+        swapName = carried and carried.name or ("#" .. tostring(swapSlot))
+    end
+    pendingOffers[tonumber(i)] = {
+        name = info.name, desc = info.desc, icon = info.icon, family = info.family,
+        rank = tonumber(rank), cond = tonumber(cond), boon = tonumber(boon),
+        boonMag = tonumber(boonMag), kind = kind, swapName = swapName,
+    }
+end)
+
+GauntletProtocol.On("OFFER_END", function()
+    offers = pendingOffers
+    pendingOffers = {}
+    if DB("autoOpen") then ShowChooser() else pendingOffer = true; RefreshMain() end
+end)
+
+-- No player-facing leaderboard tab exists yet (out of this file's rendering
+-- scope per spec); print it to chat so ".gauntlet top" still shows something
+-- once the protocol is active, same as it always has via plain chat text.
+GauntletProtocol.On("TOP", function(rank, name, tier, level, cause, conducts)
+    DEFAULT_CHAT_FRAME:AddMessage(("Gauntlet Top: #%s %s - tier %s (level %s) - %s [%s]"):
+        format(tostring(rank), tostring(name), tostring(tier), tostring(level),
+               tostring(cause), tostring(conducts)), 1, 0.82, 0)
+end)
+
+GauntletProtocol.OnModeChange(function(newMode)
+    if newMode == "protocol" then
+        -- Drop any state a chat scrape may have accumulated during "pending"
+        -- so a late HELLO cannot leave stale fallback data mixed in.
+        offers, mode, pendingOffer = {}, nil, false
+        chooser:Hide()
+    end
+    if main:IsShown() then RefreshMain() end
+end)
+
 -- ====================================================== minimap button ====
 minimapBtn = CreateFrame("Button", "GauntletMinimapButton", Minimap)
 minimapBtn:SetWidth(31); minimapBtn:SetHeight(31)
@@ -405,15 +583,19 @@ minimapBtn:SetScript("OnEnter", function(self)
     GameTooltip:SetText("The Gauntlet", 1, 0.82, 0)
     GameTooltip:AddLine(("Tier %d  -  %s"):format(run.tier, run.state), 1, 1, 1)
     if pendingOffer then GameTooltip:AddLine("A choice is waiting.", 1, 0.82, 0) end
+    GameTooltip:AddLine(GauntletProtocol.mode == "protocol" and "Protocol: connected"
+                         or "Protocol: chat fallback", 0.6, 0.6, 0.6)
     GameTooltip:AddLine("Click to open, drag to move.", 0.6, 0.6, 0.6)
     GameTooltip:Show()
 end)
 minimapBtn:SetScript("OnLeave", function() mmGlow:Hide(); GameTooltip:Hide() end)
 minimapBtn:SetScript("OnClick", function()
     if main:IsShown() then main:Hide() return end
-    affixes, mode = {}, "status"
+    if GauntletProtocol.mode ~= "protocol" then
+        affixes, mode = {}, "status"
+        SendChatMessage(".gauntlet status", "SAY")
+    end
     RefreshMain(); main:Show()
-    SendChatMessage(".gauntlet status", "SAY")
 end)
 
 -- =============================================================== events ====
@@ -436,7 +618,16 @@ SlashCmdList["GAUNTLET"] = function(cmd)
     if cmd == "pick" and next(offers) then ShowChooser() return end
     if cmd == "config" then gear:GetScript("OnClick")() return end
     if main:IsShown() then main:Hide() return end
-    affixes, mode = {}, "status"
+    if GauntletProtocol.mode == "protocol" then
+        -- TODO(design): staleness heuristic - "never received a snapshot" is
+        -- the only case the spec gives a name to, so that is what triggers a
+        -- re-SYNC; anything richer needs a signal Phase 0 does not have yet.
+        if run.tier == 0 and not next(affixes) then
+            GauntletProtocol.SendSync()
+        end
+    else
+        affixes, mode = {}, "status"
+        SendChatMessage(".gauntlet status", "SAY")
+    end
     RefreshMain(); main:Show()
-    SendChatMessage(".gauntlet status", "SAY")
 end
