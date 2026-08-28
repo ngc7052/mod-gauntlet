@@ -1,0 +1,45 @@
+[worldserver]
+
+########################################
+# mod-gauntlet configuration
+########################################
+#
+#    Gauntlet.Enable
+#        Description: Master switch for the module.
+#        Default:     1 - (enabled)
+#                     0 - (disabled)
+
+Gauntlet.Enable = 1
+
+#
+#    Gauntlet.Hardcore
+#        Description: Death permanently retires the run. This is the premise of
+#                     the module; disable only if you want affixes without the
+#                     one-life stake.
+#        Default:     1 - (enabled)
+
+Gauntlet.Hardcore = 1
+
+#
+#    Gauntlet.TierInterval
+#        Description: Levels between affix tiers. With 5, tiers land at level
+#                     5, 10, 15 ... 80, for 16 affixes over a full run.
+#        Default:     5
+
+Gauntlet.TierInterval = 5
+
+#
+#    Gauntlet.ChoicesPerTier
+#        Description: How many rolled affixes are offered at each tier. Set to
+#                     1 to remove player choice and make the roll pure fate.
+#        Default:     3
+
+Gauntlet.ChoicesPerTier = 3
+
+#
+#    Gauntlet.Announce
+#        Description: Broadcast tier picks and run-ending deaths server-wide.
+#                     Hardcore is considerably better with an audience.
+#        Default:     1 - (enabled)
+
+Gauntlet.Announce = 1

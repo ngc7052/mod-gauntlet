@@ -1,0 +1,7 @@
+mod-gauntlet is released under the GNU Affero General Public License v3.0,
+matching the licensing of AzerothCore and its module ecosystem.
+
+The full text of the AGPL-3.0 is available at:
+    https://www.gnu.org/licenses/agpl-3.0.txt
+
+SPDX-License-Identifier: AGPL-3.0-or-later

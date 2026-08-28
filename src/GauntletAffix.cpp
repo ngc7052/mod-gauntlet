@@ -1,0 +1,204 @@
+/*
+ * mod-gauntlet - affix generator
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+#include "Gauntlet.h"
+#include <array>
+
+namespace Gauntlet
+{
+    namespace
+    {
+        // splitmix64: small, fast, and identical on every platform, so a seed
+        // reproduces the same run anywhere. Deliberately NOT std::rand.
+        uint64 Mix(uint64 x)
+        {
+            x += 0x9E3779B97F4A7C15ULL;
+            x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ULL;
+            x = (x ^ (x >> 27)) * 0x94D049BB133111EBULL;
+            return x ^ (x >> 31);
+        }
+
+        uint32 RollIn(uint64& state, uint32 lo, uint32 hi)
+        {
+            state = Mix(state);
+            return lo + static_cast<uint32>(state % (hi - lo + 1));
+        }
+
+        // Curse magnitude bands per severity: {min%, max%}
+        constexpr std::array<std::pair<uint32, uint32>, 6> SEVERITY_BANDS = { {
+            {  2,  4 },   // Trivial
+            {  5,  9 },   // Minor
+            { 10, 16 },   // Moderate
+            { 17, 25 },   // Major
+            { 26, 36 },   // Severe
+            { 37, 50 },   // Dire
+        } };
+
+        // Conditional affixes hit less often, so they roll harder numbers.
+        uint32 ConditionWeight(Condition c)
+        {
+            switch (c)
+            {
+                case Condition::Always:          return 100;
+                case Condition::InCombat:        return 130;
+                case Condition::OutOfCombat:     return 190;
+                case Condition::BelowHalfHealth: return 210;
+                case Condition::AboveHalfHealth: return 140;
+                case Condition::WhileSolo:       return 150;
+                case Condition::WhileGrouped:    return 170;
+                case Condition::InDungeon:       return 180;
+                case Condition::InOpenWorld:     return 120;
+                case Condition::VersusElites:    return 200;
+                case Condition::VersusPlayers:   return 220;
+                case Condition::AtNight:         return 175;
+                case Condition::AtDay:           return 175;
+                case Condition::WhileMoving:     return 145;
+                case Condition::WhileStationary: return 195;
+                case Condition::WhileMounted:    return 230;
+                default:                         return 100;
+            }
+        }
+    }
+
+    std::string EffectName(Effect e)
+    {
+        switch (e)
+        {
+            case Effect::MaxHealth:        return "Brittle";
+            case Effect::DamageTaken:      return "Exposed";
+            case Effect::DamageDone:       return "Feeble";
+            case Effect::HealingReceived:  return "Withering";
+            case Effect::HealingDone:      return "Faithless";
+            case Effect::MoveSpeed:        return "Leaden";
+            case Effect::AttackSpeed:      return "Sluggish";
+            case Effect::CastSpeed:        return "Stammering";
+            case Effect::ManaPool:         return "Hollow";
+            case Effect::HealthRegen:      return "Festering";
+            case Effect::ExperienceGain:   return "Forgetful";
+            case Effect::MoneyGain:        return "Impoverished";
+            case Effect::DurabilityLoss:   return "Corroding";
+            case Effect::ThreatGeneration: return "Hunted";
+            default:                       return "Unknown";
+        }
+    }
+
+    std::string ConditionName(Condition c)
+    {
+        switch (c)
+        {
+            case Condition::Always:          return "Everlasting";
+            case Condition::InCombat:        return "Embattled";
+            case Condition::OutOfCombat:     return "Restless";
+            case Condition::BelowHalfHealth: return "Desperate";
+            case Condition::AboveHalfHealth: return "Complacent";
+            case Condition::WhileSolo:       return "Solitary";
+            case Condition::WhileGrouped:    return "Codependent";
+            case Condition::InDungeon:       return "Delving";
+            case Condition::InOpenWorld:     return "Wandering";
+            case Condition::VersusElites:    return "Outmatched";
+            case Condition::VersusPlayers:   return "Rivalrous";
+            case Condition::AtNight:         return "Nocturnal";
+            case Condition::AtDay:           return "Sunlit";
+            case Condition::WhileMoving:     return "Fleeting";
+            case Condition::WhileStationary: return "Rooted";
+            case Condition::WhileMounted:    return "Saddlesore";
+            default:                         return "Unknown";
+        }
+    }
+
+    std::string BoonName(Boon b)
+    {
+        switch (b)
+        {
+            case Boon::None:            return "";
+            case Boon::BonusDamage:     return "Wrathful";
+            case Boon::BonusHealing:    return "Mending";
+            case Boon::BonusMoveSpeed:  return "Fleetfooted";
+            case Boon::BonusExperience: return "Enlightened";
+            case Boon::BonusMoney:      return "Avaricious";
+            case Boon::BonusMaxHealth:  return "Stalwart";
+            case Boon::BonusRegen:      return "Renewing";
+            default:                    return "";
+        }
+    }
+
+    std::string SeverityName(Severity s)
+    {
+        switch (s)
+        {
+            case Severity::Trivial:  return "Trivial";
+            case Severity::Minor:    return "Minor";
+            case Severity::Moderate: return "Moderate";
+            case Severity::Major:    return "Major";
+            case Severity::Severe:   return "Severe";
+            case Severity::Dire:     return "Dire";
+            default:                 return "Unknown";
+        }
+    }
+
+    std::string Affix::Name() const
+    {
+        std::string n = ConditionName(condition) + " " + EffectName(effect);
+        if (boon != Boon::None)
+            n = BoonName(boon) + " " + n;
+        return n;
+    }
+
+    std::string Affix::Describe() const
+    {
+        std::string const cond = (condition == Condition::Always)
+            ? "" : (" (" + ConditionName(condition) + ")");
+
+        std::string out = SeverityName(severity) + ": " + EffectName(effect)
+                        + " " + std::to_string(magnitude) + "%" + cond;
+
+        if (boon != Boon::None)
+            out += " | boon: " + BoonName(boon) + " " + std::to_string(boonMagnitude) + "%";
+
+        return out;
+    }
+
+    Affix Roll(uint32 seed, uint32 tier, uint32 rollIndex)
+    {
+        // Distinct stream per (seed, tier, choice slot).
+        uint64 state = Mix((static_cast<uint64>(seed) << 32)
+                         ^ (static_cast<uint64>(tier) << 8)
+                         ^ static_cast<uint64>(rollIndex));
+
+        Affix a;
+        a.effect    = static_cast<Effect>(RollIn(state, 0, static_cast<uint32>(Effect::MAX) - 1));
+        a.condition = static_cast<Condition>(RollIn(state, 0, static_cast<uint32>(Condition::MAX) - 1));
+
+        // Severity drifts upward with tier but never becomes fully predictable.
+        uint32 const floorSev = std::min<uint32>(tier / 4u, 3u);
+        uint32 const sev      = std::min<uint32>(RollIn(state, floorSev, floorSev + 2u),
+                                                 static_cast<uint32>(Severity::MAX) - 1);
+        a.severity = static_cast<Severity>(sev);
+
+        auto const& band = SEVERITY_BANDS[sev];
+        uint32 base = RollIn(state, band.first, band.second);
+
+        // Rarely-active affixes hit harder to stay relevant.
+        a.magnitude = std::max<uint32>(1u, base * ConditionWeight(a.condition) / 100u);
+
+        // Roughly one in three affixes carries a boon.
+        if (RollIn(state, 0, 99) < 34)
+        {
+            a.boon = static_cast<Boon>(RollIn(state, 1, static_cast<uint32>(Boon::MAX) - 1));
+            a.boonMagnitude = std::max<uint32>(1u, a.magnitude * RollIn(state, 40, 80) / 100u);
+        }
+
+        a.id = static_cast<uint32>(Mix(state) & 0x7FFFFFFFu);
+        return a;
+    }
+
+    uint32 VariationCount()
+    {
+        return static_cast<uint32>(Effect::MAX)
+             * static_cast<uint32>(Condition::MAX)
+             * static_cast<uint32>(Severity::MAX)
+             * static_cast<uint32>(Boon::MAX);
+    }
+}
