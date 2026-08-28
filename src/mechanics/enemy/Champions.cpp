@@ -14,6 +14,7 @@
 #include "Map.h"
 #include "ObjectAccessor.h"
 #include "Player.h"
+#include "SpellAuraEffects.h"
 #include "Unit.h"
 
 #include <algorithm>
@@ -64,22 +65,37 @@ namespace Gauntlet
         constexpr float OWNER_DAMAGE_MULT  = 1.25f;
         constexpr uint32 XP_MULT           = 2;
 
-        // "Enrage". Verified present in Spell.dbc (record id 8599, SpellName
-        // "Enrage") and used as SPELL_ENRAGE by exactly six core scripts:
-        // alterac_valley.cpp:27, boss_ossirian.cpp:382,
-        // mob_anubisath_sentinel.cpp:50, boss_keristrasza.cpp:31,
-        // zone_shadowmoon_valley.cpp:1326 and scourge_invasion.h.
+        // "Enrage", and it is worn for the glow alone. Verified present in
+        // Spell.dbc (record id 8599, SpellName "Enrage") and used as
+        // SPELL_ENRAGE by exactly six core scripts: alterac_valley.cpp:27,
+        // boss_ossirian.cpp:382, mob_anubisath_sentinel.cpp:50,
+        // boss_keristrasza.cpp:31, zone_shadowmoon_valley.cpp:1326 and
+        // scourge_invasion.h.
         //
-        // It is not only a visual. Its two effects are SPELL_AURA_MOD_DAMAGE_
-        // PERCENT_DONE +10 and SPELL_AURA_MOD_MELEE_HASTE +30
-        // (SpellAuraDefines.h:142 and :201), for 120 s (DurationIndex 4). Those
-        // apply to everything the Champion hits, not only to its owner, which
-        // the owner-only +25% below deliberately does not. The design names
-        // this spell by id, so it is used as named and the leak is reported
-        // rather than hidden. The duration is longer than an open-world fight,
-        // and the core strips the aura on evade (Unit::RemoveEvadeAuras,
-        // Unit.cpp:5730, reached from CreatureAI::_EnterEvadeMode,
-        // CreatureAI.cpp:403), so nothing has to expire it by hand.
+        // The card calls this "a visible enrage aura". It is not. Read out of
+        // env/dist/data/dbc/Spell.dbc, effects 0 and 1 are both
+        // SPELL_EFFECT_APPLY_AURA carrying EffectApplyAuraName 79
+        // SPELL_AURA_MOD_DAMAGE_PERCENT_DONE and 138 SPELL_AURA_MOD_MELEE_HASTE
+        // (SpellAuraDefines.h:142 and :201), base points 9 and 29, one die side
+        // each. And EffectRealPointsPerLevel[0] is 1.0 against BaseLevel 1 with
+        // MaxLevel 0, so the damage effect is not +10% but +(casterLevel + 9)%:
+        // +29% on a level 20 Champion and +69% on a level 60 one
+        // (SpellInfo.cpp:409-428).
+        //
+        // A Champion is a real creature, so every bit of that lands on whoever
+        // it hits -- a grouped player carrying no affix included, which design
+        // section 5.3 forbids -- and none of it passes through plan section
+        // 2.5's cap, which governs only what this module multiplies. The card
+        // names exactly one damage number, +25% to the owner, and
+        // DamageTakenMult below is where that one is paid.
+        //
+        // So the aura is applied for its visual and then emptied; see
+        // Silence(). Its 120 s duration (DurationIndex 4, SpellDuration.dbc id
+        // 4 = 120000 ms) is left alone rather than shortened: Restore() strips
+        // it when the fight ends, the core strips it on evade
+        // (Unit::RemoveEvadeAuras, Unit.cpp:5730, reached from
+        // CreatureAI::_EnterEvadeMode, CreatureAI.cpp:403), and what outlives
+        // both is now a glow on a creature nobody is fighting.
         constexpr uint32 SPELL_ENRAGE = 8599;
 
         // Champions promote one creature every six to ten fights, so this is
@@ -96,6 +112,39 @@ namespace Gauntlet
 
         uint32 Threshold(AffixInstance const* self) { return FIGHTS_PER_CHAMPION[RankOf(self) - 1]; }
         float  HealthMult(AffixInstance const* self) { return HEALTH_MULT[RankOf(self) - 1]; }
+
+        // The buff taken back out of the buff, so that only the glow is left.
+        // AddAura returns the Aura it applied (Unit.h:1351, Unit.cpp:15150) and
+        // Aura::GetEffect hands back each effect (SpellAuras.h:176).
+        // AuraEffect::ChangeAmount is the setter that re-runs the handler
+        // rather than only moving the number (SpellAuraEffects.h:75,
+        // SpellAuraEffects.cpp:713-753): it unapplies the effect at its old
+        // amount, writes the new one, then applies it again. Both of this
+        // spell's handlers honour AURA_EFFECT_HANDLE_CHANGE_AMOUNT --
+        // HandleModDamagePercentDone recomputes the creature's damage-done mods
+        // from whatever auras remain (SpellAuraEffects.cpp:5005-5029) and
+        // HandleModMeleeSpeedPct reverses its own attack-time mod (:4809-4826)
+        // -- so the Champion really is left at its base damage and its base
+        // swing timer. ChangeAmount marks through SetAmount, which also clears
+        // m_canBeRecalculated (SpellAuraEffects.h:66), so a later
+        // RecalculateAmount cannot quietly put the level scaling back (:76).
+        //
+        // The glow is untouched, because the client is never told an amount:
+        // SMSG_AURA_UPDATE carries slot, spell id, flags, caster level, stack
+        // and duration and nothing else (SpellAuras.cpp:187-221). What draws
+        // the effect is the spell's SpellVisual 870, which needs only the aura
+        // to hold a visible slot, and 8599 is not passive so it takes one
+        // (Aura::CanBeSentToClient, SpellAuras.cpp:1088). Nobody has put eyes
+        // on that; see the report.
+        void Silence(Aura* aura)
+        {
+            if (!aura)
+                return;
+
+            for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
+                if (AuraEffect* effect = aura->GetEffect(i))
+                    effect->ChangeAmount(0);
+        }
 
         class Champions final : public IMechanic
         {
@@ -313,8 +362,9 @@ namespace Gauntlet
 
             // AddAura tolerates a missing spell and a dead target by returning
             // null (Unit.cpp:15150-15161); the Champion is neither, and there
-            // is nothing useful to do if the aura does not take.
-            creature->AddAura(SPELL_ENRAGE, creature);
+            // is nothing useful to do if the aura does not take. Silence()
+            // takes the aura's two hidden buffs off it and leaves the glow.
+            Silence(creature->AddAura(SPELL_ENRAGE, creature));
 
             if (ctx.addon)
                 ctx.addon->SendEvent(ctx.player, CHAMPIONS_KEY, 0, "Champion");
