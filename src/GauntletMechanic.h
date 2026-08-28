@@ -71,6 +71,13 @@ namespace Gauntlet
         virtual void  OnAttach(Ctx&) {}                       // pick or login
         virtual void  OnDetach(Ctx&) {}                       // swap, logout, death
         virtual void  OnTick(Ctx&, uint32 /*diffMs*/) {}      // 500 ms, Timed mechanics
+        // The two halves of every timed event. Scheduler::Arm queues a Warn at
+        // `inMs - warnMs` and a Fire at `inMs`; the framework calls OnWarn for
+        // the first and OnEvent for the second, with the same eventId. A
+        // mechanic that telegraphs implements both. Design section 4.8: if a
+        // player cannot tell which affix acted, the addon needs a line -- and
+        // the warning is that line.
+        virtual void  OnWarn(Ctx&, uint32 /*eventId*/) {}     // scheduler telegraph
         virtual void  OnEvent(Ctx&, uint32 /*eventId*/) {}    // scheduler callback
         virtual void  OnKill(Ctx&, Creature*) {}
         virtual void  OnPetKill(Ctx&, Creature*) {}
