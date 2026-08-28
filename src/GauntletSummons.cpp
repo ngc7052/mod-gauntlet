@@ -119,19 +119,38 @@ namespace Gauntlet
         auto const existing = _byOwner.find(ownerGuid);
         if (existing != _byOwner.end())
         {
-            if (existing->second.size() >= _maxAlive)
-                return nullptr;
+            // Two caps, not one, and the split is on whether the thing can be
+            // fought. See IsScenery() in the header: a telegraph that a
+            // creature cap can switch off is a telegraph the player cannot
+            // rely on, and design section 4.8 does not allow that.
+            bool const scenery = IsScenery(entry);
 
-            if (countsAsStalker)
+            uint32 fighters = 0;
+            uint32 props    = 0;
+            uint32 stalkers = 0;
+            for (Record const& r : existing->second)
             {
-                uint32 stalkers = 0;
-                for (Record const& r : existing->second)
-                    if (r.stalker)
-                        ++stalkers;
+                if (IsScenery(r.entry))
+                    ++props;
+                else
+                    ++fighters;
 
-                if (stalkers >= SUMMON_CAP_STALKER)
+                if (r.stalker)
+                    ++stalkers;
+            }
+
+            if (scenery)
+            {
+                if (props >= SUMMON_CAP_SCENERY)
                     return nullptr;
             }
+            else if (fighters >= _maxAlive)
+            {
+                return nullptr;
+            }
+
+            if (countsAsStalker && stalkers >= SUMMON_CAP_STALKER)
+                return nullptr;
         }
 
         // Level to the owner. The creature's summoner GUID is set by

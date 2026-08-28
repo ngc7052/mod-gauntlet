@@ -82,10 +82,6 @@ namespace Gauntlet
         // same spot, so the circle simply never blinks.
         constexpr uint32 MARK_REFRESH_MS = MARK_VISIBLE_MS - 1000;
 
-        // World Trigger (Not Immune PC). Invisible model, NOT_SELECTABLE,
-        // CREATURE_FLAG_EXTRA_TRIGGER -- it cannot be seen, selected, attacked
-        // or pulled into the fight.
-        constexpr uint32 ENTRY_WORLD_TRIGGER = 21252;
 
         // How many corpses may be counting down at once. The summon wrapper
         // caps every affix at four creatures between them and Death Rattle

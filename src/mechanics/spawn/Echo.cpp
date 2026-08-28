@@ -164,6 +164,7 @@ namespace Gauntlet
             uint32     _owedXp    = 0;
             uint32     _pollMs    = 0;
             int32      _transient = 0;       // only read when ctx.state is null
+            bool       _paying    = false;   // inside Reward's own GiveXP; see there
         };
 
         // -------------------------------------------------------------------
@@ -440,10 +441,15 @@ namespace Gauntlet
                 return;
             }
 
-            // Straight to GiveXP rather than through a multiplier: the card
-            // pays a lump, not a rate, and routing it through OnXP would put it
-            // through this affix's own hooks again.
+            // Player::GiveXP fires OnPlayerGiveXP, which comes back into OnXP
+            // below -- including this instance's. Without the flag the reward
+            // would be folded into the average that sizes the *next* reward,
+            // and each Echo would pay more than the last for no reason a player
+            // could see. The flag is cleared before Say() so nothing after it
+            // is inside the window.
+            _paying = true;
             player->GiveXP(owed, nullptr);
+            _paying = false;
 
             Say(player, "The Echo falls silent, and what it took comes back: "
                         + std::to_string(owed) + " experience.");
@@ -456,7 +462,7 @@ namespace Gauntlet
             // experience is already halved by Gauntlet.Summons.XpRate and
             // letting it into the average would make each Echo cheaper than
             // the last.
-            if (amount == 0 || !victim)
+            if (amount == 0 || !victim || _paying)
                 return;
 
             Creature* creature = victim->ToCreature();

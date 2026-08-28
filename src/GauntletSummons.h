@@ -36,6 +36,36 @@ namespace Gauntlet
     constexpr uint32 ENTRY_FIRST = ENTRY_SHADE;
     constexpr uint32 ENTRY_LAST  = ENTRY_DOPPELGANGER;
 
+    // World Trigger (Not Immune PC), plan appendix A. Invisible model,
+    // NOT_SELECTABLE, CREATURE_FLAG_EXTRA_TRIGGER; the core's own scripts use
+    // it wherever something has to be cast from a point on the ground. Falling
+    // Sky's mark and Death Rattle's circle are both one of these, so the entry
+    // is named here rather than in each mechanic -- Scenery() below has to know
+    // it.
+    constexpr uint32 ENTRY_WORLD_TRIGGER = 21252;
+
+    // "Scenery": something this module put into the world that the player
+    // cannot fight. An invisible trigger drawing a circle, and Grudge's
+    // Restless Spirit, which is NON_ATTACKABLE, NOT_SELECTABLE and rooted.
+    //
+    // The distinction exists because of the cap below. Design section 4.2's
+    // "at most four affix-spawned creatures in total" is a rule about
+    // uninvited *enemies* -- what it is protecting is a player from being
+    // swarmed by four affixes at once. Counting a telegraph against it would
+    // mean that a run carrying Falling Sky and Death Rattle silently stops
+    // drawing circles as soon as two corpses are counting down, which is
+    // design section 4.8's rule broken by design section 4.2's, and the
+    // telegraph is the half that must never lose.
+    constexpr bool IsScenery(uint32 entry)
+    {
+        return entry == ENTRY_WORLD_TRIGGER || entry == ENTRY_RESTLESS;
+    }
+
+    // Scenery gets a cap of its own so that a mechanic arming in a loop is
+    // still bounded. Two circles from Death Rattle, two spirits from Grudge and
+    // one mark from Falling Sky is the worst an honest run can produce.
+    constexpr uint32 SUMMON_CAP_SCENERY = 6;   // TODO(design)
+
     // Design section 4.2: at most one uninvited creature from the stalker/
     // ambush group alive per player, and at most four affix-spawned creatures
     // in total. The total is also Gauntlet.Summons.MaxAlive in the config; the

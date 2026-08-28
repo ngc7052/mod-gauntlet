@@ -80,14 +80,6 @@ namespace Gauntlet
         // tolerance.
         constexpr uint32 MARK_VISIBLE_MS = 5000;
 
-        // World Trigger (Not Immune PC), named by plan appendix A. This
-        // realm's creature_template carries it with the invisible model 169,
-        // unit_flags 0x2000000 UNIT_FLAG_NOT_SELECTABLE and flags_extra 0x82 =
-        // CREATURE_FLAG_EXTRA_TRIGGER | CREATURE_FLAG_EXTRA_CIVILIAN
-        // (CreatureData.h:53 and :47), so it cannot be seen, selected,
-        // attacked, or provoked into the fight that would freeze its despawn
-        // timer.
-        constexpr uint32 ENTRY_WORLD_TRIGGER = 21252;
 
         // The trigger's own backstop, and the one invented number in this
         // file. The strike despawns it explicitly, so this only matters when
