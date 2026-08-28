@@ -41,10 +41,30 @@ GTEST_OBJ="$OBJDIR/gtest-all.o"
 GTEST_MAIN_OBJ="$OBJDIR/gtest_main.o"
 GTEST_CXXFLAGS=(-std=c++2a -isystem "$GTEST_ROOT/include" -isystem "$GTEST_ROOT")
 
+# True when $1 (an object) needs rebuilding: it is missing, its source is newer,
+# or any header the compiler recorded as a prerequisite is newer. Comparing only
+# against the .cpp is how a Gauntlet.h change once left every object considered
+# fresh and reported five passing tests that had been compiled against the
+# previous header.
+needs_rebuild() {
+  local obj="$1" src="$2" dep="${1%.o}.d"
+  [ -f "$obj" ] || return 0
+  [ "$src" -nt "$obj" ] && return 0
+  [ -f "$dep" ] || return 0
+  local prereq
+  # Strip the "target:" prefix and the line-continuation backslashes, then test
+  # each remaining path.
+  for prereq in $(sed -e 's/^[^:]*://' -e 's/\\$//' "$dep"); do
+    [ -e "$prereq" ] || continue
+    [ "$prereq" -nt "$obj" ] && return 0
+  done
+  return 1
+}
+
 compile() {
   local src="$1" obj="$2"
   shift 2
-  local cmd=("$CXX" "$@" -c "$src" -o "$obj")
+  local cmd=("$CXX" "$@" -MMD -MF "${obj%.o}.d" -c "$src" -o "$obj")
   echo "==> ${cmd[*]}"
   if ! "${cmd[@]}"; then
     echo "FAILED: ${cmd[*]}"
@@ -80,7 +100,7 @@ objs=("$GTEST_OBJ" "$GTEST_MAIN_OBJ")
 
 for src in "${module_srcs[@]}" "${test_srcs[@]}"; do
   obj="$OBJDIR/$(basename "${src%.cpp}").o"
-  if [ ! -f "$obj" ] || [ "$src" -nt "$obj" ]; then
+  if needs_rebuild "$obj" "$src"; then
     compile "$src" "$obj" "${CXXFLAGS[@]}" -isystem "$GTEST_ROOT/include"
   fi
   objs+=("$obj")
