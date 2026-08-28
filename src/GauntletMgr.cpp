@@ -12,6 +12,7 @@
 #include "World.h"
 #include "WorldSessionMgr.h"
 #include "GameTime.h"
+#include "WorldSession.h"
 
 namespace Gauntlet
 {
@@ -28,11 +29,21 @@ namespace Gauntlet
         _interval = sConfigMgr->GetOption<uint32>("Gauntlet.TierInterval", 5);
         _choices  = sConfigMgr->GetOption<uint32>("Gauntlet.ChoicesPerTier", 3);
         _announce = sConfigMgr->GetOption<bool>("Gauntlet.Announce", true);
+        _playersOnly = sConfigMgr->GetOption<bool>("Gauntlet.PlayersOnly", true);
 
         if (_interval == 0)
             _interval = 5;
         if (_choices == 0)
             _choices = 1;
+    }
+
+    bool Mgr::IsEligible(Player* player) const
+    {
+        if (!player || !player->GetSession())
+            return false;
+        if (_playersOnly && player->GetSession()->IsBot())
+            return false;
+        return true;
     }
 
     RunState* Mgr::Get(Player* player)
@@ -45,7 +56,7 @@ namespace Gauntlet
 
     void Mgr::Load(Player* player)
     {
-        if (!player)
+        if (!IsEligible(player))
             return;
 
         RunState st;
@@ -198,7 +209,7 @@ namespace Gauntlet
 
     float Mgr::Multiplier(Player* player, Effect effect) const
     {
-        if (!_enabled || !player)
+        if (!_enabled || !IsEligible(player))
             return 1.0f;
 
         auto it = _runs.find(player->GetGUID());

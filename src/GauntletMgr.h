@@ -39,6 +39,9 @@ namespace Gauntlet
         // Aggregated multiplier for one effect, honouring conditions.
         float Multiplier(Player* player, Effect effect) const;
 
+        // Bots are Player objects too; the challenge is for real players only.
+        bool IsEligible(Player* player) const;
+
         bool Enabled() const { return _enabled; }
         void LoadConfig();
 
@@ -55,6 +58,7 @@ namespace Gauntlet
         uint32 _interval = 5;
         uint32 _choices  = 3;
         bool   _announce = true;
+        bool   _playersOnly = true;
     };
 }
 

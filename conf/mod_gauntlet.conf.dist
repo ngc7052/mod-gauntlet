@@ -43,3 +43,12 @@ Gauntlet.ChoicesPerTier = 3
 #        Default:     1 - (enabled)
 
 Gauntlet.Announce = 1
+
+#
+#    Gauntlet.PlayersOnly
+#        Description: Exclude bots (mod-playerbots and similar) from the
+#                     challenge. Bots cannot choose affixes, so leaving this
+#                     off floods the server with their run-ending deaths.
+#        Default:     1 - (players only)
+
+Gauntlet.PlayersOnly = 1

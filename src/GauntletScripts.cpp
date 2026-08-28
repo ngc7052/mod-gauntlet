@@ -14,6 +14,9 @@
 using namespace Acore::ChatCommands;
 using namespace Gauntlet;
 
+static char const* GAUNTLET_RETIRED_MSG =
+    "Your Gauntlet run has ended. This character is retired.";
+
 class GauntletWorldScript : public WorldScript
 {
 public:
@@ -32,7 +35,7 @@ public:
 
     void OnPlayerLogin(Player* player) override
     {
-        if (!sGauntlet->Enabled())
+        if (!sGauntlet->Enabled() || !sGauntlet->IsEligible(player))
             return;
 
         sGauntlet->Load(player);
@@ -43,7 +46,7 @@ public:
         ChatHandler ch(player->GetSession());
         if (st->dead)
         {
-            ch.PSendSysMessage("|cffff2020[Gauntlet]|r This run ended. The character is retired.");
+            ch.PSendSysMessage("|cffff2020[Gauntlet]|r {}", GAUNTLET_RETIRED_MSG);
             return;
         }
 
@@ -58,13 +61,15 @@ public:
 
     void OnPlayerLogout(Player* player) override
     {
+        if (!sGauntlet->IsEligible(player))
+            return;
         sGauntlet->Save(player);
         sGauntlet->Forget(player->GetGUID());
     }
 
     void OnPlayerLevelChanged(Player* player, uint8 /*oldLevel*/) override
     {
-        if (!sGauntlet->Enabled())
+        if (!sGauntlet->Enabled() || !sGauntlet->IsEligible(player))
             return;
 
         RunState* st = sGauntlet->Get(player);
@@ -78,10 +83,36 @@ public:
 
     void OnPlayerJustDied(Player* player) override
     {
-        if (!sGauntlet->Enabled() || !sGauntlet->Hardcore())
+        if (!sGauntlet->Enabled() || !sGauntlet->Hardcore() || !sGauntlet->IsEligible(player))
             return;
 
         sGauntlet->EndRun(player, "slain");
+    }
+
+    // AzerothCore exposes proper veto hooks, so the run simply cannot be
+    // revived - no kicking, no re-killing, no disconnection.
+    bool OnPlayerCanResurrect(Player* player) override
+    {
+        if (!sGauntlet->Enabled() || !sGauntlet->Hardcore() || !sGauntlet->IsEligible(player))
+            return true;
+
+        RunState* st = sGauntlet->Get(player);
+        if (st && st->dead)
+        {
+            ChatHandler(player->GetSession()).PSendSysMessage(
+                "|cffff2020[Gauntlet]|r {}", GAUNTLET_RETIRED_MSG);
+            return false;
+        }
+        return true;
+    }
+
+    bool OnPlayerCanRepopAtGraveyard(Player* player) override
+    {
+        if (!sGauntlet->Enabled() || !sGauntlet->Hardcore() || !sGauntlet->IsEligible(player))
+            return true;
+
+        RunState* st = sGauntlet->Get(player);
+        return !(st && st->dead);
     }
 
     void OnPlayerGiveXP(Player* player, uint32& amount, Unit* /*victim*/, uint8 /*source*/) override
