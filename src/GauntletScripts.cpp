@@ -446,9 +446,14 @@ static void GauntletSummonChanged(ObjectGuid ownerGuid, uint16 mechanic, uint32 
 // plainly, so a translation unit nothing references is dropped and the
 // GAUNTLET_MECHANIC registrar inside it never runs -- leaving MakeMechanic to
 // answer nullptr for a mechanic whose source is right there, and the affix to
-// be offered and do nothing. Measured: plain archive registers 0 of 4 mechanics,
-// --whole-archive registers 4 of 4. Every macro defines one of these; every one
-// has to be named here. See the comment on GAUNTLET_MECHANIC.
+// be offered and do nothing. Measured with the module's own registrar and the
+// four Player-free scalars archived exactly this way: 0 of 4 registered without
+// the anchors, 4 of 4 with them. There are eight now, and the four added for
+// Phase 1 cannot be measured on this machine because they need Player.h -- but
+// an anchor name that does not match its GAUNTLET_MECHANIC invocation is an
+// undefined symbol at link, not another silent nullptr. Every macro defines one
+// of these; every one has to be named here. See the comment on
+// GAUNTLET_MECHANIC.
 // Declared in namespace Gauntlet because that is where each mechanic file
 // invokes the macro, and the macro defines the anchor wherever it is invoked.
 namespace Gauntlet

@@ -1199,24 +1199,34 @@ namespace Gauntlet
         if (st->dead)
             return;
 
-        // OnTick goes to *every* carried mechanic and not only the MF_Timed
-        // ones. MF_Timed means "spends the event budget", which Deep Wounds
-        // must not, and its decay, its batched write onto maximum health and
-        // its readout all hang off this tick without ever arming an event.
+        // The 500 ms boundary, and everything past this line runs on it rather
+        // than on the world tick. The accumulator is here rather than in each
+        // mechanic because this hook fires once per World::Update -- roughly
+        // every millisecond -- and the interface documents OnTick as a 500 ms
+        // hook; the accumulated figure is what is passed, so a mechanic
+        // integrating over diffMs still measures real time.
         //
-        // The accumulator is here rather than in each mechanic because this
-        // hook is the world tick -- once per World::Update, roughly every
-        // millisecond -- and the interface documents OnTick as a 500 ms hook.
-        // The accumulated figure is what is passed, so a mechanic integrating
-        // over diffMs measures real time.
+        // The scheduler is behind the same boundary on purpose. Scheduler::Tick
+        // accumulates to the same 500 ms itself, so feeding it whole boundaries
+        // is identical arithmetic -- but the Suppression below is a question
+        // that is only asked twice a second, and answering it a thousand times
+        // a second per player is work for nothing. GetAreaId() is the one part
+        // of it that is not a field read: it recomputes the area from the
+        // terrain whenever the player has moved since the last call
+        // (Object.cpp:3174-3180).
         live->tickMs += diffMs;
-        if (live->tickMs >= Scheduler::TICK_MS)
-        {
-            uint32 const elapsed = live->tickMs;
-            live->tickMs = 0;
-            ForEachMechanic(player, st,
-                            [elapsed](Ctx& ctx, AffixInstance& a) { a.impl->OnTick(ctx, elapsed); });
-        }
+        if (live->tickMs < Scheduler::TICK_MS)
+            return;
+
+        uint32 const elapsed = live->tickMs;
+        live->tickMs = 0;
+
+        // To *every* carried mechanic and not only the MF_Timed ones. MF_Timed
+        // means "spends the event budget", which Deep Wounds must not, and its
+        // decay, its batched write onto maximum health and its readout all hang
+        // off this tick without ever arming an event.
+        ForEachMechanic(player, st,
+                        [elapsed](Ctx& ctx, AffixInstance& a) { a.impl->OnTick(ctx, elapsed); });
 
         // Gauntlet.Events.Enable = 0 means no event is armed and none is
         // delivered. The scheduler has no opinion about it; this is the gate.
@@ -1243,7 +1253,7 @@ namespace Gauntlet
 
         // Tick returns a copy, so a mechanic that arms or cancels from inside
         // its own callback cannot move the list being walked.
-        for (ScheduledEvent const& ev : live->clock.Tick(diffMs, sup))
+        for (ScheduledEvent const& ev : live->clock.Tick(elapsed, sup))
         {
             // A Fire can be lethal -- Falling Sky's is -- and the death path
             // empties the queue underneath us. The batch was handed out before
