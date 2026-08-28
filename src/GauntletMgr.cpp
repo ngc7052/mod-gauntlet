@@ -1140,10 +1140,7 @@ namespace Gauntlet
             // affix that just made this blow hurt more is an affix that acted.
             // KILLBY needs a name and this is where one is.
             if (kind == AggregateKind::DamageTaken && factor > 1.0f)
-            {
-                st.lastActor   = a.mechanic;
-                st.lastActorMs = ACTOR_MEMORY_MS;
-            }
+                NoteActor(player, a.mechanic);
         }
 
         return product;
@@ -1270,8 +1267,7 @@ namespace Gauntlet
             {
                 // The affix did something on its own clock, which is the
                 // clearest possible reading of "the last mechanic to act".
-                st->lastActor   = ev.mechanic;
-                st->lastActorMs = ACTOR_MEMORY_MS;
+                NoteActor(player, ev.mechanic);
                 inst->impl->OnEvent(ctx, ev.id);
             }
             else
@@ -1343,14 +1339,7 @@ namespace Gauntlet
         // there is: the Shade that killed you is named by name rather than by
         // whatever multiplied the last blow.
         if (Creature* creature = attacker ? attacker->ToCreature() : nullptr)
-        {
-            uint16 const mechanic = sGauntletSummons->MechanicOf(creature);
-            if (mechanic != MECHANIC_NONE)
-            {
-                st->lastActor   = mechanic;
-                st->lastActorMs = ACTOR_MEMORY_MS;
-            }
-        }
+            NoteActor(player, sGauntletSummons->MechanicOf(creature));
 
         ForEachMechanic(player, st, [attacker, amount](Ctx& ctx, AffixInstance& a)
         {

@@ -74,9 +74,11 @@ namespace Gauntlet
         void OnGiveXP(Player* player, uint32& amount, Unit* victim);
         void OnLootMoney(Player* player, Loot* loot);
 
-        // Login and a zone change both re-open the grace window; a zone change
-        // also takes every summon out of the world, which CONTRACT-P1 section
-        // 2.4 requires and which nothing else covers for a move inside one map.
+        // Re-opens the grace window. Login sets it in Load, where the run is
+        // already in hand; this is the entry point for everything else. A zone
+        // change also takes every summon out of the world, which CONTRACT-P1
+        // section 2.4 requires and which nothing else covers for a move that
+        // stays inside one map.
         void OpenGrace(Player* player);
         void OnZoneChanged(Player* player);
 
