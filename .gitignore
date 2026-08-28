@@ -4,3 +4,6 @@ build/
 *.user
 .vscode/
 .idea/
+
+# local dev helper, paths are machine-specific
+sync-to-server.sh
