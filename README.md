@@ -11,10 +11,12 @@ it, rather than a multiplier bolted onto your character sheet. A shade that
 hunts you between fights. A strike that lands where you were standing. A
 paladin whose Consecration burns twice as hot for half as long.
 
-> **Status.** The module is mid-redesign. **33 of the 69 mechanics are live**
+> **Status.** The module is mid-redesign. **35 of the 69 mechanics are live**
 > and offerable; the rest are registry rows waiting on their implementation and
 > are never offered. Phases 1–3 are complete and reported in `docs/`; Phase 4
-> (the class curses) is in progress. See *What is implemented*, below.
+> (the class curses) is in progress and lands one class at a time, so the count
+> below moves. `docs/phase-4-progress.md` tracks it, and the `OFFERABLE` list
+> in `tests/RegistryTest.cpp` is what actually enforces it.
 
 ## How it works
 
@@ -47,7 +49,7 @@ lever:
 | **Attrition** | A cost with a counterplay button, not a flat tax: a wound only rest heals, health spent where mana should have been. | 2 / 2 |
 | **Rules** | A restriction on what you're allowed to do rather than a number: no auction house, no partying up. | 3 / 3 |
 | **Bargain** | A curse you choose on purpose, because of what it pays out. | 2 / 2 |
-| **Class** | A curse written for one class specifically, leaning on the thing that class actually struggles with. | 8 / 44 |
+| **Class** | A curse written for one class specifically, leaning on the thing that class actually struggles with. | 10 / 44 |
 
 Every mechanic has up to three **ranks**. If an affix you already carry comes
 up again in a later offer, you are never offered a duplicate — you are offered
@@ -86,7 +88,7 @@ without a reroll button.
 
 ## What is implemented
 
-Thirty-three mechanics are live today.
+Thirty-five mechanics are live as of the last commit to touch the registry.
 
 **Spawn** — The Shade, Echo, Carrion, Reinforcements, Ambush
 **Enemy** — Champions, Craven, Call to Arms, Death Rattle, Grudge, Nimble, Cunning, Keen-nosed
@@ -94,12 +96,15 @@ Thirty-three mechanics are live today.
 **Attrition** — Deep Wounds, Blood Magic
 **Rules** — Self-found, Lone Wolf, Iron Purse
 **Bargain** — Last Rites, Cursed Hoard
-**Class** — Red Mist, Berserker's Bargain, Deafening Roar *(warrior)*; Long Forbearance, Consecrated Ground *(paladin)*; Half-Tamed, Dead Weight, Wide Dead Zone *(hunter)*
+**Class** — Red Mist, Berserker's Bargain, Deafening Roar *(warrior)*; Long
+Forbearance, Consecrated Ground *(paladin)*; Half-Tamed, Dead Weight, Wide Dead
+Zone *(hunter)*; Cold Trail, Exposed Back *(rogue)*
 
-The remaining thirty-six rows are class curses for the other seven classes,
-plus two class bargains. They are written into the registry with their tier
-windows, class masks and boons, and are switched on one class at a time as
-Phase 4 lands them.
+The remaining thirty-four rows are class curses for the other seven classes,
+plus two class bargains. They are already written into the registry with their
+tier windows, class masks and boons — a row and its implementation are switched
+on in the same commit, so the table never promises a curse the module cannot
+deliver.
 
 ## Boons
 
