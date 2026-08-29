@@ -13,8 +13,8 @@ decided without reading twenty commits.
 | 2b | Paladin: C5, C6 | 32, 33 | **done** |
 | 2c | Hunter: C9, C10, C11 | 36, 37, 38 | **done** |
 | 2d | Rogue: C13, C15 | 40, 42 | **done** |
-| 2e | Priest: C17, C20 | 44, 47 | in progress |
-| 2f | Death Knight: C21, C22 | 48, 49 | |
+| 2e | Priest: C17, C20 | 44, 47 | **done** |
+| 2f | Death Knight: C21, C22 | 48, 49 | in progress |
 | 2g | Shaman: C25, C26 | 52, 53 | |
 | 2h | Mage: C29, C31 | 56, 58 | |
 | 2i | Warlock: C33 | 60 | |

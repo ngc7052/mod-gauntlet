@@ -368,7 +368,7 @@ namespace
 
         // Priest
         { 44, "c17_frail_soul", "Frail Soul", Family::Class, CM_PRIEST, 15, 70, 3,
-          MF_NotImplemented, "classcurse", Boon::BonusHealing, 17, 0,
+          MF_None, "classcurse", Boon::BonusHealing, 17, 0,
           "Weakened Soul lasts 30 seconds." },
 
         // TODO(design): tree 3 = Shadow. Reading: the card is Shadowform, which is a
@@ -385,7 +385,7 @@ namespace
 
         // The boon halves Fear Ward's cooldown.
         { 47, "c20_whispers_of_the_deep", "Whispers of the Deep", Family::Class, CM_PRIEST, 25, 70, 3,
-          MF_NotImplemented, "classcurse", Boon::BonusCooldown, 0, 0,
+          MF_None, "classcurse", Boon::BonusCooldown, 0, 0,
           "Below 20% health you lose your mind and flee for three seconds, once per fight." },
 
         // Death Knight
