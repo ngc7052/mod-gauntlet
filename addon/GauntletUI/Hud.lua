@@ -74,6 +74,12 @@ local READINGS = {
     last_rites     = { "Marked",         "flag", true  },
     last_rites_charge = { "Last Rites",  "n/m",  false },
     vindication    = { "Vindication",    "%",    true  },
+
+    -- Label-only. These never send a CTR or a STAT, so they never become a
+    -- row; they are here so the title can name what is hunting you when a
+    -- SUMMON arrives, instead of printing a wire key at the player.
+    shade          = { "The Shade",      "",     true  },
+    ambush         = { "Ambusher",       "",     true  },
 }
 
 local function Reading(key)
@@ -145,6 +151,16 @@ bar.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
 bar.bg:SetVertexColor(0, 0, 0, 0.5)
 bar.text = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 bar.text:SetPoint("CENTER", bar, "CENTER", 0, 0)
+
+-- The mechanic's own icon on the left of the bar. The label is already there,
+-- but an icon is read without reading -- and the bar is the one element a
+-- player looks at while something is about to land on them, which is exactly
+-- when there is no attention to spare for a word.
+bar.icon = bar:CreateTexture(nil, "OVERLAY")
+bar.icon:SetWidth(12); bar.icon:SetHeight(12)
+bar.icon:SetPoint("LEFT", bar, "LEFT", 1, 0)
+bar.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
 bar:Hide()
 
 local rows = {}
@@ -221,8 +237,9 @@ local function Layout()
     table.sort(live, function(a, b) return a.r.order < b.r.order end)
 
     local top = -22
-    local soon = Soonest()
+    local soon, soonKey = Soonest()
     if soon then
+        bar.icon:SetTexture(IconFor(soonKey))
         bar:Show()
         top = top - 16
     else
@@ -249,12 +266,25 @@ local function Layout()
         return
     end
 
-    -- The border turns red while something uninvited is alive and hunting,
-    -- which is the SUMMON message's whole content: a light, not a row.
+    -- The border turns red while something uninvited is alive and hunting.
+    --
+    -- The border alone was not enough. A player asked what the red meant, and
+    -- there was no way to find out: the SUMMON message carries which mechanic
+    -- it is and the HUD threw that away. The title now names them, so "why is
+    -- this red" and "what is behind me" are the same glance.
     if anyStalker then
         hud:SetBackdropBorderColor(0.85, 0.15, 0.15, 1)
+
+        local names = {}
+        for key in pairs(stalkers) do
+            local label = Reading(key)
+            table.insert(names, label)
+        end
+        table.sort(names)
+        hud.title:SetText("|cffff2020Gauntlet|r  |cffff8080" .. table.concat(names, ", ") .. "|r")
     else
         hud:SetBackdropBorderColor(unpack(BORDER))
+        hud.title:SetText("|cffff2020Gauntlet|r")
     end
 
     hud:SetHeight(26 + (soon and 16 or 0) + math.max(n, 1) * ROW_H)

@@ -13,6 +13,7 @@
 
 local offers, affixes = {}, {}
 local carriedBySlot = {}   -- slot -> resolved affix record; for OFFER's swap-name lookup
+local carriedByMech = {}   -- mechanic id -> the same record; for "II to III" on a rank-up
 local mode, pendingOffer = nil, false
 local run = { seed = "?", tier = 0, state = "alive" }
 
@@ -109,6 +110,38 @@ local KIND_COLOR = {
     swap    = { 1.00, 0.55, 0.10, "SWAP"    },
     bargain = { 0.90, 0.40, 0.75, "BARGAIN" },
 }
+
+-- Gauntlet::Boon (src/Gauntlet.h), in enum order. The panel shows the upside
+-- on the row itself rather than only inside a tooltip: an affix is a trade, and
+-- a list that shows only the cost is a list of bad news.
+--
+-- The five past BonusRegen have no magnitude of their own -- the mechanic's own
+-- sentence says what they do -- so they are named without a number.
+local BOON_SHORT = {
+    [0] = nil,          -- None
+    [1] = "%d%% dmg",
+    [2] = "%d%% heal",
+    [3] = "%d%% speed",
+    [4] = "%d%% xp",
+    [5] = "%d%% gold",
+    [6] = "%d%% hp",
+    [7] = "%d%% regen",
+    [8] = "avoidance",
+    [9] = "cooldown",
+    [10] = "ability",
+    [11] = "pet dmg",
+    [12] = "second life",
+}
+
+local function BoonText(boon, mag)
+    local f = BOON_SHORT[boon or 0]
+    if not f then return nil end
+    if f:find("%%d") then
+        if not mag or mag == 0 then return nil end
+        return f:format(mag)
+    end
+    return f
+end
 
 local RANK_PIP = { [1] = "I", [2] = "II", [3] = "III" }
 local function RankText(rank) return RANK_PIP[rank] or "" end
@@ -245,6 +278,15 @@ local function RefreshMain()
     main.head:SetText(("Tier |cffffd100%d|r   %s   |cff808080seed %s|r"):format(
         run.tier, live and "|cff40e040alive|r" or "|cffff4040retired|r", run.seed))
 
+    -- Grouped by family, then by name. The arrival order is the tier each was
+    -- taken at, which meant a run's list shuffled its own families together and
+    -- gave no sense of what the set actually was. With sixteen rows possible
+    -- that matters much more than it did with nine.
+    table.sort(affixes, function(x, y)
+        if (x.family or 99) ~= (y.family or 99) then return (x.family or 99) < (y.family or 99) end
+        return (x.name or "") < (y.name or "")
+    end)
+
     local n = 0
     for i = 1, 16 do
         local a = affixes[i]
@@ -254,7 +296,11 @@ local function RefreshMain()
             rows[i].icon:SetTexture(RowIcon(a))
             rows[i].name:SetText(a.name)
             rows[i].name:SetTextColor(s[1], s[2], s[3])
-            rows[i].tag:SetText(s[4])
+            -- Family on the right, and the boon in front of it when there is
+            -- one, so the row reads "what it costs you | what it pays".
+            local boon = BoonText(a.boon, a.boonMag)
+            rows[i].tag:SetText(boon and ("|cff60c060+" .. boon .. "|r  " .. s[4]) or s[4])
+
             if a.rank then
                 rows[i].rank:SetText(RankText(a.rank))
                 rows[i].rank:Show()
@@ -373,14 +419,32 @@ local function ShowChooser()
             local s = RowColor(o)
             cards[i].sev = s
             cards[i].icon:SetTexture(RowIcon(o))
-            cards[i].name:SetText(o.name)
+            cards[i].name:SetText(o.rank and o.rank > 1
+                                  and (o.name .. "  |cff808080" .. (RANK_PIP[o.rank] or "") .. "|r")
+                                  or o.name)
             cards[i].name:SetTextColor(s[1], s[2], s[3])
             local descText = Body(o.desc)
             if o.kind == "swap" and o.swapName then
                 descText = descText .. "  |cffff8040(swaps out " .. o.swapName .. ")|r"
             end
+
+            -- What you already carry of this one, so a RANK UP says what it is
+            -- raising rather than only that it raises something. The
+            -- description above is already written at the offered rank, so
+            -- between them the card answers "from what, to what".
+            local held = carriedByMech[o.id]
+            if o.kind == "rankup" and held and held.rank and o.rank then
+                descText = descText .. "  |cff66b0ff(" .. (RANK_PIP[held.rank] or held.rank)
+                         .. " to " .. (RANK_PIP[o.rank] or o.rank) .. ")|r"
+            end
+
             cards[i].desc:SetText(descText)
-            cards[i].descH = cards[i].desc:GetStringHeight() or 0
+            -- tonumber and not `or 0`: GetStringHeight is documented to return
+            -- a number, but a FontString that has not been laid out yet can
+            -- answer with something that is not one, and `or 0` only catches
+            -- nil. The arithmetic below is what breaks, several lines away
+            -- from the cause.
+            cards[i].descH = tonumber(cards[i].desc:GetStringHeight()) or 0
             if o.kind then
                 local k = KIND_COLOR[o.kind] or { 0.7, 0.7, 0.7, o.kind:upper() }
                 cards[i].badge:SetText(k[4])
@@ -411,7 +475,7 @@ local function ShowChooser()
     for i = 1, 3 do
         local c = cards[i]
         if c:IsShown() then
-            local h = math.max(48, NAME_H + (c.descH or 0) + 10)
+            local h = math.max(48, NAME_H + (tonumber(c.descH) or 0) + 10)
             c:SetHeight(h)
             c:ClearAllPoints()
             c:SetPoint("TOPLEFT", chooser, "TOPLEFT", 14, -top)
@@ -510,16 +574,17 @@ GauntletProtocol.On("RUN", function(seed, tier, state, class)
     if main:IsShown() then RefreshMain() end
 end)
 
-local pendingCarried, pendingCarriedBySlot = {}, {}
+local pendingCarried, pendingCarriedBySlot, pendingCarriedByMech = {}, {}, {}
 GauntletProtocol.On("AFFIX", function(slot, id, rank, cond, boon, boonMag)
     local info = MechInfo(id)
     local rec = {
         name = info.name, desc = info.desc, icon = info.icon, family = info.family,
         rank = tonumber(rank), cond = tonumber(cond), boon = tonumber(boon),
-        boonMag = tonumber(boonMag), slot = tonumber(slot),
+        boonMag = tonumber(boonMag), slot = tonumber(slot), id = tonumber(id),
     }
     tinsert(pendingCarried, rec)
     pendingCarriedBySlot[rec.slot] = rec
+    pendingCarriedByMech[rec.id]   = rec
 end)
 
 -- The same for a carried affix, keyed by slot. Reinforcements III really draws
@@ -541,8 +606,8 @@ end)
 GauntletProtocol.On("AFFIX_END", function()
     -- AFFIX_END marks a complete, authoritative snapshot; replace rather than
     -- merge, since the server may resend this after login, a pick or a swap.
-    affixes, carriedBySlot = pendingCarried, pendingCarriedBySlot
-    pendingCarried, pendingCarriedBySlot = {}, {}
+    affixes, carriedBySlot, carriedByMech = pendingCarried, pendingCarriedBySlot, pendingCarriedByMech
+    pendingCarried, pendingCarriedBySlot, pendingCarriedByMech = {}, {}, {}
     -- Unconditional: RefreshMain only writes text and textures, so running it
     -- while the window is hidden costs nothing, and gating it on IsShown() was
     -- how a freshly picked affix failed to appear until the panel was reopened.
