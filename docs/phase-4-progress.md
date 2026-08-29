@@ -22,8 +22,8 @@ decided without reading twenty commits.
 | 2k | Common: C41 Faint | 68 | **done** |
 | 3 | Class bargains: Ankh Pact, Stone of the Damned | 70, 71 | **done** |
 | 4 | The tier windows, and the exclusive key behind them | — | **done** |
-| 5 | Class curses recorded as conducts | — | in progress |
-| 6 | `docs/phase-4-report.md` | — | |
+| 5 | Class curses recorded as conducts | — | **done** (already built) |
+| 6 | `docs/phase-4-report.md` | — | **done** |
 
 Wave A is twenty-one curses (the design's build-priority A). Wave B is not this
 phase.
@@ -44,6 +44,15 @@ phase.
   is the fault this redesign exists to remove.
 - **Where a card states a flat number the boon table would ladder, add a
   `BoonTable` override.** Berserker's Bargain has one.
+
+## Status: wave A complete and deployed
+
+All six steps are done. `docs/phase-4-report.md` has the full write-up; the
+short version is that the phase's biggest finding was not a class curse at all
+but a Phase 0 exclusive key that limited a run to one class curse ever, which is
+why extending thirty-three tier windows measured as no improvement whatsoever.
+
+Wave B — the remaining twenty-three curses — is not this phase.
 
 ## Decisions taken while working
 

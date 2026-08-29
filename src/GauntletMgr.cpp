@@ -1022,11 +1022,12 @@ namespace Gauntlet
         // affixes is everything it carried. Both are read by `.gauntlet top`
         // and by the addon's TOP line.
         //
-        // Phase 0 cannot produce a conduct. The Class family is entirely
-        // MF_NotImplemented, so the generator never offers one and no carried
-        // affix can be Family::Class -- this loop is written for Phase 4 and
-        // will hold an empty string until then. It is here now so the column
-        // is never left behind when the family lands.
+        // Live since Phase 4. Phase 0 wrote this loop against a Class family
+        // that was entirely MF_NotImplemented -- so it held an empty string for
+        // four phases, and was written anyway so the column would not be left
+        // behind when the family landed. It was not: twenty-three class rows
+        // are offerable now and a run that carries one records it here without
+        // anything else changing.
         std::string conducts;
         std::string affixes;
         for (AffixInstance const& a : st->affixes)
