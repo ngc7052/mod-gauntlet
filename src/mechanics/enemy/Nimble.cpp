@@ -39,8 +39,23 @@ namespace Gauntlet
 {
     namespace
     {
-        // The card's ladder: 20 -> 30 -> 40% faster.
-        constexpr uint32 SPEED_PCT[] = { 20, 30, 40 };
+        // The card's ladder: 20 -> 30 -> 40% faster, and it ends there.
+        //
+        // Nimble keeps maxRank = 3 while the rest of the table moved to four,
+        // and the reason is two lines above this one: the factor goes through
+        // AggregateKind::EnemySpeed, whose ceiling is Gauntlet.Caps.EnemySpeed
+        // at 1.40. Rank III is already exactly at it, so a rank IV of this
+        // mechanic would be clamped to the same number and the offer would
+        // promise an escalation that does not exist -- the fault this whole
+        // redesign was written to remove.
+        //
+        // Raising the cap is not the fix either: 140% is design section 4.3's
+        // number and section 2.8's eighth principle, never remove the
+        // universal escape, is what it protects. A fourth rank here needs a
+        // second axis, not a bigger multiplier, and there is not one on the
+        // card. The fourth entry below exists only to satisfy the assert and
+        // is unreachable: Eligible refuses a rank-up past def.maxRank.
+        constexpr uint32 SPEED_PCT[] = { 20, 30, 40, 40 };
         static_assert(std::size(SPEED_PCT) >= MAX_RANK, "SPEED_PCT is short a rank");
 
         // How many creatures are hurried at once. A pull bigger than this is

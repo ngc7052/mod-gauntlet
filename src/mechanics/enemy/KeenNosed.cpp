@@ -46,8 +46,11 @@ namespace Gauntlet
     {
         constexpr uint16 MECHANIC_KEEN_NOSED = 13;
 
-        // The card's ladder: +5 -> +8 -> +12 yd.
-        constexpr float BONUS_YARDS[] = { 5.0f, 8.0f, 12.0f };
+        // The card's ladder: +5 -> +8 -> +12 yd, and +18 at rank IV. Past
+        // that the affix stops being about pulling carefully and starts
+        // being about whether a zone can be crossed at all, which is a
+        // different affix.
+        constexpr float BONUS_YARDS[] = { 5.0f, 8.0f, 12.0f, 18.0f };
         static_assert(std::size(BONUS_YARDS) >= MAX_RANK, "BONUS_YARDS is short a rank");
 
         // How wide a net the grid search casts. It has to reach past the

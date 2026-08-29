@@ -52,15 +52,19 @@ namespace Gauntlet
         // State::MaxKeyLen.
         constexpr char const* STATE_COUNT = "champions.count";
 
-        // Design section 4.6's severity ladder, rank I to III.
-        constexpr uint32 FIGHTS_PER_CHAMPION[] = { 10, 8, 6 };
+        // Design section 4.6's severity ladder, rank I to III. Rank IV is
+        // past it: every fourth fight, at four times the health. It stays a
+        // promoted real mob rather than a summon, so the reward scales with
+        // it -- which is what keeps the top rank of a reward-shaped affix
+        // worth taking rather than only worth surviving.
+        constexpr uint32 FIGHTS_PER_CHAMPION[] = { 10, 8, 6, 4 };
         static_assert(std::size(FIGHTS_PER_CHAMPION) >= MAX_RANK, "FIGHTS_PER_CHAMPION is short a rank");
-        constexpr float HEALTH_MULT[]         = { 2.0f, 2.5f, 3.0f };
+        constexpr float HEALTH_MULT[]         = { 2.0f, 2.5f, 3.0f, 4.0f };
         static_assert(std::size(HEALTH_MULT) >= MAX_RANK, "HEALTH_MULT is short a rank");
 
         // "twice the health" for each rung of the ladder above, for Describe.
         constexpr char const* HEALTH_WORDS[] = { "twice the", "two and a half times the",
-                                                         "three times the" };
+                                                 "three times the", "four times the" };
         static_assert(std::size(HEALTH_WORDS) >= MAX_RANK, "HEALTH_WORDS is short a rank");
 
         // The card names one number for each of these and does not vary them

@@ -56,8 +56,12 @@ namespace Gauntlet
     {
         constexpr uint16 MECHANIC_DEATH_RATTLE = 9;
 
-        // The card's damage ladder: 8/12/18% of maximum health.
-        constexpr uint32 SEVERITY_PCT[] = { 8, 12, 18 };
+        // The card's damage ladder: 8/12/18% of maximum health, and 25% at
+        // rank IV. The counterplay does not change with rank -- two seconds
+        // and five yards -- so the whole of the ladder is what it costs to
+        // not take them, which is what makes the last rank a real threat
+        // rather than a bigger number.
+        constexpr uint32 SEVERITY_PCT[] = { 8, 12, 18, 25 };
         static_assert(std::size(SEVERITY_PCT) >= MAX_RANK, "SEVERITY_PCT is short a rank");
 
         // "Two seconds after a kill".

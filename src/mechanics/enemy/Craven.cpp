@@ -47,9 +47,12 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_CRAVEN = 7;
 
         // The card's ladder: flee at 20 -> 25 -> 35%, fetches 1 -> 1 -> 2.
-        constexpr uint32 FLEE_PCT[]  = { 20, 25, 35 };
+        // Rank IV is past the card at 50% and 3: every enemy runs at half
+        // health, which turns the affix from a nuisance into a rule about
+        // how you open a fight -- burst it down or expect the camp.
+        constexpr uint32 FLEE_PCT[]  = { 20, 25, 35, 50 };
         static_assert(std::size(FLEE_PCT) >= MAX_RANK, "FLEE_PCT is short a rank");
-        constexpr uint32 FETCHES[]   = { 1, 1, 2 };
+        constexpr uint32 FETCHES[]   = { 1, 1, 2, 3 };
         static_assert(std::size(FETCHES) >= MAX_RANK, "FETCHES is short a rank");
 
         // The card's fixed numbers: five seconds of running, and fifteen yards

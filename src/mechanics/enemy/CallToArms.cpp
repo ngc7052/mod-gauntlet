@@ -39,10 +39,13 @@ namespace Gauntlet
     {
         constexpr uint16 MECHANIC_CALL_TO_ARMS = 8;
 
-        // The card's ladder: R = 20 -> 30 -> 40 yd, 1 -> 1 -> 2 kin.
-        constexpr float RADIUS_YARDS[] = { 20.0f, 30.0f, 40.0f };
+        // The card's ladder: R = 20 -> 30 -> 40 yd, 1 -> 1 -> 2 kin. Rank IV
+        // is past the card at 50 yd and 3 kin: the radius is already wider
+        // than a pull, so what the last rank really adds is that a kill in a
+        // camp brings most of the camp.
+        constexpr float RADIUS_YARDS[] = { 20.0f, 30.0f, 40.0f, 50.0f };
         static_assert(std::size(RADIUS_YARDS) >= MAX_RANK, "RADIUS_YARDS is short a rank");
-        constexpr uint32 KIN_COUNT[]    = { 1, 1, 2 };
+        constexpr uint32 KIN_COUNT[]    = { 1, 1, 2, 3 };
         static_assert(std::size(KIN_COUNT) >= MAX_RANK, "KIN_COUNT is short a rank");
 
         uint8 RankIndex(AffixInstance const* self)

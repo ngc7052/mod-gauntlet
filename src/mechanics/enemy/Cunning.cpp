@@ -49,9 +49,14 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_CUNNING = 12;
 
         // The card's ladder: cooldown 15 -> 12 -> 8 s, lock 2 -> 3 -> 4 s.
-        constexpr uint32 KICK_CD_MS[] = { 15000, 12000, 8000 };
+        // Rank IV is 6 s and 4 s, and the lock deliberately does not move
+        // with it: four locked seconds out of every six is already two
+        // thirds of a caster's uptime denied while something is in melee
+        // range, and a fifth would leave a window too short to land a cast
+        // in at all. A role tax with no window is not a tax, it is a ban.
+        constexpr uint32 KICK_CD_MS[] = { 15000, 12000, 8000, 6000 };
         static_assert(std::size(KICK_CD_MS) >= MAX_RANK, "KICK_CD_MS is short a rank");
-        constexpr uint32 LOCK_MS[]    = { 2000, 3000, 4000 };
+        constexpr uint32 LOCK_MS[]    = { 2000, 3000, 4000, 4000 };
         static_assert(std::size(LOCK_MS) >= MAX_RANK, "LOCK_MS is short a rank");
 
         // The card's two fixed numbers: five yards of reach, and the half

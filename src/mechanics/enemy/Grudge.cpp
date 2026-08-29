@@ -43,8 +43,10 @@ namespace Gauntlet
     {
         constexpr uint16 MECHANIC_GRUDGE = 10;
 
-        // The card's ladder: 2 -> 3 -> 5% of maximum health per second.
-        constexpr uint32 DRAIN_PCT[] = { 2, 3, 5 };
+        // The card's ladder: 2 -> 3 -> 5% of maximum health per second, and
+        // 7% at rank IV. Walking away still stops it at every rank, so the
+        // ladder prices standing on a corpse rather than removing the out.
+        constexpr uint32 DRAIN_PCT[] = { 2, 3, 5, 7 };
         static_assert(std::size(DRAIN_PCT) >= MAX_RANK, "DRAIN_PCT is short a rank");
 
         // The card's other numbers, which do not ladder: 25 s, 4 yd, and half
