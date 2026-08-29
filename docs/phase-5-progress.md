@@ -1,5 +1,7 @@
 # Phase 5 — running plan and progress
 
+**Status: complete.** See `docs/phase-5-report.md`.
+
 Live working document, same shape as `docs/phase-4-progress.md`: updated as each
 step lands so an interrupted session resumes from it, and so the state is
 readable without going through the commits.
@@ -27,7 +29,7 @@ nothing in this module has been playtested; and the three-way choice
 | 4 | `docs/checklists.md` | **done** |
 | 5 | `.gauntlet top` conducts, and the addon's leaderboard | **done** |
 | 6 | README for the family model, and the determinism note | **done** |
-| 7 | `docs/phase-5-report.md` | |
+| 7 | `docs/phase-5-report.md` | **done** |
 
 ## Standing rules for this run
 
