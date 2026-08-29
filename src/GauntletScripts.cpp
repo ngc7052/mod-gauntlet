@@ -725,6 +725,8 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_WhispersOfTheDeep();  // 47  C20 priest
     void AddSC_gauntlet_mechanic_RuneStarved();        // 48  C21 death knight
     void AddSC_gauntlet_mechanic_GraveCall();          // 49  C22 death knight
+    void AddSC_gauntlet_mechanic_OneTotem();           // 52  C25 shaman
+    void AddSC_gauntlet_mechanic_TotemicAnchor();      // 53  C26 shaman
     void AddSC_gauntlet_mechanic_SelfFound();          // 23
     void AddSC_gauntlet_mechanic_LoneWolf();           // 24
     void AddSC_gauntlet_mechanic_IronPurse();          // 25
@@ -771,6 +773,8 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_WhispersOfTheDeep();
     AddSC_gauntlet_mechanic_RuneStarved();
     AddSC_gauntlet_mechanic_GraveCall();
+    AddSC_gauntlet_mechanic_OneTotem();
+    AddSC_gauntlet_mechanic_TotemicAnchor();
     AddSC_gauntlet_mechanic_IronPurse();
     AddSC_gauntlet_mechanic_SelfFound();
     AddSC_gauntlet_mechanic_LoneWolf();

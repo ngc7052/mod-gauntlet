@@ -414,12 +414,12 @@ namespace
         // Shaman
         // The boon is bespoke: the one totem still standing lasts twice as long.
         { 52, "c25_one_totem", "One Totem", Family::Class, CM_SHAMAN, 15, 70, 3,
-          MF_NotImplemented, "classcurse", Boon::BonusAbility, 0, 0,
+          MF_None, "classcurse", Boon::BonusAbility, 0, 0,
           "Only one totem may stand at a time." },
 
         // The boon is bespoke: your totems' effects are 30% stronger.
         { 53, "c26_totemic_anchor", "Totemic Anchor", Family::Class, CM_SHAMAN, 20, 70, 3,
-          MF_NotImplemented, "classcurse", Boon::BonusAbility, 0, 0,
+          MF_None, "classcurse", Boon::BonusAbility, 0, 0,
           "You take 30% more damage when more than fifteen yards from your totems." },
 
         // TODO(design): tree 1 = Elemental. Reading: the card taxes casting the same

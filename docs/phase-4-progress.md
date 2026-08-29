@@ -15,8 +15,8 @@ decided without reading twenty commits.
 | 2d | Rogue: C13, C15 | 40, 42 | **done** |
 | 2e | Priest: C17, C20 | 44, 47 | **done** |
 | 2f | Death Knight: C21, C22 | 48, 49 | **done** |
-| 2g | Shaman: C25, C26 | 52, 53 | in progress |
-| 2h | Mage: C29, C31 | 56, 58 | |
+| 2g | Shaman: C25, C26 | 52, 53 | **done** |
+| 2h | Mage: C29, C31 | 56, 58 | in progress |
 | 2i | Warlock: C33 | 60 | |
 | 2j | Druid: C37 | 64 | |
 | 2k | Common: C41 Faint | 68 | |
