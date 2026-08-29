@@ -14,8 +14,8 @@ decided without reading twenty commits.
 | 2c | Hunter: C9, C10, C11 | 36, 37, 38 | **done** |
 | 2d | Rogue: C13, C15 | 40, 42 | **done** |
 | 2e | Priest: C17, C20 | 44, 47 | **done** |
-| 2f | Death Knight: C21, C22 | 48, 49 | in progress |
-| 2g | Shaman: C25, C26 | 52, 53 | |
+| 2f | Death Knight: C21, C22 | 48, 49 | **done** |
+| 2g | Shaman: C25, C26 | 52, 53 | in progress |
 | 2h | Mage: C29, C31 | 56, 58 | |
 | 2i | Warlock: C33 | 60 | |
 | 2j | Druid: C37 | 64 | |
@@ -74,6 +74,16 @@ than from memory.
    boon does what a dodge does -- the blow deals nothing -- and the wording says
    "avoid" rather than "dodge", because the combat log will read as a zero
    rather than as a dodge. Exposed Back is the first to use it.
-6. **An extended aura's tooltip still lies.** `SetDuration`/`SetMaxDuration`
+6. **One new creature template, entry 900006 'Risen'.** Grave Call needs
+   something to stand up, and display 570 is Slavering Ghoul's, in use by
+   creature 1791 in the world today -- so it is in `CreatureDisplayInfo.dbc` on
+   any client that can see Duskwood. No DBC edit, no client patch. It is in the
+   base file and in a dated update, and **`ac-db-import` must be rebuilt before
+   it is applied**, because that container runs the SQL baked into its image.
+7. **Rune-starved's boon is not delivered and its blurb does not promise it.**
+   The card spends it on runic power decaying more slowly, and that decay is
+   inside the core's own rune tick with no hook on it. Saying nothing is better
+   than promising a number nothing pays.
+8. **An extended aura's tooltip still lies.** `SetDuration`/`SetMaxDuration`
    move the client's timer but not the DBC, so every curse that stretches an
    aura says the real number in its own `Describe()`.

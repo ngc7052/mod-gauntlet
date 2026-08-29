@@ -390,12 +390,12 @@ namespace
 
         // Death Knight
         { 48, "c21_rune_starved", "Rune-starved", Family::Class, CM_DEATH_KNIGHT, 60, 80, 3,
-          MF_NotImplemented, "classcurse", Boon::BonusRegen, 0, 0,
+          MF_None, "classcurse", Boon::BonusRegen, 0, 0,
           "While all six runes are on cooldown you take 30% more damage." },
 
         // The boon halves Raise Dead's cooldown.
         { 49, "c22_grave_call", "Grave Call", Family::Class, CM_DEATH_KNIGHT, 60, 80, 3,
-          MF_NotImplemented, "classcurse", Boon::BonusCooldown, 46584, 0,
+          MF_None, "classcurse", Boon::BonusCooldown, 46584, 0,
           "The dead you do not claim rise against you." },
 
         // The boon is bespoke: every presence is 25% stronger. requiresSpell is

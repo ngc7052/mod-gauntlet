@@ -723,6 +723,8 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_ExposedBack();        // 42  C15 rogue
     void AddSC_gauntlet_mechanic_FrailSoul();          // 44  C17 priest
     void AddSC_gauntlet_mechanic_WhispersOfTheDeep();  // 47  C20 priest
+    void AddSC_gauntlet_mechanic_RuneStarved();        // 48  C21 death knight
+    void AddSC_gauntlet_mechanic_GraveCall();          // 49  C22 death knight
     void AddSC_gauntlet_mechanic_SelfFound();          // 23
     void AddSC_gauntlet_mechanic_LoneWolf();           // 24
     void AddSC_gauntlet_mechanic_IronPurse();          // 25
@@ -767,6 +769,8 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_ExposedBack();
     AddSC_gauntlet_mechanic_FrailSoul();
     AddSC_gauntlet_mechanic_WhispersOfTheDeep();
+    AddSC_gauntlet_mechanic_RuneStarved();
+    AddSC_gauntlet_mechanic_GraveCall();
     AddSC_gauntlet_mechanic_IronPurse();
     AddSC_gauntlet_mechanic_SelfFound();
     AddSC_gauntlet_mechanic_LoneWolf();

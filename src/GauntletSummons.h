@@ -32,9 +32,10 @@ namespace Gauntlet
     constexpr uint32 ENTRY_AMBUSHER     = 900003;   // S5 Ambush
     constexpr uint32 ENTRY_RESTLESS     = 900004;   // E5 Grudge, visual only
     constexpr uint32 ENTRY_DOPPELGANGER = 900005;   // S2 Echo
+    constexpr uint32 ENTRY_RISEN        = 900006;   // C22 Grave Call
 
     constexpr uint32 ENTRY_FIRST = ENTRY_SHADE;
-    constexpr uint32 ENTRY_LAST  = ENTRY_DOPPELGANGER;
+    constexpr uint32 ENTRY_LAST  = ENTRY_RISEN;
 
     // World Trigger (Not Immune PC), plan appendix A. Invisible model,
     // NOT_SELECTABLE, CREATURE_FLAG_EXTRA_TRIGGER; the core's own scripts use

@@ -57,7 +57,7 @@
 -- Every display id below exists in CreatureDisplayInfo.dbc and is already used
 -- by a creature spawned in the live world, so no client patch is needed.
 
-DELETE FROM `creature_template` WHERE `entry` BETWEEN 900001 AND 900005;
+DELETE FROM `creature_template` WHERE `entry` BETWEEN 900001 AND 900006;
 INSERT INTO `creature_template`
     (`entry`, `name`, `subname`, `minlevel`, `maxlevel`, `exp`, `faction`, `npcflag`,
      `speed_walk`, `speed_run`, `detection_range`, `rank`, `dmgschool`, `DamageModifier`,
@@ -132,6 +132,19 @@ VALUES
      0, 2048, 0, 0, 7, 0, 0,
      0, 0, '', 0, 1, 2.0,
      1, 1, 1, 0, 0,
+     1, 102760704, 'gauntlet_summon'),
+
+    -- C22 Grave Call's Risen. A corpse the death knight did not claim, standing
+    -- up on its own. Ordinary in every way -- the card's point is the corpse
+    -- economy it forces, not the strength of what rises -- and weaker than a
+    -- normal mob at the first two ranks, which the mechanic applies at runtime
+    -- rather than needing a second template for.
+    (900006, 'Risen', NULL, 1, 1, 0, 14, 0,
+     1.0, 1.14286, 20, 0, 0, 1.0,
+     2000, 2000, 1, 1, 1,
+     0, 2048, 0, 0, 7, 0, 0,
+     0, 0, '', 0, 1, 1.0,
+     1, 1, 1, 0, 0,
      1, 102760704, 'gauntlet_summon');
 
 -- ---------------------------------------------------------------------------
@@ -148,7 +161,7 @@ VALUES
 --   10045  Wisp                                                -- Restless Spirit
 --    2357  Defias Bandit                                       -- Echo
 
-DELETE FROM `creature_template_model` WHERE `CreatureID` BETWEEN 900001 AND 900005;
+DELETE FROM `creature_template_model` WHERE `CreatureID` BETWEEN 900001 AND 900006;
 INSERT INTO `creature_template_model`
     (`CreatureID`, `Idx`, `CreatureDisplayID`, `DisplayScale`, `Probability`)
 VALUES
@@ -156,7 +169,11 @@ VALUES
     (900002, 0,  2710, 1, 1),
     (900003, 0,  5035, 1, 1),
     (900004, 0, 10045, 1, 1),
-    (900005, 0,  2357, 1, 1);
+    (900005, 0,  2357, 1, 1),
+    -- 570 is Slavering Ghoul's display, in use by creature 1791 in the
+    -- world today, so it is present in CreatureDisplayInfo.dbc on any
+    -- client that can see Duskwood.
+    (900006, 0,   570, 1, 1);
 
 -- ---------------------------------------------------------------------------
 -- creature_template_movement
@@ -166,7 +183,7 @@ VALUES
 -- must not drift, and the others take the defaults the LEFT JOIN supplies when
 -- there is no row at all (WorldDatabase.cpp:82).
 
-DELETE FROM `creature_template_movement` WHERE `CreatureId` BETWEEN 900001 AND 900005;
+DELETE FROM `creature_template_movement` WHERE `CreatureId` BETWEEN 900001 AND 900006;
 INSERT INTO `creature_template_movement`
     (`CreatureId`, `Ground`, `Swim`, `Flight`, `Rooted`, `Chase`, `Random`)
 VALUES
