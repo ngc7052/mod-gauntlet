@@ -531,16 +531,17 @@ Changing presence costs all runic power and goes on cooldown.
   because it lives inside each presence's own aura with no seam. The blurb does
   not promise it.
 
-**C24 · One Ward** (`c24_one_ward`, 51) · **three ranks only**
+**C24 · One Ward** (`c24_one_ward`, 51) · shared cooldown 2 / 3 / 5 / 8 min
 Anti-Magic Shell and Icebound Fortitude share a cooldown; rank III adds
-Lichborne.
+Lichborne. Before Phase 7 the cooldown was flat, so ranks I and II were the same
+behaviour *and* the same sentence.
 - `PermanentCooldown`. Use one and confirm the other greys.
 
 ### Shaman
 
 **C25 · One Totem** (`c25_one_totem`, 52)
 Rank I: one totem at a time. Rank II: the standing totem dies to one hit.
-Rank III: it also costs double.
+Rank III: totems cost twice as much. Rank IV: three times.
 - **The cull runs on the tick, not at the cast**, because the new totem is not
   in its slot until the spell effect has run. Drop four totems fast and confirm
   the right three go — and that the cull looks instant rather than laggy.
@@ -642,7 +643,7 @@ And each unspent point makes you weaker.
 
 ### The two class bargains
 
-**C43 · Ankh Pact** (`c43_ankh_pact`, 70) · shaman, tiers 40–80
+**C43 · Ankh Pact** (`c43_ankh_pact`, 70) · shaman, tiers 40–80, **one rank**
 Reincarnation works once in this run, and every boon you carry burns out.
 - `.gauntlet debug hurt 100`, then Reincarnate. The run must survive and
   `.gauntlet status` must show **every** boon at zero.
@@ -652,7 +653,7 @@ Reincarnation works once in this run, and every boon you carry burns out.
   resurrection that never happened. Cancel the resurrect and confirm the charge
   survives.
 
-**C44 · Stone of the Damned** (`c44_stone_of_the_damned`, 71) · warlock, tiers 40–80
+**C44 · Stone of the Damned** (`c44_stone_of_the_damned`, 71) · warlock, tiers 40–80, **one rank**
 A Soulstone brings you back once, and whoever killed you is waiting.
 - **The killer is recorded on every blow, not on the killing one**, because by
   then the attacker may have wandered off or despawned.

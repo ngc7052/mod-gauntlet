@@ -417,7 +417,7 @@ namespace
         // The boon is bespoke: both wards last half again as long. requiresSpell
         // is Icebound Fortitude, the later of the two the card shares a
         // cooldown between.
-        { 51, "c24_one_ward", "One Ward", Family::Class, CM_DEATH_KNIGHT, 60, 80, 3,
+        { 51, "c24_one_ward", "One Ward", Family::Class, CM_DEATH_KNIGHT, 60, 80, 4,
           MF_None, "", Boon::BonusAbility, 48792, 0,
           "Anti-Magic Shell and Icebound Fortitude share a cooldown." },
 
@@ -514,14 +514,19 @@ namespace
         // Class here and reward-shaped for the offer builder's guarantee.
         // The boon is the second life: Reincarnation answers once, and burns
         // away every boon the run carries when it does.
-        { 70, "c43_ankh_pact", "Ankh Pact", Family::Class, CM_SHAMAN, 40, 80, 4,
+        // One rank, not four. The mechanic is once per run and has no ladder:
+        // every rank did the same thing and printed the same sentence, which
+        // `.gauntlet debug cards` reported as three dead rank-ups in a row. A
+        // row that cannot escalate should not be offered an escalation.
+        { 70, "c43_ankh_pact", "Ankh Pact", Family::Class, CM_SHAMAN, 40, 80, 1,
           MF_RewardShaped, "", Boon::SecondLife, 20608, 0,
           "Reincarnation works once in this run, and when it does every boon you carry is burned away." },
 
         // The boon is the second life, as C43. TODO(design): the card gives no
         // ladder of its own, saying only "as C43", so maxRank follows Ankh
         // Pact's three.
-        { 71, "c44_stone_of_the_damned", "Stone of the Damned", Family::Class, CM_WARLOCK, 40, 80, 4,
+        // One rank, for Ankh Pact's reason: the card says "as C43".
+        { 71, "c44_stone_of_the_damned", "Stone of the Damned", Family::Class, CM_WARLOCK, 40, 80, 1,
           MF_RewardShaped, "", Boon::SecondLife, 693, 0,
           "A Soulstone will bring you back once, and whoever kills you will be waiting." },
 

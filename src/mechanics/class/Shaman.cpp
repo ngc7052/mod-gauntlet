@@ -215,8 +215,11 @@ namespace Gauntlet
 
             if (FRAGILE[i])
                 out += " The one that stands dies to a single hit.";
+            // The number, not the word. It said "double" at every rank above
+            // one, so rank IV's triple cost read exactly as rank III's -- the
+            // behaviour differed and the card did not say so.
             if (COST_MULT[i] > 1)
-                out += " Totems cost double.";
+                out += " Totems cost " + std::to_string(COST_MULT[i]) + " times as much.";
 
             out += " In exchange the standing totem lasts twice as long.";
             return out;

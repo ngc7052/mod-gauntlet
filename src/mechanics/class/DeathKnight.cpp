@@ -456,8 +456,17 @@ namespace Gauntlet
         constexpr uint32 SPELL_ICEBOUND_FORTITUDE  = 48792;
         constexpr uint32 SPELL_LICHBORNE           = 49039;
 
-        // The card's shared cooldown: the longer of the two.
-        constexpr uint32 WARD_SHARED_MS = 120000;
+        // The card's shared cooldown is the longer of the two, two minutes, and
+        // it used to be flat across every rank. With Lichborne only joining the
+        // share at rank III, that made ranks I and II identical -- the same
+        // behaviour and, because Describe() reads only the rank-III branch, the
+        // same offer text word for word. `.gauntlet debug cards` is what found
+        // it.
+        //
+        // So the shared cooldown carries the ladder and Lichborne still joins at
+        // III: two minutes, three, five, and eight.
+        constexpr uint32 WARD_SHARED_MS[] = { 120000, 180000, 300000, 480000 };
+        static_assert(std::size(WARD_SHARED_MS) >= MAX_RANK, "WARD_SHARED_MS is short a rank");
 
         class OneWard final : public IMechanic
         {
@@ -495,11 +504,13 @@ namespace Gauntlet
                     if (id == SPELL_LICHBORNE && !rankThree)
                         continue;
 
-                    player->AddSpellCooldown(id, 0, WARD_SHARED_MS, /*needSendToClient*/ true);
+                    player->AddSpellCooldown(id, 0, WARD_SHARED_MS[RankIndexOf(ctx.self)],
+                                             /*needSendToClient*/ true);
                 }
 
                 AddonFor(ctx)->SendEvent(player, KeyOf(MECHANIC_ONE_WARD, "c24_one_ward"),
-                                         WARD_SHARED_MS / 1000u, "One Ward");
+                                         WARD_SHARED_MS[RankIndexOf(ctx.self)] / 1000u,
+                                         "One Ward");
             }
 
             // The boon: whichever ward was used lasts longer.
@@ -521,11 +532,13 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                bool const three = RankIndexOf(&self) >= 2;
-                uint32 const pct = self.boonMag;
+                uint8 const  i     = RankIndexOf(&self);
+                bool const   three = i >= 2;
+                uint32 const pct   = self.boonMag;
 
-                std::string out = "Anti-Magic Shell and Icebound Fortitude share a two-minute"
-                                  " cooldown";
+                std::string out = "Anti-Magic Shell and Icebound Fortitude share a "
+                                + std::to_string(WARD_SHARED_MS[i] / 60000u)
+                                + "-minute cooldown";
                 out += three ? ", and so does Lichborne." : ".";
                 out += " Read the fight before you spend one.";
 
@@ -536,9 +549,10 @@ namespace Gauntlet
                 return out;
             }
 
-            std::string Diagnose(Ctx&) const override
+            std::string Diagnose(Ctx& ctx) const override
             {
-                return "one ward: two-minute shared cooldown";
+                return "one ward: " + std::to_string(WARD_SHARED_MS[RankIndexOf(ctx.self)] / 60000u)
+                     + "-minute shared cooldown";
             }
         };
     }
