@@ -54,14 +54,18 @@ namespace Gauntlet
         constexpr uint32 EVENT_RISE = 1;
 
         // The card's ladder: every 30 -> 25 -> 18 kills, health x2 -> x2.5 -> x3.
-        constexpr int32 KILLS_PER_ECHO[] = { 30, 25, 18 };
+        constexpr int32 KILLS_PER_ECHO[] = { 30, 25, 18, 12 };
         static_assert(std::size(KILLS_PER_ECHO) >= MAX_RANK, "KILLS_PER_ECHO is short a rank");
 
         // creature_template row 900005 already carries HealthModifier 2.0, so
         // what is left to code is the ratio to it -- the SQL says so in its own
         // comment. Damage has no ladder on the card and the template carries
         // the single figure.
-        constexpr float HEALTH_RATIO[] = { 1.0f, 1.25f, 1.5f };
+        // Rank IV: every twelfth kill, at x3.5 a normal mob. The echo is a
+        // copy of the player, so the health ladder is what decides whether it
+        // is a fight or an execution, and 1.75 is the last step that still
+        // loses to a character playing well.
+        constexpr float HEALTH_RATIO[] = { 1.0f, 1.25f, 1.5f, 1.75f };
         static_assert(std::size(HEALTH_RATIO) >= MAX_RANK, "HEALTH_RATIO is short a rank");
 
         // The card's twenty yards, and its reward: "killing it grants five

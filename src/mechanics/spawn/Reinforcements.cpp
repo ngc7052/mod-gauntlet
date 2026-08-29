@@ -58,11 +58,16 @@ namespace Gauntlet
         constexpr uint32 EVENT_FIRST = 1;
 
         // The card's ladder: 45/15 s -> 30/15 s -> 20/10 s, cap 2 -> 3 -> 4.
-        constexpr uint32 FIRST_MS[]  = { 45000, 30000, 20000 };
+        // Rank IV is past the card at 15/8 s and a cap of 6: a fight that
+        // runs a minute is now six enemies deep, which makes disengaging a
+        // decision rather than an option you never take. The cap matters
+        // more than the cadence here -- Gauntlet.Summons.MaxAlive still
+        // bounds what can be standing at once across every spawn mechanic.
+        constexpr uint32 FIRST_MS[]  = { 45000, 30000, 20000, 15000 };
         static_assert(std::size(FIRST_MS) >= MAX_RANK, "FIRST_MS is short a rank");
-        constexpr uint32 REPEAT_MS[] = { 15000, 15000, 10000 };
+        constexpr uint32 REPEAT_MS[] = { 15000, 15000, 10000, 8000 };
         static_assert(std::size(REPEAT_MS) >= MAX_RANK, "REPEAT_MS is short a rank");
-        constexpr uint32 CAP[]       = { 2, 3, 4 };
+        constexpr uint32 CAP[]       = { 2, 3, 4, 6 };
         static_assert(std::size(CAP) >= MAX_RANK, "CAP is short a rank");
 
         // "spawns 20 yd away and attacks the owner".

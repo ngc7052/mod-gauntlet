@@ -57,7 +57,11 @@ namespace Gauntlet
         constexpr uint32 EVENT_RISE = 1;
 
         // The card's severity ladder: interval 15 -> 10 -> 7 minutes.
-        constexpr uint32 INTERVAL_MS[] = { 900000u, 600000u, 420000u };
+        // Rank IV is past the card at five minutes, which is the shortest
+        // interval that still leaves room to travel between them: the Shade
+        // has to be outrun or killed, and one that rises before the last is
+        // dealt with stops being a chase and becomes an escort.
+        constexpr uint32 INTERVAL_MS[] = { 900000u, 600000u, 420000u, 300000u };
         static_assert(std::size(INTERVAL_MS) >= MAX_RANK, "INTERVAL_MS is short a rank");
 
         // The card's other ladder is health x1.5 -> x2 -> x2.5 of a normal mob.
@@ -66,7 +70,7 @@ namespace Gauntlet
         // own comment. Damage is a single figure on the card (~1.2x) with no
         // ladder, and the template carries that too, so rank alone changes
         // nothing about how hard it hits.
-        constexpr float HEALTH_RATIO[] = { 1.0f, 4.0f / 3.0f, 5.0f / 3.0f };
+        constexpr float HEALTH_RATIO[] = { 1.0f, 4.0f / 3.0f, 5.0f / 3.0f, 2.0f };
         static_assert(std::size(HEALTH_RATIO) >= MAX_RANK, "HEALTH_RATIO is short a rank");
 
         // The card's numbers, unaltered. The 150 yd / 15 s leash is absent
@@ -281,7 +285,16 @@ namespace Gauntlet
             void  CountEscape(Ctx& ctx);
             bool  NemesisAsleep(Ctx& ctx) const;
             int32 NemesisStep(Ctx& ctx) const;
-            bool  IsNemesis(Ctx& ctx) const { return RankOf(ctx.self) >= MAX_RANK; }
+            // Rank III and up, not MAX_RANK.
+            //
+            // It was >= MAX_RANK, which read as "the last rank" and was rank
+            // III while there were three. Phase 6 added a fourth, and leaving
+            // it as written would have quietly taken the named nemesis away
+            // from every character already carrying a Shade III -- a mechanic
+            // removed by a constant moving, which is not a thing a rank-up
+            // should ever do. Three is the number the card names, so three is
+            // what it says.
+            bool  IsNemesis(Ctx& ctx) const { return RankOf(ctx.self) >= 3; }
             std::string Label(Ctx& ctx) const;
 
             ObjectGuid _guid;                 // the Shade currently hunting
@@ -696,7 +709,9 @@ namespace Gauntlet
                               " minutes and hunts you until you kill it or leave it behind."
                               " It is slower than you are, and much slower than a mount.";
 
-            if (rank >= MAX_RANK)
+            // Three, matching IsNemesis. The blurb and the behaviour have to
+            // agree about which rank the nemesis starts at.
+            if (rank >= 3)
                 out += " It is one named creature: every time you leave it behind it returns"
                        " stronger, and killing it keeps it down for two tiers.";
 

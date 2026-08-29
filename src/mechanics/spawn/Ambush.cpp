@@ -42,8 +42,11 @@ namespace Gauntlet
 
         constexpr uint32 EVENT_AMBUSH = 1;
 
-        // The card's ladder: 30 -> 20 -> 12 seconds of stillness.
-        constexpr uint32 STILL_MS[] = { 30000, 20000, 12000 };
+        // The card's ladder: 30 -> 20 -> 12 seconds of stillness. Rank IV is
+        // past the card and continues the compression to 8, which is short
+        // enough that eating a meal is no longer safe -- the point at which
+        // the affix stops being about resting and starts being about where.
+        constexpr uint32 STILL_MS[] = { 30000, 20000, 12000, 8000 };
         static_assert(std::size(STILL_MS) >= MAX_RANK, "STILL_MS is short a rank");
 
         // The card's fixed numbers: a four-second warning, twelve yards, and a

@@ -51,9 +51,13 @@ namespace Gauntlet
         constexpr uint32 EVENT_SCAVENGERS = 1;
 
         // The card's ladder: every 5 -> 4 -> 3 loots, 2 -> 2 -> 3 scavengers.
-        constexpr int32 LOOTS_PER_PACK[] = { 5, 4, 3 };
+        // Rank IV is past the card: every second corpse, four of them. Both
+        // halves move, because moving only the count would make looting a
+        // fight you have already won and moving only the size would make it
+        // one you cannot.
+        constexpr int32 LOOTS_PER_PACK[] = { 5, 4, 3, 2 };
         static_assert(std::size(LOOTS_PER_PACK) >= MAX_RANK, "LOOTS_PER_PACK is short a rank");
-        constexpr uint32 PACK_SIZE[]      = { 2, 2, 3 };
+        constexpr uint32 PACK_SIZE[]      = { 2, 2, 3, 4 };
         static_assert(std::size(PACK_SIZE) >= MAX_RANK, "PACK_SIZE is short a rank");
 
         // The card's other fixed number: they arrive 25 yards away and charge.
