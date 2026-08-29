@@ -54,10 +54,12 @@ lever:
 | **Bargain** | A curse you choose on purpose, because of what it pays out. | 2 / 2 |
 | **Class** | A curse written for one class specifically, leaning on the thing that class actually struggles with. | 43 / 43 |
 
-Every mechanic has up to three **ranks**. If an affix you already carry comes
+Every mechanic has up to four **ranks**. If an affix you already carry comes
 up again in a later offer, you are never offered a duplicate — you are offered
 its next rank instead, and taking it replaces what you hold in that slot with
-the stronger version. Simulated over 240,000 offer sets, a run reaches the
+the stronger version. Eight mechanics stop at three, because their third rank
+already ends the ladder — Vanish cannot be denied harder than never — and a
+rank-up that changes nothing is worse than no rank-up. Simulated over 240,000 offer sets, a run reaches the
 sixteen-affix cap around level 49 and spends the rest of the climb deepening
 and trading rather than collecting.
 
