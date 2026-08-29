@@ -349,7 +349,7 @@ namespace
         // Rogue
         // The boon halves Sprint's cooldown.
         { 40, "c13_cold_trail", "Cold Trail", Family::Class, CM_ROGUE, 20, 80, 3,
-          MF_NotImplemented, "classcurse", Boon::BonusCooldown, 1856, 0,
+          MF_None, "classcurse", Boon::BonusCooldown, 1856, 0,
           "Vanish has a ten-minute cooldown." },
 
         // TODO(design): rogue poisons have no spell id in the plan's Appendix A, so no gate.
@@ -359,7 +359,7 @@ namespace
 
         // The boon is +5% dodge.
         { 42, "c15_exposed_back", "Exposed Back", Family::Class, CM_ROGUE, 15, 70, 3,
-          MF_NotImplemented, "classcurse", Boon::BonusAvoidance, 0, 0,
+          MF_None, "classcurse", Boon::BonusAvoidance, 0, 0,
           "Attacks from behind you deal 50% more damage." },
 
         { 43, "c16_slow_hands", "Slow Hands", Family::Class, CM_ROGUE, 20, 70, 3,

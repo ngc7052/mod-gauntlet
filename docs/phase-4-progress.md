@@ -12,8 +12,8 @@ decided without reading twenty commits.
 | 2a | Warrior: C1, C2, C4 | 28, 29, 31 | **done** `9b6b16c` |
 | 2b | Paladin: C5, C6 | 32, 33 | **done** |
 | 2c | Hunter: C9, C10, C11 | 36, 37, 38 | **done** |
-| 2d | Rogue: C13, C15 | 40, 42 | in progress |
-| 2e | Priest: C17, C20 | 44, 47 | |
+| 2d | Rogue: C13, C15 | 40, 42 | **done** |
+| 2e | Priest: C17, C20 | 44, 47 | in progress |
 | 2f | Death Knight: C21, C22 | 48, 49 | |
 | 2g | Shaman: C25, C26 | 52, 53 | |
 | 2h | Mage: C29, C31 | 56, 58 | |
@@ -68,6 +68,12 @@ than from memory.
    to pay it, because `AggregateKind::DamageDone` is the *player's* damage.
    Outside the clamp deliberately: the caps bound what the world does to the
    player and what the player does to the world, and a hunter's pet is neither.
-5. **An extended aura's tooltip still lies.** `SetDuration`/`SetMaxDuration`
+5. **`Boon::BonusAvoidance` is delivered as a full avoid, not as dodge.** There
+   is no server-side way to add flat dodge without applying an aura, and an aura
+   needs a spell id whose DBC tooltip would then describe something else. So the
+   boon does what a dodge does -- the blow deals nothing -- and the wording says
+   "avoid" rather than "dodge", because the combat log will read as a zero
+   rather than as a dodge. Exposed Back is the first to use it.
+6. **An extended aura's tooltip still lies.** `SetDuration`/`SetMaxDuration`
    move the client's timer but not the DBC, so every curse that stretches an
    aura says the real number in its own `Describe()`.
