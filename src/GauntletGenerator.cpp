@@ -113,6 +113,13 @@ namespace
             case 18:
                 return boon == Boon::BonusExperience ? 10u * (step + 1u) : 0u;
 
+            // C2 Berserker's Bargain: "below 35% health you deal 25% more
+            // damage". The rank moves the health line, not the damage, so the
+            // boon is flat where the category's table would have laddered it
+            // 8/16/24 and promised three numbers the card does not have.
+            case 29:
+                return boon == Boon::BonusDamage ? 25u : 0u;
+
             default:
                 break;
         }

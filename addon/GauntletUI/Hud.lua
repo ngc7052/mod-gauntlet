@@ -78,6 +78,10 @@ local READINGS = {
     -- Label-only. These never send a CTR or a STAT, so they never become a
     -- row; they are here so the title can name what is hunting you when a
     -- SUMMON arrives, instead of printing a wire key at the player.
+    -- Family C, wave A.
+    c01_red_mist   = { "Rage",           "%",    true  },
+    c02_berserkers_bargain = { "Bargain", "flag", true },
+
     shade          = { "The Shade",      "",     true  },
     ambush         = { "Ambusher",       "",     true  },
 }

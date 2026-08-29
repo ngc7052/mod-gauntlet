@@ -279,12 +279,12 @@ namespace
 
         // Warrior
         { 28, "c01_red_mist", "Red Mist", Family::Class, CM_WARRIOR, 15, 70, 3,
-          MF_NotImplemented, "classcurse", Boon::BonusRegen, 0, 0,
+          MF_None, "classcurse", Boon::BonusRegen, 0, 0,
           "At 100 rage you lose your mind for three seconds and your rage empties." },
 
         // TODO(design): requiresSpell picks Shield Wall of the card's three panic buttons.
         { 29, "c02_berserkers_bargain", "Berserker's Bargain", Family::Class, CM_WARRIOR, 25, 80, 3,
-          MF_NotImplemented, "classcurse", Boon::BonusDamage, 871, 0,
+          MF_RewardShaped, "classcurse", Boon::BonusDamage, 871, 0,
           "Below 35% health you deal 25% more damage, but your panic buttons will not answer." },
 
         // TODO(design): requiresSpell is Defensive Stance, the second stance a warrior trains.
@@ -292,8 +292,12 @@ namespace
           MF_NotImplemented, "classcurse", Boon::BonusRegen, 71, 0,
           "Changing stance has a ten-second cooldown." },
 
+        // Boon changed from BonusRegen in Phase 4. The card's boon is "shouts
+        // free and long", which is a bespoke upside to named abilities and is
+        // exactly what Boon::BonusAbility is for; BonusRegen would have had the
+        // offer promise a regeneration percentage the mechanic never pays.
         { 31, "c04_deafening_roar", "Deafening Roar", Family::Class, CM_WARRIOR, 20, 70, 3,
-          MF_NotImplemented, "classcurse", Boon::BonusRegen, 0, 0,
+          MF_None, "classcurse", Boon::BonusAbility, 0, 0,
           "Your shouts wake every enemy within thirty yards." },
 
         // Paladin

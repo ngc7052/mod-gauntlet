@@ -677,6 +677,11 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_BloodMagic();         // 20
     void AddSC_gauntlet_mechanic_LastRites();          // 26
     void AddSC_gauntlet_mechanic_CursedHoard();        // 27
+
+    // Family C, wave A.
+    void AddSC_gauntlet_mechanic_RedMist();            // 28  C1  warrior
+    void AddSC_gauntlet_mechanic_BerserkersBargain();  // 29  C2  warrior
+    void AddSC_gauntlet_mechanic_DeafeningRoar();      // 31  C4  warrior
     void AddSC_gauntlet_mechanic_SelfFound();          // 23
     void AddSC_gauntlet_mechanic_LoneWolf();           // 24
     void AddSC_gauntlet_mechanic_IronPurse();          // 25
@@ -708,6 +713,10 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_BloodMagic();
     AddSC_gauntlet_mechanic_LastRites();
     AddSC_gauntlet_mechanic_CursedHoard();
+
+    AddSC_gauntlet_mechanic_RedMist();
+    AddSC_gauntlet_mechanic_BerserkersBargain();
+    AddSC_gauntlet_mechanic_DeafeningRoar();
     AddSC_gauntlet_mechanic_IronPurse();
     AddSC_gauntlet_mechanic_SelfFound();
     AddSC_gauntlet_mechanic_LoneWolf();
