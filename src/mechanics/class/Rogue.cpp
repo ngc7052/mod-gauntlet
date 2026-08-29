@@ -55,7 +55,9 @@ namespace Gauntlet
         // every tick.
         // ==================================================================
         // 10 min, 30 min, then gone.
-        constexpr uint32 VANISH_COOLDOWN_MS[] = { 600000, 1800000, 0 };
+        // Rank III is a standing denial and there is nothing past never, so Cold
+        // Trail keeps maxRank = 3; the fourth entry is unreachable.
+        constexpr uint32 VANISH_COOLDOWN_MS[] = { 600000, 1800000, 0, 0 };
         static_assert(std::size(VANISH_COOLDOWN_MS) >= MAX_RANK, "VANISH_COOLDOWN_MS is short a rank");
 
         class ColdTrail final : public IMechanic
@@ -152,7 +154,7 @@ namespace Gauntlet
         // itself. Back to a wall, Blind the second mob, Gouge and reposition.
         // ==================================================================
         // The card's ladder for damage taken from outside the front arc.
-        constexpr float BEHIND_MULT[] = { 1.30f, 1.50f, 1.75f };
+        constexpr float BEHIND_MULT[] = { 1.30f, 1.50f, 1.75f, 2.00f };
         static_assert(std::size(BEHIND_MULT) >= MAX_RANK, "BEHIND_MULT is short a rank");
 
         class ExposedBack final : public IMechanic
@@ -223,7 +225,7 @@ namespace Gauntlet
         // Multi-DoTting a camp is the greedy play and bleeds accordingly, and
         // unpoisoned blades are always an option.
         // ==================================================================
-        constexpr uint32 POISON_SHARE_PCT[] = { 25, 35, 50 };
+        constexpr uint32 POISON_SHARE_PCT[] = { 25, 35, 50, 65 };
         static_assert(std::size(POISON_SHARE_PCT) >= MAX_RANK, "POISON_SHARE_PCT is short a rank");
 
         class PoisonedBlades final : public IMechanic
@@ -318,7 +320,11 @@ namespace Gauntlet
         // being for escaping rather than for repositioning every three seconds.
         // ==================================================================
         // The card's ladder: half, then none, then none plus no combo points.
-        constexpr float MOVING_REGEN[] = { 0.5f, 0.0f, 0.0f };
+        // Half, then none, then none plus no combo points -- and there the ladder
+        // ends. Regeneration is already zero and the combo-point half is spent,
+        // so Slow Hands keeps maxRank = 3 rather than offering a rank-up that
+        // changes nothing. The fourth entry is unreachable.
+        constexpr float MOVING_REGEN[] = { 0.5f, 0.0f, 0.0f, 0.0f };
         static_assert(std::size(MOVING_REGEN) >= MAX_RANK, "MOVING_REGEN is short a rank");
 
         // The boon's flat addition to the energy bar.

@@ -102,7 +102,7 @@ namespace Gauntlet
         // 100 -> 90 -> 80 rage. Rage is stored times ten
         // (Player::GetPower(POWER_RAGE) counts in tenths), so these are the
         // stored values.
-        constexpr uint32 RAGE_TRIGGER[] = { 1000, 900, 800 };
+        constexpr uint32 RAGE_TRIGGER[] = { 1000, 900, 800, 700 };
         static_assert(std::size(RAGE_TRIGGER) >= MAX_RANK, "RAGE_TRIGGER is short a rank");
 
         // The card's two fixed numbers.
@@ -256,7 +256,10 @@ namespace Gauntlet
         // ==================================================================
         constexpr uint16 MECHANIC_BERSERKERS = 29;
 
-        constexpr uint32 LINE_PCT[] = { 30, 35, 40 };
+        // Rank IV puts the line at half health, which is where a warrior spends
+        // most of a hard fight: the damage is free and the panic buttons are
+        // gone for the half of the fight you most want them.
+        constexpr uint32 LINE_PCT[] = { 30, 35, 40, 50 };
 
         static_assert(std::size(LINE_PCT) >= MAX_RANK, "LINE_PCT is short a rank");
 
@@ -389,7 +392,7 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_ROAR = 31;
 
         // The card's ladder, in yards.
-        constexpr float ROAR_YARDS[] = { 20.0f, 30.0f, 40.0f };
+        constexpr float ROAR_YARDS[] = { 20.0f, 30.0f, 40.0f, 50.0f };
         static_assert(std::size(ROAR_YARDS) >= MAX_RANK, "ROAR_YARDS is short a rank");
 
         // The boon: "shouts free and long". Four minutes is the card's number.
@@ -520,7 +523,9 @@ namespace Gauntlet
         // ==================================================================
 
         // The card's ladder, in seconds of lockout on the other two stances.
-        constexpr uint32 STANCE_LOCK_MS[] = { 6000, 10000, 20000 };
+        // Thirty seconds at rank IV: a stance is a decision for the whole
+        // fight rather than a rotation step.
+        constexpr uint32 STANCE_LOCK_MS[] = { 6000, 10000, 20000, 30000 };
         static_assert(std::size(STANCE_LOCK_MS) >= MAX_RANK, "STANCE_LOCK_MS is short a rank");
 
         constexpr uint32 SPELL_BATTLE_STANCE     = 2457;

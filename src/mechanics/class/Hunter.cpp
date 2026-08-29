@@ -68,11 +68,14 @@ namespace Gauntlet
         // The card's ladder is what counts as unhappy enough to break the leash.
         // Rank III also breaks at Content, which is most of the time for a
         // hunter who is not feeding.
-        constexpr uint32 TURNS_AT[] = { UNHAPPY, UNHAPPY, CONTENT };
+        // CONTENT is the top of this ladder -- a pet cannot be more than content
+        // without being happy, and turning on a happy pet is a different affix.
+        // Rank IV escalates on the other axis instead: it stays hostile longer.
+        constexpr uint32 TURNS_AT[] = { UNHAPPY, UNHAPPY, CONTENT, CONTENT };
         static_assert(std::size(TURNS_AT) >= MAX_RANK, "TURNS_AT is short a rank");
 
         // The card's two numbers: fifteen seconds, twenty-five at rank III.
-        constexpr uint32 HOSTILE_MS[] = { 15000, 15000, 25000 };
+        constexpr uint32 HOSTILE_MS[] = { 15000, 15000, 25000, 40000 };
         static_assert(std::size(HOSTILE_MS) >= MAX_RANK, "HOSTILE_MS is short a rank");
 
         // Not on the card. A short grace after a break so a hunter who calls the
@@ -228,7 +231,10 @@ namespace Gauntlet
         // ==================================================================
         // 3 min, 5 min, then gone. Rank III is the card's "removes it", which is
         // the family ladder's price -> higher price -> removal in one row.
-        constexpr uint32 FEIGN_COOLDOWN_MS[] = { 180000, 300000, 0 };
+        // 3 min, 5 min, then gone. Rank III is a standing denial and there is
+        // nothing past never, so Dead Weight keeps maxRank = 3; the fourth entry
+        // is unreachable and exists only for the assert.
+        constexpr uint32 FEIGN_COOLDOWN_MS[] = { 180000, 300000, 0, 0 };
         static_assert(std::size(FEIGN_COOLDOWN_MS) >= MAX_RANK, "FEIGN_COOLDOWN_MS is short a rank");
 
         class DeadWeight final : public IMechanic
@@ -336,7 +342,7 @@ namespace Gauntlet
         // purpose.
         // ==================================================================
         // The card's ladder, in yards.
-        constexpr float DEAD_ZONE_YARDS[] = { 8.0f, 10.0f, 15.0f };
+        constexpr float DEAD_ZONE_YARDS[] = { 8.0f, 10.0f, 15.0f, 20.0f };
         static_assert(std::size(DEAD_ZONE_YARDS) >= MAX_RANK, "DEAD_ZONE_YARDS is short a rank");
 
         // The boon's threshold: beyond this, shots hit harder.
@@ -428,7 +434,7 @@ namespace Gauntlet
         // ==================================================================
         constexpr uint16 MECHANIC_BLOOD_BOND = 39;
 
-        constexpr uint32 BOND_PCT[] = { 20, 30, 40 };
+        constexpr uint32 BOND_PCT[] = { 20, 30, 40, 50 };
 
         static_assert(std::size(BOND_PCT) >= MAX_RANK, "BOND_PCT is short a rank");
 
