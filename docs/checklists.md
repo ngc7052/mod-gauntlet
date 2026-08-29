@@ -28,7 +28,7 @@ account. Nothing below stakes a real run.
 .gauntlet debug offers <tier>          # what the generator would offer, committing nothing
 .gauntlet debug set <state-key> <n>    # push a counter to the edge of its trigger
 .gauntlet debug hurt <percent>         # test a death path without staking a run
-.gauntlet debug cards [key]            # every card at every rank, flagging any two that read the same
+.gauntlet debug cards [key]            # every card at every rank: dead ranks, and words the addon cannot split
 .gauntlet status                       # what the player sees
 .gauntlet top                          # the leaderboard, and now the conducts
 ```
@@ -37,8 +37,10 @@ Keys are the registry's own (`shade`, `c13_cold_trail`, …) and are listed in
 `src/GauntletRegistry.cpp` next to each id.
 
 **Run `.gauntlet debug cards` first, once, and read the tail.** It prints every
-mechanic's offer text at every rank and shouts when two consecutive ranks read
-identically — a rank-up that costs a tier and changes nothing. It found one on
+mechanic's offer text at every rank and shouts at two things: two consecutive
+ranks that read identically — a rank-up that costs a tier and changes nothing —
+and a word longer than the addon's 200-byte chunk, which the wire splits
+mid-word and rejoins with a space that was never there. It found one on
 its first run (Half-Tamed I and II) and it is the cheapest check in this file:
 one command, no character, no run staked.
 

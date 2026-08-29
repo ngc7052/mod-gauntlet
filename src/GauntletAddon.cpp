@@ -4,6 +4,7 @@
  */
 
 #include "GauntletAddon.h"
+#include "GauntletWire.h"
 #include "GauntletMgr.h"
 #include "Chat.h"
 #include "GameTime.h"
@@ -345,50 +346,25 @@ namespace Gauntlet
         Emit(player, f.Str());
     }
 
-    // "GNT\tODESC\t<index>\t" is thirteen bytes at three digits of index, and
-    // Frame refuses anything over MaxPayload, so this leaves a wide margin
-    // rather than sitting on the limit.
-    constexpr std::size_t DESC_CHUNK = 200;
-
-    // One mechanic's own sentence, sent as however many frames it takes.
+    // The splitter lives in GauntletWire.cpp, which is free of Player.h and is
+    // therefore the only part of the addon's wire that tests/run-tests.sh can
+    // compile. That is not incidental: the rule it keeps -- the server splits on
+    // a space and drops it, the addon rejoins with exactly one -- has already
+    // been broken once in a way a player saw, "in dungeons.In exchange", and it
+    // had no test until it moved out of this file.
     //
-    // Both the offer list and the carried list need it and for the same
-    // reason: MechanicDef::blurb is one static line per registry row, so it
-    // says the same thing at rank I and rank III. Reinforcements III really
-    // draws an enemy after twenty seconds and then every ten, and the blurb
-    // said "longer than 30 seconds ... every 15 seconds" -- the rank I numbers
-    // -- in the panel of a player carrying rank III.
-    //
-    // Split on a space so a chunk boundary never lands inside a word, and drop
-    // the space itself: the addon rejoins the pieces with exactly one.
-    //
-    // Leaving it on the end of a chunk did not survive the trip. The first
-    // version broke "... in dungeons. In exchange, you have 5% more health."
-    // into a chunk ending in "dungeons. " and one starting "In exchange", and
-    // what arrived was "dungeons.In exchange" -- the trailing space is trimmed
-    // somewhere between here and CHAT_MSG_ADDON. Neither side may rely on a
-    // space at a message boundary, so neither side sends one.
+    // One mechanic's own sentence, sent as however many frames it takes. Both
+    // the offer list and the carried list need it and for the same reason:
+    // MechanicDef::blurb is one static line per registry row, so it says the
+    // same thing at rank I and rank III. Reinforcements III really draws an
+    // enemy after twenty seconds and then every twelve, and the blurb said
+    // "longer than 30 seconds ... every 15 seconds" -- the rank I numbers -- in
+    // the panel of a player carrying rank III.
     template <typename Emitter>
     void EmitDescription(char const* type, int64 key, std::string const& desc, Emitter&& emit)
     {
-        for (std::size_t at = 0; at < desc.size(); )
-        {
-            std::size_t take = std::min<std::size_t>(DESC_CHUNK, desc.size() - at);
-            std::size_t skip = 0;
-
-            if (at + take < desc.size())
-            {
-                std::size_t const space = desc.rfind(' ', at + take);
-                if (space != std::string::npos && space > at)
-                {
-                    take = space - at;   // up to, not including, the space
-                    skip = 1;
-                }
-            }
-
-            emit(type, key, desc.substr(at, take));
-            at += take + skip;
-        }
+        for (std::string const& part : SplitDescription(desc))
+            emit(type, key, part);
     }
 
     void Addon::SendAffixes(Player* player)

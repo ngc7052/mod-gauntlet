@@ -8,6 +8,7 @@
 #include "GauntletMechanic.h"
 #include "GauntletMgr.h"
 #include "GauntletRegistry.h"
+#include "GauntletWire.h"
 #include "GauntletScheduler.h"
 #include "GauntletSummons.h"
 #include "Chat.h"
@@ -989,6 +990,7 @@ public:
             return false;
 
         uint32 dead = 0;
+        uint32 wide = 0;
         uint32 shown = 0;
 
         for (MechanicDef const& def : AllMechanics())
@@ -1020,6 +1022,27 @@ public:
                 std::string const text = sGauntlet->DescribeOf(preview);
                 handler->PSendSysMessage("  rank {}: {}", rank, text);
 
+                // The one shape the addon's split/rejoin cannot survive: a
+                // single word longer than a chunk has no space to cut at, so
+                // the cut is hard and the rejoin inserts a space that was never
+                // there. tests/WireTest.cpp proves the round trip for
+                // everything else; this is the live half of that guard, over
+                // all sixty-nine mechanics at every rank, because Describe()
+                // needs a Player and the test harness cannot build one.
+                std::size_t longest = 0, run = 0;
+                for (char c : text)
+                {
+                    if (c == ' ') { run = 0; continue; }
+                    longest = std::max<std::size_t>(longest, ++run);
+                }
+                if (longest >= DESC_CHUNK)
+                {
+                    ++wide;
+                    handler->PSendSysMessage(
+                        "  |cffff2020^ a {}-character word: the addon splits this mid-word and "
+                        "rejoins it with a space that was not there|r", longest);
+                }
+
                 if (rank > 1 && text == previous)
                 {
                     ++dead;
@@ -1038,8 +1061,9 @@ public:
             return false;
         }
 
-        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r {} mechanic(s), {} dead rank(s).",
-                                 shown, dead);
+        handler->PSendSysMessage(
+            "|cffff2020[Gauntlet debug]|r {} mechanic(s), {} dead rank(s), {} unsplittable word(s).",
+            shown, dead, wide);
         return true;
     }
 
