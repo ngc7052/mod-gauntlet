@@ -6,6 +6,7 @@
 #include "GauntletWire.h"
 
 #include <algorithm>
+#include <string_view>
 
 namespace Gauntlet
 {
@@ -60,6 +61,51 @@ namespace Gauntlet
         }
 
         return out;
+    }
+
+    std::size_t Utf8Floor(std::string_view s, std::size_t n)
+    {
+        if (n >= s.size())
+            return s.size();
+
+        while (n > 0 && IsContinuation(static_cast<unsigned char>(s[n])))
+            --n;
+        return n;
+    }
+
+    std::string TrimList(std::string_view list, std::size_t budget)
+    {
+        if (list.size() <= budget)
+            return std::string(list);
+
+        constexpr std::string_view marker = ", ...";
+        if (budget <= marker.size())
+            return std::string();
+
+        std::size_t const room = budget - marker.size();
+        std::size_t cut = list.rfind(", ", room);
+        if (cut == std::string_view::npos)
+            cut = Utf8Floor(list, room);   // one enormous entry: hard cut
+
+        return std::string(list.substr(0, cut)) + std::string(marker);
+    }
+
+    bool ParseUInt(std::string_view s, uint32 limit, uint32& out)
+    {
+        if (s.empty() || s.size() > 10)
+            return false;
+
+        uint64 value = 0;
+        for (char c : s)
+        {
+            if (c < '0' || c > '9')
+                return false;
+            value = value * 10 + static_cast<uint64>(c - '0');
+            if (value > limit)
+                return false;
+        }
+        out = static_cast<uint32>(value);
+        return true;
     }
 
     std::string JoinDescription(std::vector<std::string> const& parts)

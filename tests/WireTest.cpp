@@ -179,3 +179,125 @@ TEST(Wire, AHardCutNeverLandsInsideACharacter)
         EXPECT_EQ(rebuilt, word) << "chunk size " << chunk << ": bytes were lost or added";
     }
 }
+
+// ---------------------------------------------------------------------------
+// The inbound field parser.
+//
+// This is the module's entire inbound surface: the addon sends PICK <i>, and
+// `i` arrives as text a client chose. Everything downstream indexes a vector
+// with it. It had no test until Phase 8 and could not have had one, because it
+// lived in GauntletAddon.cpp.
+// ---------------------------------------------------------------------------
+
+TEST(WireParse, AcceptsExactlyTheDecimalsInRange)
+{
+    uint32 out = 0xDEADBEEF;
+
+    EXPECT_TRUE(ParseUInt("0", 255, out));   EXPECT_EQ(out, 0u);
+    EXPECT_TRUE(ParseUInt("7", 255, out));   EXPECT_EQ(out, 7u);
+    EXPECT_TRUE(ParseUInt("255", 255, out)); EXPECT_EQ(out, 255u);
+    EXPECT_TRUE(ParseUInt("0000000255", 255, out)) << "leading zeros are digits";
+    EXPECT_EQ(out, 255u);
+}
+
+TEST(WireParse, RefusesEverythingElse)
+{
+    uint32 out = 0;
+
+    // The shapes a hand-written or hostile client actually sends.
+    for (char const* bad : { "", " ", "\t", "+1", "-1", "1 ", " 1", "1.0", "0x10",
+                             "1e3", "abc", "1a", "a1", "\xFF", "1\n", "٣" })
+        EXPECT_FALSE(ParseUInt(bad, 255, out)) << "accepted \"" << bad << "\"";
+
+    EXPECT_FALSE(ParseUInt("256", 255, out)) << "over the limit";
+    EXPECT_FALSE(ParseUInt("99999999999", 0xFFFFFFFFu, out)) << "eleven digits";
+}
+
+TEST(WireParse, CannotBeMadeToOverflow)
+{
+    // The reason the length cap and the running limit check both exist: ten
+    // digits fit in uint64 without wrapping, and the per-digit test stops the
+    // accumulator before it can reach a value the caller did not allow.
+    uint32 out = 0;
+
+    EXPECT_TRUE(ParseUInt("4294967295", 0xFFFFFFFFu, out));
+    EXPECT_EQ(out, 0xFFFFFFFFu);
+    EXPECT_FALSE(ParseUInt("4294967296", 0xFFFFFFFFu, out));
+    EXPECT_FALSE(ParseUInt("9999999999", 0xFFFFFFFFu, out));
+}
+
+TEST(WireParse, LeavesTheOutputAloneWhenItRefuses)
+{
+    // Callers test the bool. One that did not would otherwise read a value
+    // half-parsed from a rejected field.
+    uint32 out = 4242;
+    EXPECT_FALSE(ParseUInt("12x", 255, out));
+    EXPECT_EQ(out, 4242u) << "a refused parse wrote to its output";
+}
+
+// ---------------------------------------------------------------------------
+// Truncation: a name and a run's epitaph both have to fit a 255-byte message.
+// ---------------------------------------------------------------------------
+
+TEST(WireTrim, AListShorterThanItsBudgetIsUntouched)
+{
+    EXPECT_EQ(TrimList("Red Mist III, Cold Feet II", 255), "Red Mist III, Cold Feet II");
+}
+
+TEST(WireTrim, ALongListIsCutAtAnEntryBoundaryAndMarked)
+{
+    std::string const list = "Red Mist III, Cold Feet II, Mana Burn III, Fickle Sheep I";
+
+    // Strictly below the list's own length: at or above it nothing is cut, and
+    // an uncut list must not be marked as one. That boundary is checked
+    // separately below.
+    for (std::size_t budget = 6; budget < list.size(); ++budget)
+    {
+        std::string const cut = TrimList(list, budget);
+        ASSERT_LE(cut.size(), budget) << "budget " << budget << " produced " << cut.size();
+        EXPECT_NE(cut.find(", ..."), std::string::npos)
+            << "budget " << budget << ": a cut list must say it was cut";
+    }
+
+    EXPECT_EQ(TrimList(list, list.size()), list) << "exactly fits: untouched and unmarked";
+    EXPECT_EQ(TrimList(list, list.size() + 1), list);
+}
+
+TEST(WireTrim, ABudgetTooSmallForTheMarkerGivesNothingRatherThanNonsense)
+{
+    for (std::size_t budget = 0; budget <= 5; ++budget)
+        EXPECT_TRUE(TrimList("Red Mist III, Cold Feet II", budget).empty()) << "budget " << budget;
+}
+
+TEST(WireTrim, OneEnormousEntryIsCutOnACharacterBoundary)
+{
+    // No ", " to cut at, so the cut is hard -- and it must still not leave half
+    // a character on the wire.
+    std::string entry;
+    for (int i = 0; i < 60; ++i)
+        entry += "\xE2\x80\x94";
+
+    for (std::size_t budget = 8; budget <= 120; ++budget)
+    {
+        std::string const cut = TrimList(entry, budget);
+        ASSERT_LE(cut.size(), budget) << "budget " << budget;
+
+        std::string const body = cut.substr(0, cut.size() - 5);   // drop the marker
+        EXPECT_EQ(body.size() % 3u, 0u)
+            << "budget " << budget << ": cut part-way through a character";
+    }
+}
+
+TEST(WireFloor, BacksOffToACharacterBoundaryAndNeverPastTheEnd)
+{
+    std::string const s = "ab\xE2\x80\x94" "cd";   // a b <em dash> c d
+
+    EXPECT_EQ(Utf8Floor(s, s.size() + 10), s.size()) << "a budget past the end is the end";
+    EXPECT_EQ(Utf8Floor(s, 0), 0u);
+    EXPECT_EQ(Utf8Floor(s, 2), 2u) << "already on a boundary";
+    EXPECT_EQ(Utf8Floor(s, 3), 2u) << "inside the em dash, back off";
+    EXPECT_EQ(Utf8Floor(s, 4), 2u) << "still inside it";
+    EXPECT_EQ(Utf8Floor(s, 5), 5u) << "the byte after it is a boundary";
+
+    EXPECT_EQ(Utf8Floor("", 4), 0u);
+}

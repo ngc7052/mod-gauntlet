@@ -42,62 +42,6 @@ namespace Gauntlet
             }
         }
 
-        // Backs `n` off to the nearest UTF-8 boundary at or below itself, so
-        // truncating a character name never leaves half a sequence on the
-        // wire. Continuation bytes are 10xxxxxx, so a cut at any byte that is
-        // not one lands on the start of a character and everything before it
-        // is whole.
-        std::size_t Utf8Floor(std::string_view s, std::size_t n)
-        {
-            if (n >= s.size())
-                return s.size();
-
-            while (n > 0 && (static_cast<unsigned char>(s[n]) & 0xC0) == 0x80)
-                --n;
-            return n;
-        }
-
-        // A parser for one client-supplied decimal field. Refuses an empty
-        // field, anything that is not a digit, and anything above `limit`, so
-        // no inbound value can overflow or index past the end of a vector.
-        // This is why the module has no atoi in it.
-        bool ParseUInt(std::string_view s, uint32 limit, uint32& out)
-        {
-            if (s.empty() || s.size() > 10)
-                return false;
-
-            uint64 value = 0;
-            for (char c : s)
-            {
-                if (c < '0' || c > '9')
-                    return false;
-                value = value * 10 + static_cast<uint64>(c - '0');
-                if (value > limit)
-                    return false;
-            }
-            out = static_cast<uint32>(value);
-            return true;
-        }
-
-        // Cuts a comma-separated list down to `budget` bytes at the last
-        // complete entry that fits, marking that something was dropped.
-        std::string TrimList(std::string_view list, std::size_t budget)
-        {
-            if (list.size() <= budget)
-                return std::string(list);
-
-            constexpr std::string_view marker = ", ...";
-            if (budget <= marker.size())
-                return std::string();
-
-            std::size_t const room = budget - marker.size();
-            std::size_t cut = list.rfind(", ", room);
-            if (cut == std::string_view::npos)
-                cut = Utf8Floor(list, room);   // one enormous entry: hard cut
-
-            return std::string(list.substr(0, cut)) + std::string(marker);
-        }
-
         // One outbound message under construction. Every field goes through
         // here, which is the only place a tab is ever written, and the only
         // place a string from the database is scrubbed.

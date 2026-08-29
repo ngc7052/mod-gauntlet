@@ -48,6 +48,28 @@ namespace Gauntlet
     std::vector<std::string> SplitDescription(std::string const& desc,
                                               std::size_t chunk = DESC_CHUNK);
 
+    // Backs `n` off to the nearest UTF-8 boundary at or below itself, so
+    // truncating a character name never leaves half a sequence on the wire.
+    // Continuation bytes are 10xxxxxx, so a cut at any byte that is not one
+    // lands on the start of a character and everything before it is whole.
+    std::size_t Utf8Floor(std::string_view s, std::size_t n);
+
+    // A comma-separated list cut to fit a budget, at an entry boundary where
+    // there is one, and marked so the reader knows it was cut. The conducts on
+    // a leaderboard row are the only thing that needs it -- VARCHAR(255) into a
+    // 255-byte protocol message -- and cutting a run's epitaph mid-word would
+    // be a poor way to end it.
+    std::string TrimList(std::string_view list, std::size_t budget);
+
+    // A parser for one client-supplied decimal field.
+    //
+    // This is the module's entire inbound surface: the addon sends PICK <i> and
+    // SYNC, and `i` goes through here. It refuses an empty field, anything that
+    // is not a digit, and anything above `limit`, so no inbound value can
+    // overflow or index past the end of a vector -- which is why the module has
+    // no atoi in it and why this is worth a test of its own.
+    bool ParseUInt(std::string_view s, uint32 limit, uint32& out);
+
     // What the addon does with the pieces, mirrored here so the round trip can
     // be asserted rather than assumed. addon/GauntletUI/Panel.lua's ODESC and
     // ADESC handlers are the real implementation; this is a copy of a one-line
