@@ -127,7 +127,13 @@ namespace Gauntlet
         MF_None         = 0,
         MF_Timed        = 1u << 0,   // uses the scheduler clock; counts toward the event budget
         MF_OnKill       = 1u << 1,   // family cap "on-kill"
-        MF_Stalker      = 1u << 2,   // family cap "stalker": one per run
+        // Something that hunts the player, which the addon draws a SUMMON
+        // indicator for. NOT the one-per-run cap: that is the "stalker"
+        // exclusive key, which S1 and S2 carry and Ambush deliberately does
+        // not -- see the note on the Ambush row in GauntletRegistry.cpp. The
+        // comment here said "family cap: one per run" for five phases and was
+        // wrong about Ambush the whole time.
+        MF_Stalker      = 1u << 2,
         MF_RoleTax      = 1u << 3,   // cap: one per run (Cunning, Falter)
         // 1 << 4 was MF_Scalar, "takes a Condition from the condition axis".
         // Phase 2 deleted the last four Scalars and the flag with them; the bit

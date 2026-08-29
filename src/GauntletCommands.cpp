@@ -588,9 +588,17 @@ public:
     {
         Player* p = handler->GetPlayer();
 
-        // conducts joins the select for the addon's TOP line; the chat lines
-        // below are unchanged, because a conduct list is too long to read in
-        // a chat frame and the plan gives it to the addon's leaderboard tab.
+        // conducts joins the select for the addon's TOP line, which is where
+        // it belongs -- the plan gives it to the addon's leaderboard tab and
+        // Phase 5 finally built one, so a player with the addon hovers a run
+        // and reads the whole list in a tooltip.
+        //
+        // It is also printed here, on a line of its own under the run it
+        // belongs to and only when there is one. The earlier reading was that
+        // a conduct list is too long for a chat frame, and it is too long to
+        // append to the run's own line -- but a player without the addon would
+        // otherwise never see the column at all, and a run's conducts are the
+        // reason its place on this list means anything.
         QueryResult r = CharacterDatabase.Query(
             "SELECT `name`, `tier`, `level`, `cause`, `conducts` FROM `gauntlet_leaderboard` "
             "ORDER BY `tier` DESC, `level` DESC LIMIT 10");
@@ -611,11 +619,15 @@ public:
             uint32 const      level = f[2].Get<uint32>();
             std::string const cause = f[3].Get<std::string>();
 
+            std::string const conducts = f[4].Get<std::string>();
+
             handler->PSendSysMessage("  {}. {} - tier {} at level {} ({})", rank,
                                      name, tier, level, cause);
+            if (!conducts.empty())
+                handler->PSendSysMessage("     |cff60c060conducts:|r {}", conducts);
 
             if (p)
-                sGauntletAddon->SendTop(p, rank, name, tier, level, cause, f[4].Get<std::string>());
+                sGauntletAddon->SendTop(p, rank, name, tier, level, cause, conducts);
 
             ++rank;
         } while (r->NextRow());

@@ -22,10 +22,10 @@ nothing in this module has been playtested; and the three-way choice
 | # | Step | State |
 |---|---|---|
 | 1 | The seven dead `Gauntlet.Family.*.Enable` keys | **done** |
-| 2 | The empty tail: measure the levers, make the choice a config key | **in progress** |
-| 3 | The pair tests, as unit tests where they can be one | |
+| 2 | The empty tail: measure the levers | **done** — the answer is not a config key; see below |
+| 3 | The pair tests | **folded into step 4** — see below |
 | 4 | `docs/checklists.md` | |
-| 5 | `.gauntlet top` conducts, and the addon's leaderboard | |
+| 5 | `.gauntlet top` conducts, and the addon's leaderboard | **done** |
 | 6 | README for the family model, and the determinism note | |
 | 7 | `docs/phase-5-report.md` | |
 
@@ -115,3 +115,47 @@ have counterplay but pay nothing, Blood Magic is a tax with a boon, the Rules
 rows are restrictions. Diluting `MF_RewardShaped` until the guarantee is
 trivially met would make the guarantee mean nothing, which is worse than it
 failing honestly.
+
+## Why step 2 did not end in a config key
+
+The phase's plan said "make the choice a config key", and two of the three
+choices turned out not to need one.
+
+**Option 3, stopping the tier axis before 80, is already the shipped
+behaviour.** `Mgr::OfferTier` checks whether any of the three offers names a
+mechanic and, if none does, advances the tier silently -- no chat lines, no
+chooser. So a run past the point where the table is exhausted is already quiet,
+and a `Gauntlet.MaxTier` key would only have made the same silence explicit. A
+key that changes nothing is the fault this phase opened by fixing seven of them.
+
+**Option 2 is refuted**, so there is nothing to expose.
+
+**Option 1, `MAX_RANK` above 3, cannot be a config key at all.** Every
+mechanic's rank table is `constexpr T X[MAX_RANK] = { a, b, c }`, so the
+ceiling is a compile-time constant by construction -- and raising it without
+writing 69 files of fourth values makes every one of them zero-fill silently.
+It is a phase of work with a balance pass in it, and the numbers to justify it
+are in the table above.
+
+`CAP_CLASS` is the one number in that list that is already marked
+`TODO(design)` and that the design has an opinion about: the cards give each
+class four class curses and the generator allows three. Measured, four is a net
+improvement (relaxed 48.86% to 46.75%, empty slots 130,277 to 103,289) with a
+small cost in the thirties, because a run that takes a fourth class curse
+earlier runs its class pool down sooner. It is left at three: the phase-4 report
+put the choice as "three leaves the fourth a live offer; four would let a run be
+entirely defined by its class, which may be the better game", and that is a
+question about what the game should feel like rather than one the sweep can
+answer.
+
+## Why step 3 is part of step 4
+
+Plan §5.4 names three pairs and a role-tax exclusivity to run "on a level-40
+character". Only the exclusivity half can be asserted off-game, and it already
+is: Shade/Echo and Cunning/Falter carry the `stalker` and `roletax` exclusive
+keys, and `OfferInvariants`' `I_EXCLUSIVE_KEY` checks every carried pair over
+1.6 million sets. The other three are behavioural -- do Call to Arms and Craven
+compound into an unkillable chain, does Champions plus Frenzy outrun the damage
+cap -- and answering them needs the mechanics' implementations, which cannot
+be built without the core. They are checklist entries, so they are in
+`docs/checklists.md` with the rest.

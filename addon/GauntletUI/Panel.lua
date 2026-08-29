@@ -316,7 +316,7 @@ local function RefreshMain()
 
     if n == 0 then main.empty:Show() else main.empty:Hide() end
     main.foot:SetText(pendingOffer and "|cffffd100A choice is waiting - leave combat.|r"
-                                    or "/gauntlet top for the leaderboard")
+                                    or "/gauntlet top for the furthest runs")
     main:SetHeight(math.max(120, 76 + math.max(n, 1) * ROW_H))
 end
 
@@ -660,14 +660,156 @@ GauntletProtocol.On("OFFER_END", function()
     if DB("autoOpen") then ShowChooser() else pendingOffer = true; RefreshMain() end
 end)
 
--- No player-facing leaderboard tab exists yet (out of this file's rendering
--- scope per spec); print it to chat so ".gauntlet top" still shows something
--- once the protocol is active, same as it always has via plain chat text.
+-- ========================================================== leaderboard ====
+--
+-- The server has sent conducts on the TOP frame since Phase 0 and nothing has
+-- ever drawn them: the handler printed one chat line per row and dropped the
+-- conduct list into it, which is exactly what GauntletCommands.cpp's own
+-- comment says not to do -- "a conduct list is too long to read in a chat
+-- frame and the plan gives it to the addon's leaderboard tab". This is that
+-- tab. The chat lines the server sends are untouched, because fallback mode
+-- has nothing else.
+--
+-- Conducts are the class curses a run carried when it ended. They are the
+-- run's epitaph and the reason the leaderboard is more than a number, so they
+-- get the whole width of a tooltip rather than a truncated tail.
+
+local TOP_ROWS   = 10
+local TOP_ROW_H  = 22
+local topRows    = {}
+local topData    = {}
+local topWaiting = 0        -- seconds since /gauntlet top asked, 0 when not asking
+
+local topPanel = Panel("GauntletTop", 420, 62 + TOP_ROWS * TOP_ROW_H, "Furthest Runs")
+
+topPanel.head = topPanel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+topPanel.head:SetPoint("TOPLEFT", topPanel, "TOPLEFT", 14, -30)
+topPanel.head:SetJustifyH("LEFT")
+topPanel.head:SetText("Hover a run to see the curses it carried.")
+
+for i = 1, TOP_ROWS do
+    local r = CreateFrame("Button", nil, topPanel)
+    r:SetWidth(392); r:SetHeight(TOP_ROW_H)
+    r:SetPoint("TOPLEFT", topPanel, "TOPLEFT", 14, -46 - (i - 1) * TOP_ROW_H)
+    r:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
+    r:SetBackdropColor(unpack(ROW_BG))
+
+    r.rank = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    r.rank:SetPoint("LEFT", r, "LEFT", 6, 0)
+    r.rank:SetWidth(24); r.rank:SetJustifyH("RIGHT")
+
+    r.name = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    r.name:SetPoint("LEFT", r.rank, "RIGHT", 8, 0)
+    r.name:SetWidth(110); r.name:SetJustifyH("LEFT")
+
+    r.tier = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    r.tier:SetPoint("LEFT", r.name, "RIGHT", 4, 0)
+    r.tier:SetWidth(90); r.tier:SetJustifyH("LEFT")
+
+    r.cause = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    r.cause:SetPoint("LEFT", r.tier, "RIGHT", 4, 0)
+    r.cause:SetPoint("RIGHT", r, "RIGHT", -6, 0)
+    r.cause:SetJustifyH("LEFT")
+
+    AddGlow(r)
+    r:SetScript("OnEnter", function(self)
+        self.glow:Show()
+        local d = self.data
+        if not d then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(d.name, 1, 0.82, 0)
+        GameTooltip:AddLine(("Tier %s at level %s"):format(d.tier, d.level), 1, 1, 1)
+        GameTooltip:AddLine(d.cause, 0.8, 0.8, 0.8, true)
+        if d.conducts and d.conducts ~= "" then
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine("Conducts", 1, 0.82, 0)
+            GameTooltip:AddLine(d.conducts, 0.6, 0.85, 0.6, true)
+        else
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine("No class curses carried.", 0.5, 0.5, 0.5)
+        end
+        GameTooltip:Show()
+    end)
+    r:SetScript("OnLeave", function(self) self.glow:Hide(); GameTooltip:Hide() end)
+    r:Hide()
+    topRows[i] = r
+end
+
+topPanel.empty = topPanel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+topPanel.empty:SetPoint("TOPLEFT", topPanel, "TOPLEFT", 16, -52)
+topPanel.empty:Hide()
+
+local function RefreshTop()
+    local n = 0
+    for i = 1, TOP_ROWS do
+        local d = topData[i]
+        if d then
+            topRows[i].data = d
+            topRows[i].rank:SetText("#" .. d.rank)
+            topRows[i].name:SetText(d.name)
+            topRows[i].tier:SetText(("tier |cffffd100%s|r"):format(d.tier))
+            -- Marked when the run carried conducts, because that is the whole
+            -- reason to hover a row and nothing else on the line hints at it.
+            local mark = (d.conducts and d.conducts ~= "") and "|cff60c060*|r " or ""
+            topRows[i].cause:SetText(mark .. d.cause)
+            topRows[i]:Show(); n = i
+        else
+            topRows[i].data = nil
+            topRows[i]:Hide()
+        end
+    end
+
+    if n == 0 then
+        topPanel.empty:SetText(topWaiting > 0 and "Asking the server..."
+                                              or "No completed runs yet.")
+        topPanel.empty:Show()
+    else
+        topPanel.empty:Hide()
+    end
+    topPanel:SetHeight(62 + math.max(n, 1) * TOP_ROW_H)
+end
+
+-- The server sends one TOP frame per row and no end marker, so rank 1 is the
+-- start of a batch. That is enough: the query is ORDER BY tier DESC LIMIT 10
+-- and always begins at 1, and a second /gauntlet top simply replaces the list.
 GauntletProtocol.On("TOP", function(rank, name, tier, level, cause, conducts)
-    DEFAULT_CHAT_FRAME:AddMessage(("Gauntlet Top: #%s %s - tier %s (level %s) - %s [%s]"):
-        format(tostring(rank), tostring(name), tostring(tier), tostring(level),
-               tostring(cause), tostring(conducts)), 1, 0.82, 0)
+    local i = tonumber(rank)
+    if not i or i < 1 or i > TOP_ROWS then return end
+    if i == 1 then topData = {} end
+
+    topData[i] = {
+        rank     = tostring(rank),
+        name     = tostring(name or "?"),
+        tier     = tostring(tier or "?"),
+        level    = tostring(level or "?"),
+        cause    = tostring(cause or ""),
+        conducts = conducts and tostring(conducts) or "",
+    }
+
+    topWaiting = 0
+    RefreshTop()
+    topPanel:Show()
 end)
+
+-- Nothing came back within a few seconds of asking, which on a fresh realm is
+-- the ordinary answer rather than a fault: gauntlet_leaderboard is empty until
+-- somebody finishes a run. Said plainly instead of leaving "Asking the
+-- server..." on screen forever.
+topPanel:SetScript("OnUpdate", function(self, elapsed)
+    if topWaiting <= 0 then return end
+    topWaiting = topWaiting + elapsed
+    if topWaiting < 4 then return end
+    topWaiting = 0
+    RefreshTop()
+end)
+
+local function AskForTop()
+    topData = {}
+    topWaiting = 0.001   -- non-zero starts the timer; see OnUpdate
+    RefreshTop()
+    topPanel:Show()
+    SendChatMessage(".gauntlet top", "SAY")
+end
 
 GauntletProtocol.OnModeChange(function(newMode)
     if newMode == "protocol" then
@@ -758,7 +900,7 @@ end)
 SLASH_GAUNTLET1 = "/gauntlet"
 SlashCmdList["GAUNTLET"] = function(cmd)
     cmd = (cmd or ""):lower()
-    if cmd == "top" then SendChatMessage(".gauntlet top", "SAY") return end
+    if cmd == "top" then AskForTop() return end
     if cmd == "pick" and next(offers) then ShowChooser() return end
     if cmd == "config" then gear:GetScript("OnClick")() return end
     if main:IsShown() then main:Hide() return end
