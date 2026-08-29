@@ -151,7 +151,8 @@ namespace
 
         { 10, "grudge", "Grudge", Family::Enemy, CM_MELEE, 3, 10, 3,
           MF_OnKill, "onkill-positional", Boon::BonusHealing, 0, 0,
-          "The dead linger: standing where an enemy died saps you." },
+          "Everything you kill leaves a ghost on its corpse that drains your health"
+          " while you stand near it." },
 
         { 11, "nimble", "Nimble", Family::Enemy, 0, 6, 14, 3,
           MF_None, "", Boon::BonusMaxHealth, 0, 0,

@@ -284,11 +284,22 @@ namespace Gauntlet
         {
             uint8 const i = RankIndex(&self);
 
+            // Two words changed in Phase 3, both because a player read them and
+            // could not tell what the affix did.
+            //
+            // The registry blurb said "saps you", which is the design card's
+            // own wording and is wrong twice over: it names no effect, and Sap
+            // is a rogue ability, so it reads as crowd control.
+            //
+            // This sentence said "and heal for half", which was meant to say
+            // that healing received is halved and can just as easily be read
+            // as the drain healing you -- the opposite of what it does.
             std::string out = "Everything you kill leaves a Restless Spirit standing on its corpse"
-                              " for twenty-five seconds. Within four yards of one you lose "
+                              " for twenty-five seconds. Within four yards of one you take "
                             + std::to_string(DRAIN_PCT[i])
-                            + "% of your maximum health every second and heal for half. Fight on"
-                              " fresh ground, and decide when to loot.";
+                            + "% of your maximum health as damage every second, and any healing"
+                              " you receive is halved. Fight on fresh ground, and decide when"
+                              " to loot.";
 
             out += BoonClause(self.boon, self.boonMag);
             return out;

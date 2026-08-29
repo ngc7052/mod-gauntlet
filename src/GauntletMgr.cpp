@@ -422,6 +422,31 @@ namespace Gauntlet
         return "An affix this server no longer knows.";
     }
 
+    std::string Mgr::DescribeOffer(Offer const& offer) const
+    {
+        AffixInstance probe;
+        probe.mechanic   = offer.mechanic;
+        probe.rank       = offer.rank;
+        probe.condition  = offer.condition;
+        probe.boon       = offer.boon;
+        probe.boonMag    = offer.boonMag;
+        probe.genVersion = GeneratorVersion;
+
+        // MakeMechanic hands back an owned pointer and AffixInstance is a
+        // plain struct that does not free one, so this is deleted by hand. It
+        // is a default-constructed mechanic asked one const question and never
+        // attached, ticked or given a Ctx, so it holds no run state and reads
+        // none.
+        probe.impl = MakeMechanic(offer.mechanic);
+
+        std::string const out = DescribeOf(probe);
+
+        delete probe.impl;
+        probe.impl = nullptr;
+
+        return out;
+    }
+
     void Mgr::Load(Player* player)
     {
         if (!IsEligible(player))

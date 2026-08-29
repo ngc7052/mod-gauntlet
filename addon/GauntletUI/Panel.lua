@@ -526,6 +526,28 @@ GauntletProtocol.On("OFFER", function(i, id, rank, cond, boon, boonMag, kind, sw
     }
 end)
 
+-- The mechanic's own sentence at the rank being offered, which the server
+-- sends as one or more ODESC frames right after the OFFER it belongs to.
+--
+-- It replaces Data.lua's static blurb rather than adding to it: the blurb is
+-- one line per registry row and says the same thing at every rank, so a RANK
+-- UP offer used to read exactly like the NEW offer beside it. Long sentences
+-- arrive in pieces and are joined here in arrival order.
+--
+-- A server too old to send ODESC simply never calls this, and the blurb set in
+-- the OFFER handler stands.
+GauntletProtocol.On("ODESC", function(i, text)
+    local o = pendingOffers[tonumber(i)]
+    if not o then return end
+
+    if o.descFromServer then
+        o.desc = o.desc .. (text or "")
+    else
+        o.desc = text or ""
+        o.descFromServer = true
+    end
+end)
+
 GauntletProtocol.On("OFFER_END", function()
     offers = pendingOffers
     pendingOffers = {}

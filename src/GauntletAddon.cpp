@@ -12,6 +12,7 @@
 #include "WorldPacket.h"
 #include "WorldSession.h"
 #include <cstddef>
+#include <algorithm>
 #include <string>
 
 namespace Gauntlet
@@ -371,6 +372,11 @@ namespace Gauntlet
         Emit(player, Frame("AFFIX_END").Str());
     }
 
+    // "GNT\tODESC\t<index>\t" is thirteen bytes at three digits of index, and
+    // Frame refuses anything over MaxPayload, so this leaves a wide margin
+    // rather than sitting on the limit.
+    constexpr std::size_t DESC_CHUNK = 200;
+
     void Addon::SendOffers(Player* player)
     {
         if (!CanSend(player))
@@ -402,6 +408,40 @@ namespace Gauntlet
             f.Text(WireKind(o.kind), 16);
             f.Num(o.swapSlot);
             Emit(player, f.Str());
+
+            // The mechanic's own sentence, at the rank this offer is
+            // promising. Without it the panel can only draw
+            // MechanicDef::blurb, which is one static line per row -- so a
+            // RANK UP offer read exactly like the NEW offer beside it and told
+            // the player nothing about what the rank changed. They are being
+            // asked to accept a permanent number that nothing has shown them.
+            //
+            // Sent as its own frame rather than a field on OFFER because the
+            // sentences run to 250 characters and MaxPayload is 255. Long ones
+            // arrive as several ODESC frames for the same index and the addon
+            // joins them, so nothing has to be truncated at a word boundary
+            // that a future rank might move.
+            std::string const desc = sGauntlet->DescribeOffer(o);
+            for (std::size_t at = 0; at < desc.size(); )
+            {
+                std::size_t take = std::min<std::size_t>(DESC_CHUNK, desc.size() - at);
+
+                // Break on a space when there is one to break on, so a chunk
+                // boundary never lands inside a word.
+                if (at + take < desc.size())
+                {
+                    std::size_t const space = desc.rfind(' ', at + take);
+                    if (space != std::string::npos && space > at)
+                        take = space - at + 1;
+                }
+
+                Frame d("ODESC");
+                d.Num(static_cast<int64>(i + 1));
+                d.Text(desc.substr(at, take), DESC_CHUNK);
+                Emit(player, d.Str());
+
+                at += take;
+            }
         }
 
         Emit(player, Frame("OFFER_END").Str());

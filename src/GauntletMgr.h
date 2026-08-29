@@ -219,6 +219,17 @@ namespace Gauntlet
         std::string NameOf(uint16 mechanic, Condition condition, Boon boon) const;
         std::string DescribeOf(AffixInstance const& instance) const;
 
+        // The same sentence for an offer that has not been taken, at the rank
+        // and boon magnitude the offer is promising.
+        //
+        // It has to build a throwaway mechanic to ask, because Describe() is a
+        // method on the implementation and an offer has none -- it is a row in
+        // st->pending, not a carried affix. Without this the panel can only
+        // show MechanicDef::blurb, which is one static sentence per row: a
+        // rank-up offer then reads exactly like the rank-1 offer next to it,
+        // and the player is asked to accept a number nothing has told them.
+        std::string DescribeOffer(Offer const& offer) const;
+
     private:
         bool ConditionActive(Player* player, Condition c) const;
 

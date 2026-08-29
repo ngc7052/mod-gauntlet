@@ -63,7 +63,7 @@ GauntletData = {
         [9] = { name = "Death Rattle", key = "death_rattle", family = 1,
                  icon = "Interface\\Icons\\INV_Misc_Bone_HumanSkull_01", desc = "Corpses burst two seconds after death, hurting anyone within five yards." },
         [10] = { name = "Grudge", key = "grudge", family = 1,
-                 icon = "Interface\\Icons\\Ability_Warrior_Revenge", desc = "The dead linger: standing where an enemy died saps you." },
+                 icon = "Interface\\Icons\\Ability_Warrior_Revenge", desc = "Everything you kill leaves a ghost on its corpse that drains your health while you stand near it." },
         [11] = { name = "Nimble", key = "nimble", family = 1,
                  icon = "Interface\\Icons\\Ability_Rogue_Sprint", desc = "Enemies move 30% faster." },
         [12] = { name = "Cunning", key = "cunning", family = 1,
