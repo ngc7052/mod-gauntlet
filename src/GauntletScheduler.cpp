@@ -28,6 +28,27 @@ namespace Gauntlet
                 return a.dueMs < b.dueMs;
             if (a.kind != b.kind)
                 return static_cast<uint8>(a.kind) < static_cast<uint8>(b.kind);
+
+            // Oldest arming first, and this is the whole of the starvation fix.
+            //
+            // It used to be the mechanic id, which is a stable ranking of the
+            // registry rather than of anything about the events -- so whenever
+            // several fires came due at the same moment, the same mechanic won
+            // every time and the same mechanic lost every time. Under a spacing
+            // tight enough to make ties routine, the loser is not merely late,
+            // it never fires at all: re-telegraphing pushes it to the next
+            // spacing boundary, where it ties again, and loses again, forever.
+            //
+            // Falling Sky (id 14) sat behind Echo (2), Ambush (5) and
+            // Reinforcements (4) on every tie and issued 23 telegraphs without
+            // a single strike in five minutes of unbroken combat.
+            //
+            // `seq` is assigned once at Arm() and survives a re-telegraph, so
+            // an event that has been waiting is ahead of everything armed after
+            // it and cannot be lapped. The order is still total and still
+            // deterministic, which is what the tests rely on.
+            if (a.seq != b.seq)
+                return a.seq < b.seq;
             if (a.mechanic != b.mechanic)
                 return a.mechanic < b.mechanic;
             return a.id < b.id;
@@ -154,6 +175,7 @@ namespace Gauntlet
         ScheduledEvent ev;
         ev.mechanic = mechanic;
         ev.id       = id;
+        ev.seq      = ++_seq;
 
         if (lead > 0)
         {

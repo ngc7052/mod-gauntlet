@@ -49,6 +49,12 @@ namespace Gauntlet
         uint16    mechanic = MECHANIC_NONE;
         uint32    id       = 0;      // the mechanic's own tag for this event
         EventKind kind     = EventKind::Warn;
+
+        // Arming order, assigned once and never changed -- a re-telegraph keeps
+        // it. Two events due at the same instant are ordered by this rather
+        // than by mechanic id, so the one that has been waiting longer goes
+        // first and nothing can be lapped forever. See Earlier().
+        uint32    seq      = 0;
     };
 
     // One per player. Owns the clock; mechanics never own one.
@@ -105,6 +111,21 @@ namespace Gauntlet
         // plus WARN_STALE_SLACK_MS after the warning was sent, the pair is
         // re-telegraphed: a fresh Warn goes out and the Fire moves to a full
         // lead behind it. The player always gets a warning that is still true.
+        //
+        // Re-telegraphing is unbounded on purpose: a Fire held for a very long
+        // time re-announces as often as it has to, and each announcement is
+        // true when it is made. What stops that becoming a mechanic that only
+        // ever warns is the ordering rule on ScheduledEvent::seq -- without it,
+        // a re-telegraphed Fire moved to the back of a queue sorted by due
+        // time and, when it tied with a fresher event, lost the tie-break to
+        // the lower mechanic id every single time.
+        //
+        // Measured before that fix, with four timed affixes and the shipped
+        // 12 s spacing: Falling Sky III issued 23 warnings and fired 0 times in
+        // five minutes of unbroken combat. Its 3 s lead tolerates 5 s of delay
+        // against a 12 s wait, so it re-telegraphed on every cycle, and id 14
+        // sat behind 2, 4 and 5 on every tie. The player saw the circle land
+        // twenty-three times and never once saw the sky fall.
         std::vector<ScheduledEvent> Tick(uint32 diff, Suppression const& s);
 
         // 1 + step * (timedAffixes - 1); intervals a mechanic asks for are
@@ -167,6 +188,7 @@ namespace Gauntlet
         uint32 _minSpacingMs  = DEFAULT_MIN_SPACING_MS;
         float  _budgetStep    = DEFAULT_BUDGET_STEP;
         uint32 _timedAffixes  = 0;
+        uint32 _seq           = 0;   // monotonic arming counter; see ScheduledEvent::seq
     };
 }
 

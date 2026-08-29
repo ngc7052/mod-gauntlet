@@ -19,6 +19,8 @@
 
 #include <gtest/gtest.h>
 
+#include <map>
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -768,4 +770,124 @@ namespace
 
         EXPECT_TRUE(s.Queue().empty()) << "everything armed came out";
     }
+}
+
+// =====================================================================
+// Starvation (Phase 3)
+// =====================================================================
+//
+// The bug this exists to prevent, in one sentence: a mechanic with a short
+// warning lead could issue telegraph after telegraph and never once fire.
+//
+// Re-telegraphing moves a Fire's dueMs later, and the queue is sorted by
+// dueMs, so a re-telegraphed Fire goes behind every event that has not slipped
+// yet. Once enough timed affixes saturate the minimum spacing, whichever
+// mechanic has the shortest lead is re-telegraphed every time and never
+// reaches the front again.
+//
+// It was found in play, reported as "falling sky 3 rank says every 20 seconds
+// in combat, but nothing burger happens". Falling Sky III asks for 20 s with a
+// 3 s lead; the shipped spacing is 12 s, so it tolerates 5 s of delay against
+// a 12 s wait and loses every contest. Measured before the fix: 23 warnings, 0
+// fires, in five minutes of unbroken combat.
+TEST(Scheduler, AShortLeadIsNotStarvedByTheSpacing)
+{
+    Scheduler s;
+    s.SetTimedAffixCount(4);
+    s.SetMinSpacingMs(12000);
+    s.SetBudgetStep(0.25f);
+
+    // A saturating set, not a typical one. Three of the four are real cadences;
+    // the fast 4 s re-arm stands in for the mechanics that genuinely do it --
+    // Death Rattle arms a 2 s fuse on every kill, Carrion re-arms on a 10 s
+    // deferral whenever it cannot act -- because what starves an event is a
+    // competitor that is always due, not a competitor that is frequent.
+    //
+    // Falling Sky is id 14 and every one of its rivals here has a lower id,
+    // which is exactly the shape the old tie-break punished. Reverting the
+    // ordering rule turns this set into 23 warnings and 0 fires for it.
+    struct Timed { uint16 id; uint32 cadence; uint32 lead; };
+    constexpr Timed CARRIED[] = {
+        { 14, 20000, 3000 },   // Falling Sky III -- highest id, so it loses every tie
+        {  5,  4000, 4000 },   // an always-due competitor
+        {  2, 90000, 8000 },   // Echo
+        {  4, 20000, 5000 },   // Reinforcements III
+    };
+
+    std::map<uint16, uint32> fires, warns, tag;
+    for (Timed const& t : CARRIED)
+    {
+        tag[t.id] = 1;
+        s.Arm(t.id, 1, t.cadence, t.lead);
+    }
+
+    Suppression const none;
+    for (uint32 elapsed = 0; elapsed < 300000; elapsed += 500)
+    {
+        for (ScheduledEvent const& ev : s.Tick(500, none))
+        {
+            if (ev.kind == EventKind::Warn)
+            {
+                ++warns[ev.mechanic];
+                continue;
+            }
+
+            ++fires[ev.mechanic];
+
+            // Re-arm exactly as the mechanics do from their own OnEvent.
+            for (Timed const& t : CARRIED)
+                if (t.id == ev.mechanic)
+                    s.Arm(t.id, ++tag[t.id], t.cadence, t.lead);
+        }
+    }
+
+    for (Timed const& t : CARRIED)
+    {
+        EXPECT_GT(fires[t.id], 0u)
+            << "mechanic " << t.id << " issued " << warns[t.id] << " warning(s) and fired "
+            << fires[t.id] << " time(s) in five minutes of unbroken combat. A telegraph that "
+               "never resolves is worse than no affix at all: the player learns to ignore it.";
+
+        // A warning per fire is the promise. Some slippage is inherent in a
+        // saturated queue -- that is what re-telegraphing is for -- but an
+        // event that warns many times per fire is crying wolf, and a player
+        // learns to ignore a countdown that usually resolves into nothing.
+        //
+        // The always-due competitor is exempt: it re-arms faster than the
+        // spacing can ever release it, which is a shape no real mechanic has
+        // for long, and it is here to saturate the queue rather than to be
+        // measured.
+        if (t.cadence >= 10000)
+            EXPECT_LE(warns[t.id], fires[t.id] * 2 + 2)
+                << "mechanic " << t.id << " warned " << warns[t.id] << " times for " << fires[t.id]
+                << " fire(s); the countdown is crying wolf";
+    }
+}
+
+// The ordering rule itself, in isolation: an event that has been waiting is
+// ahead of one armed later when the two come due together. Before Phase 3 the
+// tie went to the lower mechanic id, which is a stable ranking of the registry
+// and not of anything about the events -- so the same mechanic won every tie
+// and, under a tight spacing, the same mechanic never fired at all.
+TEST(Scheduler, ATieGoesToWhicheverWasArmedFirst)
+{
+    Scheduler s;
+    s.SetMinSpacingMs(0);     // spacing off: this is purely about order
+
+    // Armed in descending id order, so an id tie-break would reverse them.
+    s.Arm(19, 1, 5000, 0);
+    s.Arm(14, 1, 5000, 0);
+    s.Arm(6,  1, 5000, 0);
+
+    std::vector<uint16> order;
+    Suppression const none;
+    for (uint32 t = 0; t < 10000 && order.size() < 3; t += 500)
+        for (ScheduledEvent const& ev : s.Tick(500, none))
+            if (ev.kind == EventKind::Fire)
+                order.push_back(ev.mechanic);
+
+    ASSERT_EQ(3u, order.size());
+    EXPECT_EQ(19u, order[0]) << "armed first, so it goes first";
+    EXPECT_EQ(14u, order[1]);
+    EXPECT_EQ(6u,  order[2]) << "armed last, so it goes last -- not first for having the lowest id";
 }
