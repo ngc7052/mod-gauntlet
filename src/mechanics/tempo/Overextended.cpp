@@ -35,8 +35,11 @@ namespace Gauntlet
     {
         constexpr uint16 MECHANIC_OVEREXTENDED = 16;
 
-        // The card's ladder: 15 -> 20 -> 30% per extra attacker.
-        constexpr uint32 PER_ATTACKER_PCT[] = { 15, 20, 30 };
+        // The card's ladder: 15 -> 20 -> 30% per extra attacker, and 40 at
+        // rank IV -- where three extra attackers is the whole of
+        // Gauntlet.Caps.DamageTaken on its own, which is the point: the top
+        // rank makes a bad pull immediately fatal rather than gradually so.
+        constexpr uint32 PER_ATTACKER_PCT[] = { 15, 20, 30, 40 };
         static_assert(std::size(PER_ATTACKER_PCT) >= MAX_RANK, "PER_ATTACKER_PCT is short a rank");
 
         // The readout's ceiling, for the addon's counter. Not a cap on the

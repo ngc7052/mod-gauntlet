@@ -43,8 +43,11 @@ namespace Gauntlet
     {
         constexpr uint16 MECHANIC_LAST_RITES = 26;
 
-        // The card's ladder, as scarcity: a charge every N levels.
-        constexpr uint8 LEVELS_PER_CHARGE[] = { 1, 2, 3 };
+        // The card's ladder, as scarcity: a charge every N levels, and every
+        // four at rank IV. This is the one ladder in the table where a higher
+        // rank is a smaller gift and nothing else, because the gift is the
+        // whole mechanic: Last Rites has no curse half to escalate.
+        constexpr uint8 LEVELS_PER_CHARGE[] = { 1, 2, 3, 4 };
         static_assert(std::size(LEVELS_PER_CHARGE) >= MAX_RANK, "LEVELS_PER_CHARGE is short a rank");
 
         // The card's two fixed numbers.

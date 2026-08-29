@@ -40,9 +40,12 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_FALTER = 17;
 
         // The card's ladders: cadence 60 -> 45 -> 30 s, duration 2 -> 3 -> 4 s.
-        constexpr uint32 CADENCE_MS[]  = { 60000, 45000, 30000 };
+        // Rank IV is 22 s and 5 s past the card -- a fifth of every fight
+        // spent unable to act, which is where a tempo tax should top out: it
+        // is survivable by planning around it and unsurvivable by ignoring it.
+        constexpr uint32 CADENCE_MS[]  = { 60000, 45000, 30000, 22000 };
         static_assert(std::size(CADENCE_MS) >= MAX_RANK, "CADENCE_MS is short a rank");
-        constexpr uint32 DURATION_MS[] = { 2000, 3000, 4000 };
+        constexpr uint32 DURATION_MS[] = { 2000, 3000, 4000, 5000 };
         static_assert(std::size(DURATION_MS) >= MAX_RANK, "DURATION_MS is short a rank");
 
         // "You are warned two seconds ahead."

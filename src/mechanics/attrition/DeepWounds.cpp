@@ -43,7 +43,12 @@ namespace Gauntlet
     {
         // The design card's severity ladder: 30 -> 40 -> 50% of the damage
         // taken becomes wound, at ranks I, II and III.
-        constexpr int32 WOUND_PCT[] = { 30, 40, 50 };
+        // Rank IV is 60%, past the card. Gauntlet.Caps.MaxHealth still floors
+        // what the pool can fall to, so what the last rank buys is reaching
+        // that floor in fewer blows rather than a deeper hole: the ladder is
+        // about how often you have to go and rest, which is the decision the
+        // affix exists to create.
+        constexpr int32 WOUND_PCT[] = { 30, 40, 50, 60 };
         static_assert(std::size(WOUND_PCT) >= MAX_RANK, "WOUND_PCT is short a rank");
 
         // ...capped at 40% of the pool, which is the same number plan section

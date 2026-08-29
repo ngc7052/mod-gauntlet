@@ -39,8 +39,11 @@ namespace Gauntlet
     {
         constexpr uint16 MECHANIC_FRENZY = 15;
 
-        // The card's ladder: 4 -> 6 -> 8% per stack, both ways.
-        constexpr uint32 PCT_PER_STACK[] = { 4, 6, 8 };
+        // The card's ladder: 4 -> 6 -> 8% per stack, both ways, and 10 at
+        // rank IV. BoonTable's override for this row is 2 + 2 * rank, which
+        // gives 10 at rank IV on its own -- the two have to agree, because
+        // the boon is the damage-dealt half of this same number.
+        constexpr uint32 PCT_PER_STACK[] = { 4, 6, 8, 10 };
         static_assert(std::size(PCT_PER_STACK) >= MAX_RANK, "PCT_PER_STACK is short a rank");
 
         // The card's two fixed numbers.

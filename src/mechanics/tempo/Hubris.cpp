@@ -40,15 +40,34 @@ namespace Gauntlet
 
         // The card's ladder: x0.5/x1.2 -> x0.25/x1.3 -> x0/x1.4. The penalty is
         // a percentage kept, so 50 -> 25 -> 0.
-        constexpr uint32 BELOW_KEEP_PCT[] = { 50, 25, 0 };
+        //
+        // Rank IV needed a second axis rather than a fourth number. The curse
+        // is already absolute at rank III -- an enemy below your level gives
+        // nothing, and nothing is the floor -- so continuing the ladder would
+        // have moved only ABOVE_BONUS_PCT, which is the *boon*. That is a
+        // rank-up with no downside and a bigger reward, which is not a choice
+        // and is the shape this redesign exists to delete.
+        //
+        // So the fourth rank widens what "below" means instead: an enemy at
+        // exactly your level counts as below it, and only something higher than
+        // you pays experience at all. The card's own instruction -- "level in
+        // the zone one step ahead" -- stops being advice and becomes the rule.
+        constexpr uint32 BELOW_KEEP_PCT[] = { 50, 25, 0, 0 };
         static_assert(std::size(BELOW_KEEP_PCT) >= MAX_RANK, "BELOW_KEEP_PCT is short a rank");
 
         // The bonus half, and the fallback when an instance carries no boon
         // magnitude. The generator gives this row its own BoonTable entry so
-        // that boonMag is 20/30/40 and the offer card promises exactly what the
-        // mechanic pays; this array is what a hand-built instance falls back to.
-        constexpr uint32 ABOVE_BONUS_PCT[] = { 20, 30, 40 };
+        // that boonMag is 20/30/40/50 and the offer card promises exactly what
+        // the mechanic pays; this array is what a hand-built instance falls back
+        // to. BoonTable's override for this row is 10 * (rank + 1), which gives
+        // 50 at rank IV on its own, so the two agree without either knowing
+        // about the other.
+        constexpr uint32 ABOVE_BONUS_PCT[] = { 20, 30, 40, 50 };
         static_assert(std::size(ABOVE_BONUS_PCT) >= MAX_RANK, "ABOVE_BONUS_PCT is short a rank");
+
+        // Rank IV only: an enemy at your own level is treated as below it.
+        constexpr bool EQUAL_IS_BELOW[] = { false, false, false, true };
+        static_assert(std::size(EQUAL_IS_BELOW) >= MAX_RANK, "EQUAL_IS_BELOW is short a rank");
 
         uint8 RankIndex(AffixInstance const* self)
         {
@@ -98,7 +117,7 @@ namespace Gauntlet
             uint8 const mine   = player->GetLevel();
             uint8 const theirs = victim->GetLevel();
 
-            if (theirs < mine)
+            if (theirs < mine || (theirs == mine && EQUAL_IS_BELOW[i]))
             {
                 uint32 const keep = BELOW_KEEP_PCT[i];
                 amount = static_cast<uint32>(static_cast<uint64>(amount) * keep / 100u);
@@ -151,7 +170,8 @@ namespace Gauntlet
             uint32 const keep  = BELOW_KEEP_PCT[i];
             uint32 const bonus = self.boonMag != 0 ? uint32(self.boonMag) : ABOVE_BONUS_PCT[i];
 
-            std::string out = "Enemies below your level give ";
+            std::string out = EQUAL_IS_BELOW[i] ? "Enemies at or below your level give "
+                                                : "Enemies below your level give ";
             out += keep == 0 ? "no experience" : ("only " + std::to_string(keep) + "% of their experience");
             out += "; enemies above your level give " + std::to_string(bonus)
                  + "% more. Quest experience is untouched. Level in the zone one step ahead.";

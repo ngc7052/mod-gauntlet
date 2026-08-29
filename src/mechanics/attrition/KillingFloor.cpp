@@ -82,13 +82,16 @@ namespace Gauntlet
         // with rank, because the curse half is fixed -- healing is blocked, at
         // every rank -- and the only axis left to make a rank harder is how
         // much the release is worth.
-        constexpr uint32 KILL_HEAL_PCT[] = { 10, 8, 6 };
+        constexpr uint32 KILL_HEAL_PCT[] = { 10, 8, 6, 5 };
         static_assert(std::size(KILL_HEAL_PCT) >= MAX_RANK, "KILL_HEAL_PCT is short a rank");
 
         // Rank III keeps the block up after the fight, so disengaging is no
         // longer an instant out. Zero at ranks I and II: leaving combat lifts
         // it at once.
-        constexpr uint32 LINGER_MS[] = { 0, 0, 10000 };
+        // Rank IV holds it fifteen seconds and gives back 5%: both halves
+        // move, so the top rank is a real escalation of the same question --
+        // is this fight worth finishing -- rather than only a smaller reward.
+        constexpr uint32 LINGER_MS[] = { 0, 0, 10000, 15000 };
         static_assert(std::size(LINGER_MS) >= MAX_RANK, "LINGER_MS is short a rank");
 
         class KillingFloor final : public IMechanic

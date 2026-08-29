@@ -51,8 +51,11 @@ namespace Gauntlet
     {
         constexpr uint16 MECHANIC_CURSED_HOARD = 27;
 
-        // The card's ladder: 3 -> 4 -> 5 kills to lift it.
-        constexpr uint32 KILLS_TO_LIFT[] = { 3, 4, 5 };
+        // The card's ladder: 3 -> 4 -> 5 kills to lift it, and 6 at rank IV.
+        // Gauntlet.Bargain.CursedHoard.EscapeSeconds is the other way out at
+        // every rank, so the ladder lengthens the curse rather than sealing
+        // it -- a bargain whose price cannot be paid stops being a bargain.
+        constexpr uint32 KILLS_TO_LIFT[] = { 3, 4, 5, 6 };
         static_assert(std::size(KILLS_TO_LIFT) >= MAX_RANK, "KILLS_TO_LIFT is short a rank");
 
         // The card's one damage number, and it is real: see RelaxCaps.

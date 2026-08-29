@@ -42,8 +42,10 @@ namespace Gauntlet
     {
         constexpr uint16 MECHANIC_BLOOD_MAGIC = 20;
 
-        // The card's ladder: 2 -> 3 -> 5% of the maximum pool per cast.
-        constexpr uint32 PCT_OF_MAX[] = { 2, 3, 5 };
+        // The card's ladder: 2 -> 3 -> 5% of the maximum pool per cast, and 7
+        // at rank IV. It still cannot kill -- the cost is refused below the
+        // health it would take -- so the ladder prices casting, not living.
+        constexpr uint32 PCT_OF_MAX[] = { 2, 3, 5, 7 };
         static_assert(std::size(PCT_OF_MAX) >= MAX_RANK, "PCT_OF_MAX is short a rank");
 
         uint8 RankIndex(AffixInstance const* self)
