@@ -112,6 +112,21 @@ namespace Gauntlet
         // curses stacking into "you cannot heal at all", and an absolute
         // ceiling is not a curse stacking. Lower `heal`; never raise it.
         virtual void  OnHeal(Ctx&, uint32& /*heal*/) {}
+
+        // Damage the player's pet, guardian or totem is about to deal, by
+        // reference. Lower it or raise it.
+        //
+        // The aggregate cannot express this: AggregateKind::DamageDone is the
+        // *player's* damage, and a boon that reads "your pet hits harder" would
+        // otherwise have nowhere to land. Boon::BonusPetDamage has existed
+        // since Phase 0 with nothing able to pay it.
+        //
+        // Dispatched from the same two Modify hooks the aggregate uses, when
+        // the attacker resolves to this player through
+        // GetCharmerOrOwnerPlayerOrPlayerItself. It is deliberately outside the
+        // aggregate's clamp: the caps bound what the world does to the player
+        // and what the player does to the world, and a hunter's pet is neither.
+        virtual void  OnPetDamage(Ctx&, Unit* /*victim*/, uint32& /*damage*/) {}
         virtual uint32 OnLethal(Ctx&, uint32 damage) { return damage; }              // UnitScript::DealDamage
         virtual void  OnSpellCast(Ctx&, Spell*) {}
         virtual void  OnAuraApplied(Ctx&, Unit* /*target*/, Aura*) {}

@@ -330,16 +330,16 @@ namespace
         // have paid out: GauntletAggregate reads that value as DamageDone and
         // would have handed the bonus to the player.
         { 36, "c09_half_tamed", "Half-Tamed", Family::Class, CM_HUNTER, 15, 70, 3,
-          MF_NotImplemented, "classcurse", Boon::BonusPetDamage, 883, 0,
+          MF_None, "classcurse", Boon::BonusPetDamage, 883, 0,
           "An unhappy pet turns on you." },
 
         // The boon halves Disengage's cooldown.
         { 37, "c10_dead_weight", "Dead Weight", Family::Class, CM_HUNTER, 20, 80, 3,
-          MF_NotImplemented, "classcurse|shortcut:kiting", Boon::BonusCooldown, 5384, 0,
+          MF_None, "classcurse|shortcut:kiting", Boon::BonusCooldown, 5384, 0,
           "Feign Death has a three-minute cooldown." },
 
         { 38, "c11_wide_dead_zone", "Wide Dead Zone", Family::Class, CM_HUNTER, 20, 70, 3,
-          MF_NotImplemented, "classcurse|shortcut:kiting", Boon::BonusDamage, 0, 0,
+          MF_None, "classcurse|shortcut:kiting", Boon::BonusDamage, 0, 0,
           "Ranged attacks cannot be used within ten yards." },
 
         { 39, "c12_blood_bond", "Blood Bond", Family::Class, CM_HUNTER, 25, 70, 3,

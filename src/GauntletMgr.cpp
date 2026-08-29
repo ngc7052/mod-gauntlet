@@ -1595,6 +1595,21 @@ namespace Gauntlet
         return allowed;
     }
 
+    void Mgr::OnPetDamage(Player* player, Unit* victim, uint32& damage)
+    {
+        if (!_enabled || damage == 0 || !IsEligible(player))
+            return;
+
+        RunState* st = Get(player);
+        if (!st || st->dead)
+            return;
+
+        ForEachMechanic(player, st, [victim, &damage](Ctx& ctx, AffixInstance& a)
+        {
+            a.impl->OnPetDamage(ctx, victim, damage);
+        });
+    }
+
     void Mgr::OnAuraApplied(Player* player, Unit* target, Aura* aura)
     {
         if (!_enabled || !aura || !IsEligible(player))

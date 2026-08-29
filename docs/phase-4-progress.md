@@ -10,9 +10,9 @@ decided without reading twenty commits.
 |---|---|---|---|
 | 1 | The three shared primitives | — | **done** `b960fb9` |
 | 2a | Warrior: C1, C2, C4 | 28, 29, 31 | **done** `9b6b16c` |
-| 2b | Paladin: C5, C6 | 32, 33 | in progress |
-| 2c | Hunter: C9, C10, C11 | 36, 37, 38 | |
-| 2d | Rogue: C13, C15 | 40, 42 | |
+| 2b | Paladin: C5, C6 | 32, 33 | **done** |
+| 2c | Hunter: C9, C10, C11 | 36, 37, 38 | **done** |
+| 2d | Rogue: C13, C15 | 40, 42 | in progress |
 | 2e | Priest: C17, C20 | 44, 47 | |
 | 2f | Death Knight: C21, C22 | 48, 49 | |
 | 2g | Shaman: C25, C26 | 52, 53 | |
@@ -63,6 +63,11 @@ than from memory.
    `Unit::GetDynObject` takes a single spell id and Consecration has eight
    ranks; the id of the cast that made the circle is something the module was
    told, so it is used rather than a table of eight numbers guessed from memory.
-4. **An extended aura's tooltip still lies.** `SetDuration`/`SetMaxDuration`
+4. **`IMechanic::OnPetDamage` was added, and it is outside the aggregate's
+   clamp.** `Boon::BonusPetDamage` has existed since Phase 0 with nothing able
+   to pay it, because `AggregateKind::DamageDone` is the *player's* damage.
+   Outside the clamp deliberately: the caps bound what the world does to the
+   player and what the player does to the world, and a hunter's pet is neither.
+5. **An extended aura's tooltip still lies.** `SetDuration`/`SetMaxDuration`
    move the client's timer but not the DBC, so every curse that stretches an
    aura says the real number in its own `Describe()`.

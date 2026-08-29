@@ -413,6 +413,8 @@ public:
             damage = uint32(damage * sGauntlet->AggregateAt(victim, AggregateKind::DamageTaken, attacker, nullptr));
         if (Player* dealer = attacker ? attacker->ToPlayer() : nullptr)
             damage = uint32(damage * sGauntlet->AggregateAt(dealer, AggregateKind::DamageDone, target, nullptr));
+
+        PetDamage(attacker, target, damage);
     }
 
     void ModifySpellDamageTaken(Unit* target, Unit* attacker, int32& damage, SpellInfo const* spellInfo) override
@@ -421,7 +423,37 @@ public:
             damage = int32(damage * sGauntlet->AggregateAt(victim, AggregateKind::DamageTaken, attacker, spellInfo));
         if (Player* dealer = attacker ? attacker->ToPlayer() : nullptr)
             damage = int32(damage * sGauntlet->AggregateAt(dealer, AggregateKind::DamageDone, target, spellInfo));
+
+        if (damage > 0)
+        {
+            uint32 asUnsigned = uint32(damage);
+            PetDamage(attacker, target, asUnsigned);
+            damage = int32(asUnsigned);
+        }
     }
+
+private:
+    // Damage a player's pet, guardian or totem is dealing. The attacker is not
+    // the player, so neither aggregate above sees it, and Boon::BonusPetDamage
+    // has had nowhere to land since Phase 0.
+    //
+    // GetCharmerOrOwnerPlayerOrPlayerItself (Unit.h:1295) answers the player
+    // for a pet and the player for the player, so the second test is what stops
+    // a hunter's own swing being counted twice -- once as DamageDone and once
+    // as pet damage.
+    static void PetDamage(Unit* attacker, Unit* victim, uint32& damage)
+    {
+        if (!attacker || attacker->IsPlayer())
+            return;
+
+        Player* owner = attacker->GetCharmerOrOwnerPlayerOrPlayerItself();
+        if (!owner)
+            return;
+
+        sGauntlet->OnPetDamage(owner, victim, damage);
+    }
+
+public:
 
     void ModifyHealReceived(Unit* target, Unit* healer, uint32& heal, SpellInfo const* spellInfo) override
     {
@@ -684,6 +716,9 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_DeafeningRoar();      // 31  C4  warrior
     void AddSC_gauntlet_mechanic_LongForbearance();    // 32  C5  paladin
     void AddSC_gauntlet_mechanic_ConsecratedGround();  // 33  C6  paladin
+    void AddSC_gauntlet_mechanic_HalfTamed();          // 36  C9  hunter
+    void AddSC_gauntlet_mechanic_DeadWeight();         // 37  C10 hunter
+    void AddSC_gauntlet_mechanic_WideDeadZone();       // 38  C11 hunter
     void AddSC_gauntlet_mechanic_SelfFound();          // 23
     void AddSC_gauntlet_mechanic_LoneWolf();           // 24
     void AddSC_gauntlet_mechanic_IronPurse();          // 25
@@ -721,6 +756,9 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_DeafeningRoar();
     AddSC_gauntlet_mechanic_LongForbearance();
     AddSC_gauntlet_mechanic_ConsecratedGround();
+    AddSC_gauntlet_mechanic_HalfTamed();
+    AddSC_gauntlet_mechanic_DeadWeight();
+    AddSC_gauntlet_mechanic_WideDeadZone();
     AddSC_gauntlet_mechanic_IronPurse();
     AddSC_gauntlet_mechanic_SelfFound();
     AddSC_gauntlet_mechanic_LoneWolf();
