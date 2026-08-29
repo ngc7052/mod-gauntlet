@@ -11,6 +11,7 @@
 // without checking.
 
 #include "GauntletRegistry.h"
+#include "GauntletGenerator.h"
 
 #include <gtest/gtest.h>
 
@@ -39,19 +40,20 @@ namespace
     // The mechanics the generator may offer: Phase 1's vertical slice -- The
     // Shade (1), Champions (6), Falling Sky (14) and Deep Wounds (19) --
     // Phase 2's fifteen, which is everything else in families S, E and T, and
-    // Phase 3's three Rules rows. Family C is Phase 4 and stays
+    // Phase 3's six: Blood Magic, three Rules rows and both Bargains. Family C is Phase 4 and stays
     // MF_NotImplemented; so do the two Bargains until step 4 of this phase.
     //
     // This list is the switch a phase is finished by, so it is asserted exactly
     // rather than as a count: a row that gains the flag by accident, or loses
     // it before its dispatch is wired, is an affix offered to a live hardcore
     // character that silently does nothing.
-    constexpr std::array<uint16, 23> OFFERABLE = {
+    constexpr std::array<uint16, 25> OFFERABLE = {
         1, 2, 3, 4, 5,           // S1 Shade, S2 Echo, S3 Carrion, S4 Reinforcements, S5 Ambush
         6, 7, 8, 9, 10, 11, 12, 13,  // E1 Champions .. E8 Keen-nosed
         14, 15, 16, 17, 18,      // T1 Falling Sky .. T5 Hubris
         19, 20,                  // A1 Deep Wounds, A2 Blood Magic
-        23, 24, 25               // R1 Self-found, R2 Lone Wolf, R3 Iron Purse
+        23, 24, 25,              // R1 Self-found, R2 Lone Wolf, R3 Iron Purse
+        26, 27                   // B1 Last Rites, B2 Cursed Hoard
     };
 
     // CONTRACT.md section 8's id ranges, which are fixed forever. The Attrition
@@ -201,6 +203,26 @@ TEST(Registry, OnlyTheImplementedMechanicsMayBeOffered)
     for (MechanicDef const& def : AllMechanics())
         EXPECT_EQ(IsImplemented(def), (def.flags & MF_NotImplemented) == 0)
             << "id " << def.id << ": IsImplemented must be exactly !(flags & MF_NotImplemented)";
+}
+
+TEST(Registry, BargainsOpenWhereTheGeneratorSaysTheyDo)
+{
+    // Two places named a bargain's earliest tier and they disagreed from Phase
+    // 0 to Phase 3: Cursed Hoard's row said 4, GauntletGenerator's
+    // BARGAIN_MIN_TIER said 6, and because the generator checks both, the
+    // constant won and two tiers of the card's window were dead letter. That
+    // is the quietest possible kind of wrong -- nothing fails, the affix is
+    // simply never offered where its own row says it should be.
+    for (MechanicDef const& def : AllMechanics())
+    {
+        if (def.family != Family::Bargain)
+            continue;
+
+        EXPECT_GE(def.minTier, BARGAIN_MIN_TIER)
+            << "id " << def.id << " (" << def.key << ") opens at tier " << unsigned(def.minTier)
+            << ", but the offer builder refuses every bargain below tier "
+            << unsigned(BARGAIN_MIN_TIER) << ", so those tiers of its window can never be reached";
+    }
 }
 
 TEST(Registry, LookupsAgreeWithTheTable)

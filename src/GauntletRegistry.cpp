@@ -253,14 +253,20 @@ namespace
         // The boon is the cheat death itself: a killing blow leaves you at one
         // health, once per level, and the Mark that follows is the price.
         { 26, "last_rites", "Last Rites", Family::Bargain, 0, 8, 16, 3,
-          MF_RewardShaped | MF_NotImplemented, "", Boon::SecondLife, 0, 0,
+          MF_RewardShaped, "", Boon::SecondLife, 0, 0,
           "Once per level, a killing blow leaves you at 1 health instead." },
 
         // The card's window is tiers 4-14; the family rule that bargains are
         // only offered from tier 6 (sections 3 and 4.6) is the offer builder's
         // to apply, and is not folded into minTier here.
-        { 27, "cursed_hoard", "Cursed Hoard", Family::Bargain, 0, 4, 14, 3,
-          MF_RewardShaped | MF_NotImplemented, "", Boon::BonusMoney, 0, 0,
+        // Tier 6 and not the card's 4. The design's family-B header says
+        // bargains open at tier 6 and the generator has enforced that with
+        // BARGAIN_MIN_TIER since Phase 0, so the card's window was four tiers
+        // of dead letter: the row said 4, the constant said 6, and the
+        // constant won every time. Registry.BargainsOpenWhereTheGeneratorSaysThey
+        // Do keeps the two from drifting apart again.
+        { 27, "cursed_hoard", "Cursed Hoard", Family::Bargain, 0, 6, 14, 3,
+          MF_RewardShaped, "", Boon::BonusMoney, 0, 0,
           "Chests hold twice the loot, but opening one curses you until you kill three enemies." },
 
         // --- Family C: class curses ------------------------------------

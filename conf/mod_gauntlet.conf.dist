@@ -246,6 +246,23 @@ Gauntlet.Summons.XpRate = 0.5
 Gauntlet.Grace.Seconds = 60
 
 #
+#    Gauntlet.Bargain.CursedHoard.EscapeSeconds
+#        Description: Seconds out of combat that lift Cursed Hoard's curse, in
+#                     addition to the kills its card asks for. The curse is a
+#                     genuine triple on damage taken and this realm is
+#                     hardcore, so an exit that does not require winning a
+#                     fight is what keeps one unlucky pull from ending a run.
+#
+#                     Be aware of what it costs: at ten seconds a player can
+#                     open the chest, walk away and wait, which makes the
+#                     bargain close to free. Lower it to tighten the affix.
+#
+#                     0 restores the card exactly: three kills or nothing.
+#        Default:     10
+
+Gauntlet.Bargain.CursedHoard.EscapeSeconds = 10
+
+#
 #    Gauntlet.Debug.Enable
 #        Description: Compiles in the .gauntlet debug subtree (give, remove and
 #                     rank affixes, dump run state, force an event, export the

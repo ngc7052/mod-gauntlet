@@ -1493,6 +1493,24 @@ namespace Gauntlet
         return allowed;
     }
 
+    void Mgr::OnHeal(Player* player, uint32& heal)
+    {
+        if (!_enabled || heal == 0 || !IsEligible(player))
+            return;
+
+        RunState* st = Get(player);
+        if (!st)
+            return;
+
+        ForEachMechanic(player, st, [&heal](Ctx& ctx, AffixInstance& a)
+        {
+            uint32 out = heal;
+            a.impl->OnHeal(ctx, out);
+            if (out < heal)
+                heal = out;
+        });
+    }
+
     void Mgr::OnDamageTaken(Player* player, Unit* attacker, uint32 amount)
     {
         if (!_enabled || !IsEligible(player) || amount == 0)
@@ -1639,6 +1657,26 @@ namespace Gauntlet
         ForEachMechanic(mutablePlayer, st, [&chance](Ctx& ctx, AffixInstance& a)
         {
             a.impl->OnItemRoll(ctx, chance);
+        });
+    }
+
+    void Mgr::OnLootGroupAmount(Player const* player, uint32& groupAmount)
+    {
+        // The same const_cast, and for the same reason as OnItemRoll above:
+        // the core's global loot hooks are const on the player and nothing
+        // here does more than find the run behind the guid.
+        Player* mutablePlayer = const_cast<Player*>(player);
+
+        if (!_enabled || groupAmount == 0 || !IsEligible(mutablePlayer))
+            return;
+
+        RunState* st = Get(mutablePlayer);
+        if (!st || st->dead)
+            return;
+
+        ForEachMechanic(mutablePlayer, st, [&groupAmount](Ctx& ctx, AffixInstance& a)
+        {
+            a.impl->OnLootGroupAmount(ctx, groupAmount);
         });
     }
 

@@ -70,6 +70,9 @@ local READINGS = {
     grudge         = { "Grudge",         "flag", true  },
     lone_wolf      = { "Grouped: half health", "flag", true },
     blood_magic    = { "Blood Magic",    "%",    true  },
+    cursed_hoard   = { "Cursed Hoard",   "n/m",  true  },
+    last_rites     = { "Marked",         "flag", true  },
+    last_rites_charge = { "Last Rites",  "n/m",  false },
     vindication    = { "Vindication",    "%",    true  },
 }
 

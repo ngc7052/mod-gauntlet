@@ -12,6 +12,12 @@
 
 namespace Gauntlet
 {
+    // Design section 3's family-B header: bargains are "rare (weighted ~1 in 6
+    // offers), only from tier 6, and each may be taken once per run". The
+    // offer builder enforces the tier half here; the registry's own windows
+    // must not contradict it, and RegistryTest asserts that they do not.
+    constexpr uint8 BARGAIN_MIN_TIER = 6;
+
     // ---------------------------------------------------------------------
     // The roll stream.
     //

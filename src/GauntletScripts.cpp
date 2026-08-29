@@ -425,8 +425,16 @@ public:
 
     void ModifyHealReceived(Unit* target, Unit* healer, uint32& heal, SpellInfo const* spellInfo) override
     {
-        if (Player* p = target ? target->ToPlayer() : nullptr)
-            heal = uint32(heal * sGauntlet->AggregateAt(p, AggregateKind::HealTaken, healer, spellInfo));
+        Player* p = target ? target->ToPlayer() : nullptr;
+        if (!p)
+            return;
+
+        heal = uint32(heal * sGauntlet->AggregateAt(p, AggregateKind::HealTaken, healer, spellInfo));
+
+        // And then the absolute limits, which a multiplier cannot express.
+        // Last Rites' Mark says "you cannot be healed above half", and half is
+        // a place rather than a fraction of the incoming heal.
+        sGauntlet->OnHeal(p, heal);
     }
 
     // The only place IMechanic::OnDamageTaken is dispatched from, and
@@ -504,6 +512,16 @@ public:
     {
         sGauntlet->OnItemRoll(player, chance);
         return true;
+    }
+
+    // Where a chest's contents are actually decided, and therefore where
+    // "chests hold twice the loot" has to be written. Consulted once per loot
+    // group per fill (GlobalScript.h:66) with the group's item count by
+    // reference.
+    void OnAfterCalculateLootGroupAmount(Player const* player, Loot& /*loot*/, uint16 /*lootMode*/,
+                                         uint32& groupAmount, LootStore const& /*store*/) override
+    {
+        sGauntlet->OnLootGroupAmount(player, groupAmount);
     }
 };
 
@@ -640,6 +658,8 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_Hubris();             // 18
 
     void AddSC_gauntlet_mechanic_BloodMagic();         // 20
+    void AddSC_gauntlet_mechanic_LastRites();          // 26
+    void AddSC_gauntlet_mechanic_CursedHoard();        // 27
     void AddSC_gauntlet_mechanic_SelfFound();          // 23
     void AddSC_gauntlet_mechanic_LoneWolf();           // 24
     void AddSC_gauntlet_mechanic_IronPurse();          // 25
@@ -669,6 +689,8 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_Hubris();
 
     AddSC_gauntlet_mechanic_BloodMagic();
+    AddSC_gauntlet_mechanic_LastRites();
+    AddSC_gauntlet_mechanic_CursedHoard();
     AddSC_gauntlet_mechanic_IronPurse();
     AddSC_gauntlet_mechanic_SelfFound();
     AddSC_gauntlet_mechanic_LoneWolf();

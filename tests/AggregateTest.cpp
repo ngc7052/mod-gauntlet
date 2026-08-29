@@ -423,3 +423,132 @@ TEST(Aggregate, ExperienceIsUncapped)
     std::vector<AffixInstance> const rich = { Carrying(&bounty), Carrying(&bounty) };
     EXPECT_FLOAT_EQ(Aggregate(rich, Everything(AggregateKind::Experience), caps), 2.25f);
 }
+
+// =====================================================================
+// RelaxCaps (Phase 3)
+// =====================================================================
+//
+// Two Phase 3 rows promise a number the configured clamp would eat: Cursed
+// Hoard's curse is a genuine triple against a 2.0x ceiling on damage taken,
+// and Lone Wolf halves the pool against a 0.6 floor. Delivering -40% behind a
+// blurb that says half is the same unfelt, misstated scalar the whole redesign
+// exists to delete, so IMechanic::RelaxCaps lets the mechanic that needs the
+// room ask for it.
+//
+// What must stay true is that it is a *widening*, not a bypass. The product is
+// still clamped exactly once, so a bargain curse and three ordinary affixes
+// reach the new bound together rather than each being paid out on top of it.
+// These tests are the arithmetic half of that; the census of which mechanics
+// override it at all is a source-level check, because no real mechanic links
+// into this harness -- every one of them needs Player.h.
+
+namespace
+{
+    // Mgr::EffectiveCaps in miniature: start from the configured caps, let
+    // every carried instance widen, clamp the product once.
+    float AggregateRelaxed(std::vector<AffixInstance> const& affixes,
+                           AggregateInput const& in, AggregateCaps caps)
+    {
+        for (AffixInstance const& a : affixes)
+            if (a.impl)
+                a.impl->RelaxCaps(a, in.kind, caps);
+
+        return Aggregate(affixes, in, caps);
+    }
+
+    // A factor that also asks for the headroom to deliver it.
+    class RelaxingFactor : public FixedFactor
+    {
+    public:
+        RelaxingFactor(AggregateKind kind, float factor, float ceiling)
+            : FixedFactor(kind, factor), _kind(kind), _ceiling(ceiling) {}
+
+        void RelaxCaps(AffixInstance const&, AggregateKind kind, AggregateCaps& caps) const override
+        {
+            if (kind != _kind)
+                return;
+
+            if (kind == AggregateKind::DamageTaken && caps.damageTakenMax < _ceiling)
+                caps.damageTakenMax = _ceiling;
+            if (kind == AggregateKind::MaxHealth && caps.maxHealthMin > _ceiling)
+                caps.maxHealthMin = _ceiling;
+        }
+
+    private:
+        AggregateKind _kind;
+        float         _ceiling;
+    };
+}
+
+TEST(Aggregate, NothingRelaxesACapByDefault)
+{
+    AggregateCaps const caps;
+
+    // The whole point: the default is a no-op, so a mechanic that has not
+    // thought about caps cannot accidentally move one.
+    FixedFactor heavy(AggregateKind::DamageTaken, 3.0f);
+    std::vector<AffixInstance> const one = { Carrying(&heavy) };
+
+    EXPECT_FLOAT_EQ(AggregateRelaxed(one, Everything(AggregateKind::DamageTaken), caps), 2.0f)
+        << "a x3 with no relaxation must still be clamped to the configured 2.0 ceiling";
+}
+
+TEST(Aggregate, ARelaxationWidensTheCeilingAndNothingMore)
+{
+    AggregateCaps const caps;
+
+    RelaxingFactor curse(AggregateKind::DamageTaken, 3.0f, 3.0f);
+    std::vector<AffixInstance> const cursed = { Carrying(&curse) };
+
+    EXPECT_FLOAT_EQ(AggregateRelaxed(cursed, Everything(AggregateKind::DamageTaken), caps), 3.0f)
+        << "Cursed Hoard's triple must actually be a triple";
+}
+
+TEST(Aggregate, TheProductIsStillClampedExactlyOnceAfterARelaxation)
+{
+    AggregateCaps const caps;
+
+    // The curse, plus two ordinary affixes that would take the raw product to
+    // 3 x 1.5 x 1.5 = 6.75. The relaxation raised the ceiling to 3.0 and the
+    // clamp is applied once, to the whole product -- so the answer is 3.0 and
+    // not 3.0 x 2.25, which is what "apply the relaxation after the clamp"
+    // would have produced.
+    RelaxingFactor curse(AggregateKind::DamageTaken, 3.0f, 3.0f);
+    FixedFactor    frenzy(AggregateKind::DamageTaken, 1.5f);
+    FixedFactor    champion(AggregateKind::DamageTaken, 1.5f);
+
+    std::vector<AffixInstance> const all = { Carrying(&curse), Carrying(&frenzy), Carrying(&champion) };
+
+    EXPECT_FLOAT_EQ(AggregateRelaxed(all, Everything(AggregateKind::DamageTaken), caps), 3.0f)
+        << "a relaxation must widen the ceiling, never escape it";
+}
+
+TEST(Aggregate, ARelaxationOnlyAppliesToItsOwnKind)
+{
+    AggregateCaps const caps;
+
+    // Cursed Hoard raises the damage-taken ceiling; it must not thereby lower
+    // the health floor, which is a different affix's business entirely.
+    RelaxingFactor curse(AggregateKind::DamageTaken, 3.0f, 3.0f);
+    FixedFactor    wound(AggregateKind::MaxHealth, 0.4f);
+
+    std::vector<AffixInstance> const both = { Carrying(&curse), Carrying(&wound) };
+
+    EXPECT_FLOAT_EQ(AggregateRelaxed(both, Everything(AggregateKind::MaxHealth), caps), 0.6f)
+        << "the MaxHealth floor must be untouched by a DamageTaken relaxation";
+}
+
+TEST(Aggregate, LoneWolfsHalfIsAHalfAndNotTheFloor)
+{
+    AggregateCaps const caps;
+
+    // The shape of the bug this exists to prevent: without the relaxation the
+    // 0.6 floor turns a promised -50% into a delivered -40%.
+    FixedFactor plain(AggregateKind::MaxHealth, 0.5f);
+    std::vector<AffixInstance> const unrelaxed = { Carrying(&plain) };
+    EXPECT_FLOAT_EQ(AggregateRelaxed(unrelaxed, Everything(AggregateKind::MaxHealth), caps), 0.6f);
+
+    RelaxingFactor grouped(AggregateKind::MaxHealth, 0.5f, 0.5f);
+    std::vector<AffixInstance> const relaxed = { Carrying(&grouped) };
+    EXPECT_FLOAT_EQ(AggregateRelaxed(relaxed, Everything(AggregateKind::MaxHealth), caps), 0.5f);
+}

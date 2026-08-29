@@ -53,7 +53,11 @@ namespace
 
     // Design §4.6 and the note on Cursed Hoard's row: the bargain family opens
     // at tier 6 whatever a card's own minTier says.
-    constexpr uint8 BARGAIN_MIN_TIER = 6;
+    // Moved to the header so RegistryTest can assert against it. The two
+    // places that named a bargain's earliest tier -- this constant and Cursed
+    // Hoard's registry row, which said 4 -- disagreed from Phase 0 until Phase
+    // 3, with the constant silently winning. A test cannot catch a drift it
+    // cannot see the number for.
 
     // Phase 2 deleted the last four Scalars, so nothing in the table takes a
     // condition any more and the roll that drew one is gone with them. The
@@ -532,10 +536,37 @@ namespace Gauntlet
             // rank-up with nothing to raise becomes new, and a slot with no new
             // mechanic left to offer becomes a rank-up. The offer says which it
             // is, so nothing is hidden from the player.
-            if (step == RELAX_COUNT && kind == OfferKind::Bargain)
+            // A bargain is a bonus, never a requirement, and it must not be
+            // bought with the offer set's distinct-family guarantee.
+            //
+            // Degrading only on outright failure was not enough once the family
+            // actually had implementations. Family B has exactly two rows, only
+            // one of them in window below tier 8, and CAP_BARGAIN retires both
+            // for the rest of the run -- so a slot that asks for a bargain
+            // one time in six very often finds one it can place only by
+            // relaxing a rule, and took it. Measured: turning the bargain slot
+            // on moved tiers 6-14 from an exact zero to 3-7% relaxed, and every
+            // point of that was this slot.
+            //
+            // So the test is not "can a bargain be placed at all" but "can it
+            // be placed without giving anything up". If not, and an ordinary
+            // new mechanic can, the ordinary one wins. This is the same
+            // preference Phase 2 added for New over RankUp a few lines below,
+            // for the same reason.
+            if (kind == OfferKind::Bargain && step > RELAX_STRICT)
             {
-                kind = OfferKind::New;
-                step = FirstUsableStep(ctx, kind, false, pools);
+                Pools newPools;
+                if (FirstUsableStep(ctx, OfferKind::New, false, newPools) == RELAX_STRICT)
+                {
+                    kind  = OfferKind::New;
+                    pools = std::move(newPools);
+                    step  = RELAX_STRICT;
+                }
+                else if (step == RELAX_COUNT)
+                {
+                    kind = OfferKind::New;
+                    step = FirstUsableStep(ctx, kind, false, pools);
+                }
             }
             if (step == RELAX_COUNT && kind == OfferKind::RankUp)
             {

@@ -865,26 +865,37 @@ TEST(OfferInvariants, LiveRegistryView)
     // through tier 11; what is asserted is that measurement, tier by tier,
     // with headroom for a registry edit and none for a regression.
     //
-    //   tiers 1-4    exactly 0
-    //   tiers 5-7    0.05%, 0.13%, 0.44%
-    //   tiers 9-11   1.15%, 1.13%, 8.09%
-    //   tiers 8, 12  16.07%, 50.25%  -- the swap tiers; see below
-    //   tiers 13-16  the tail: 44%, 65%, 93%, 98%
+    //   tiers 1-4     exactly 0
+    //   tiers 5-10    0.04%, 0, 0, 0, 0, 0
+    //   tiers 11-14   0.14%, 4.30%, 0.93%, 3.48%
+    //   tiers 15-16   the tail: 57.23%, 86.14%
+    //
+    // Phase 3 rewrote these. Six new rows across two new families took tiers
+    // 5-11 to within a rounding error of zero from 0.05/0.12/0.46/13.61/1.10/
+    // 1.21/8.67, and the swap tiers with them -- tier 8 was 13.61% and is now
+    // nothing at all.
+    //
+    // Exact zero is asserted only for tiers 1-4, where it is structural: below
+    // tier 5 the whole eligible table is small enough to enumerate and three
+    // distinct families are always fillable. Tier 5's four sets in ten thousand
+    // are a property of these particular seeds, not of the pool, and asserting
+    // zero there would make the suite fail the next time GeneratorVersion
+    // moves -- which is exactly what it did when this phase bumped it to 5.
     //
     // Two things shape what is asserted rather than what is measured.
     //
     // The swap tiers are 4, 8 and 12 (section 4.4.3) and slot C is a Swap
     // there, which must be a *new* mechanic: a swap is the run's one chance to
     // undo an early mistake, and it is deliberately not allowed to give way to
-    // a rank-up in a tidier family the way an ordinary New slot is. So those
-    // three tiers carry the cost of that choice, and tier 4 pays nothing for it
-    // only because the pool is still wide there.
+    // a rank-up in a tidier family the way an ordinary New slot is. Tier 12 is
+    // the only one of the three that still pays for it.
     //
     // The tail is structural and is Phase 5's to tune. A run at tier 15 is
-    // carrying most of the nineteen mechanics its class can be offered, at
-    // their ceilings; design section 4.6 expects rank-ups to dominate from tier
-    // 11 and says so. It closes as families arrive: Rules and Bargains in
-    // Phase 3, forty-four class curses in Phase 4.
+    // carrying most of the mechanics its class can be offered, at their
+    // ceilings; design section 4.6 expects rank-ups to dominate from tier 11
+    // and says so. It halved in Phase 3 (95.19% -> 56.96% at tier 15, 99.08%
+    // -> 86.59% at 16) and closes properly with Phase 4's forty-four class
+    // curses.
     for (uint8 tier = 1; tier <= 4; ++tier)
         EXPECT_EQ(relaxedPerTier[tier], 0u)
             << "tier " << unsigned(tier) << " relaxed a rule in " << relaxedPerTier[tier]
@@ -893,10 +904,13 @@ TEST(OfferInvariants, LiveRegistryView)
                "this fails the pool is too narrow and the answer is more mechanics or a wider "
                "tier window, never a weaker assertion.";
 
+    // Headroom for a registry edit, none for a regression. Every one of these
+    // was cut in Phase 3; leaving them at Phase 2's values would have let the
+    // whole improvement be given back silently by a later phase.
     struct Ceiling { uint8 tier; double pct; };
     constexpr std::array<Ceiling, 12> CEILINGS = { {
-        { 5, 2.0 }, { 6, 2.0 }, { 7, 3.0 }, { 8, 25.0 }, { 9, 3.0 }, { 10, 3.0 },
-        { 11, 15.0 }, { 12, 60.0 }, { 13, 55.0 }, { 14, 75.0 }, { 15, 97.0 }, { 16, 100.0 }
+        { 5, 0.5 }, { 6, 0.5 }, { 7, 0.5 }, { 8, 0.5 }, { 9, 0.5 }, { 10, 0.5 },
+        { 11, 1.0 }, { 12, 8.0 }, { 13, 3.0 }, { 14, 6.0 }, { 15, 65.0 }, { 16, 92.0 }
     } };
 
     for (Ceiling const& c : CEILINGS)
@@ -906,6 +920,6 @@ TEST(OfferInvariants, LiveRegistryView)
                           : 0.0;
         EXPECT_LE(rate, c.pct)
             << "tier " << unsigned(c.tier) << " relaxed " << rate << "% of its sets, against a "
-               "ceiling of " << c.pct << "% set from the Phase 2 measurement";
+               "ceiling of " << c.pct << "% set from the Phase 3 measurement";
     }
 }

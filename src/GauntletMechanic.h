@@ -98,6 +98,20 @@ namespace Gauntlet
         virtual float HealTakenMult  (Ctx&, Unit* /*healer*/,   SpellInfo const*) { return 1.f; }
 
         virtual void  OnDamageTaken(Ctx&, Unit* /*attacker*/, uint32 /*amount*/) {}  // observer, post-mult
+
+        // A heal, after the aggregate has multiplied it and after the cap, so
+        // a mechanic can put an absolute limit on where the player ends up.
+        //
+        // HealTakenMult cannot express one. It returns a ratio and never sees
+        // the heal, so "you cannot be healed above half" comes out as either
+        // "all of it lands" or "none of it does" -- and at 49% health the first
+        // of those takes the player to full, straight past the line the affix
+        // draws. Last Rites' Mark is the whole reason this exists.
+        //
+        // Post-cap on purpose: plan section 2.5's heal floor exists to stop
+        // curses stacking into "you cannot heal at all", and an absolute
+        // ceiling is not a curse stacking. Lower `heal`; never raise it.
+        virtual void  OnHeal(Ctx&, uint32& /*heal*/) {}
         virtual uint32 OnLethal(Ctx&, uint32 damage) { return damage; }              // UnitScript::DealDamage
         virtual void  OnSpellCast(Ctx&, Spell*) {}
         virtual void  OnAuraApplied(Ctx&, Unit* /*target*/, Aura*) {}
@@ -128,6 +142,12 @@ namespace Gauntlet
         // loot" and this is where that is paid; Phase 3's Cursed Hoard and
         // Self-Found want the same seam.
         virtual void  OnItemRoll(Ctx&, float& /*chance*/) {}
+
+        // How many items the core is about to roll out of one loot group.
+        // GlobalScript::OnAfterCalculateLootGroupAmount is where a chest's
+        // contents are actually decided, which is where "chests hold twice the
+        // loot" has to be written.
+        virtual void  OnLootGroupAmount(Ctx&, uint32& /*groupAmount*/) {}
 
         // A blow this character (or their pet) landed on a creature, from
         // UnitScript::OnDamage (Unit.cpp:999), which runs *before* the health

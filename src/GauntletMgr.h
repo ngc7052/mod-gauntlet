@@ -71,6 +71,10 @@ namespace Gauntlet
         void OnCreatureKill(Player* player, Creature* killed, bool byPet);
         void OnDamageTaken(Player* player, Unit* attacker, uint32 amount);
 
+        // The absolute clamp on a heal, run after ModifyHealReceived has
+        // already applied the aggregate and its floor.
+        void OnHeal(Player* player, uint32& heal);
+
         // The cheat-death path, dispatched from UnitScript::DealDamage before
         // the health is applied. Returns the damage the blow should actually
         // do; a mechanic may only lower it, never raise it. Called only when
@@ -104,6 +108,9 @@ namespace Gauntlet
         // one; the module needs a non-const pointer only to find the run keyed
         // on its guid, and changes nothing about the player either.
         void OnItemRoll(Player const* player, float& chance);
+
+        // The loot-group size, for the one bargain that pays in items.
+        void OnLootGroupAmount(Player const* player, uint32& groupAmount);
 
         // A blow this character or their pet landed on a creature, before
         // the health comes off. Craven watches for the threshold crossing.

@@ -166,7 +166,13 @@ namespace Gauntlet
     // match it, because Data.lua is generated from the registry: the change
     // that moves a mechanic id is exactly the change that must invalidate the
     // addon's table.
-    constexpr uint16 GeneratorVersion = 4;
+    // 5 is Phase 3: six registry rows made offerable across two families that
+    // had never produced an offer, Cursed Hoard's window moved from tier 4 to
+    // 6 so the row and BARGAIN_MIN_TIER agree, and the slot loop taught to
+    // prefer an ordinary new mechanic in a clean family over a bargain it
+    // could only place by relaxing a rule. The last of those alone changes
+    // every offer set that contains a bargain slot.
+    constexpr uint16 GeneratorVersion = 5;
 
     constexpr uint8 MAX_RANK = 3;
 
