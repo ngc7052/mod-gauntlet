@@ -16,15 +16,20 @@ namespace Gauntlet
     // offers), only from tier 6, and each may be taken once per run". The
     // offer builder enforces the tier half here; the registry's own windows
     // must not contradict it, and RegistryTest asserts that they do not.
-    // The first tier at which anything in the table can be offered.
+    // The first tier at which anything in the table can be offered, and the
+    // first level of a run.
     //
-    // Every window was multiplied by five when a tier became a level, so the
-    // earliest -- Champions, Carrion, Hubris, Overextended and the three Rules
-    // rows, all of them 1 before -- now opens at 5. That is the level the old
-    // tier 1 was reached at, so nothing has actually moved; it just has a
-    // number now, and the sweeps need to know it so they do not measure four
-    // tiers of guaranteed emptiness and call it a collision.
-    constexpr uint8 FIRST_TIER = 5;
+    // The rescale to one tier per level multiplied every window by five, which
+    // preserved the *level* each affix unlocked at and therefore put the
+    // earliest rows at tier 5. That was the wrong reading of the change: the
+    // point of a tier per level is that the run starts choosing at level 1, and
+    // four levels of nothing at the very start is exactly the stretch where a
+    // player is deciding whether the module is doing anything at all.
+    //
+    // So the seven rows that opened at the old tier 1 -- Champions, Carrion,
+    // Hubris, Overextended and the three Rules rows -- open at tier 1 again.
+    // Everything else keeps the level it always unlocked at.
+    constexpr uint8 FIRST_TIER = 1;
 
     constexpr uint8 BARGAIN_MIN_TIER = 30;
 

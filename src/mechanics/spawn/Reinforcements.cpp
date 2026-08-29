@@ -138,6 +138,33 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override;
 
+            // Everything this mechanic holds that a player cannot see, because
+            // it was reported as not working twice and reading the code
+            // distinguished none of the ways that could be true. `.gauntlet
+            // debug dump` now answers it in one line.
+            std::string Diagnose(Ctx& ctx) const override
+            {
+                std::string out = "reinforcements: ";
+                out += _armed ? "armed" : "not armed";
+                out += ", " + std::to_string(_spawned) + " spawned this fight, tag "
+                     + std::to_string(_eventId);
+
+                if (ctx.player)
+                {
+                    out += ctx.player->IsInCombat() ? ", in combat" : ", out of combat";
+
+                    Unit* victim = ctx.player->GetVictim();
+                    if (!victim)
+                        out += ", NO VICTIM (nothing to copy)";
+                    else if (!CopyableVictim(ctx.player))
+                        out += ", victim not copyable (elite, boss, or one of ours)";
+                    else
+                        out += ", victim copyable";
+                }
+
+                return out;
+            }
+
         private:
             void Sync(Ctx& ctx);
             void Arm(Ctx& ctx, uint32 inMs);

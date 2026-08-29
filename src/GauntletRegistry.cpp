@@ -110,7 +110,7 @@ namespace
           MF_Timed | MF_Stalker | MF_RewardShaped, "stalker", Boon::BonusExperience, 0, 0,
           "Every 25th enemy you kill returns as an echo of yourself." },
 
-        { 3, "carrion", "Carrion", Family::Spawn, 0, 5, 50, 3,
+        { 3, "carrion", "Carrion", Family::Spawn, 0, 1, 50, 3,
           MF_Timed | MF_OnKill | MF_RewardShaped, "", Boon::BonusMoney, 0, 0,
           "Every 4th corpse you loot draws scavengers." },
 
@@ -128,16 +128,16 @@ namespace
         // and is what the registry's "stalker" exclusive key holds -- and its
         // counterplay is standing up and moving three steps, which needs no
         // button, no cooldown and no crowd control. Tier 2 is level 10.
-        { 5, "ambush", "Ambush", Family::Spawn, 0, 10, 45, 3,
+        { 5, "ambush", "Ambush", Family::Spawn, 0, 4, 45, 3,
           MF_Timed | MF_Stalker, "", Boon::BonusMaxHealth, 0, 0,
           "Resting in the wild attracts an ambush." },
 
         // --- Family E: enemies that behave differently -----------------
-        { 6, "champions", "Champions", Family::Enemy, 0, 5, 80, 3,
+        { 6, "champions", "Champions", Family::Enemy, 0, 1, 80, 3,
           MF_RewardShaped, "", Boon::BonusExperience, 0, 0,
           "Every 8th fight you start opens against a Champion: twice the health, harder hits, double the reward." },
 
-        { 7, "craven", "Craven", Family::Enemy, 0, 20, 60, 3,
+        { 7, "craven", "Craven", Family::Enemy, 0, 12, 60, 3,
           MF_None, "", Boon::BonusDamage, 0, 0,
           "Enemies flee at 25% health, and come back with friends." },
 
@@ -149,7 +149,7 @@ namespace
           MF_Timed | MF_OnKill, "onkill-positional", Boon::BonusMoney, 0, 0,
           "Corpses burst two seconds after death, hurting anyone within five yards." },
 
-        { 10, "grudge", "Grudge", Family::Enemy, CM_MELEE, 15, 50, 3,
+        { 10, "grudge", "Grudge", Family::Enemy, CM_MELEE, 8, 50, 3,
           MF_OnKill, "onkill-positional", Boon::BonusHealing, 0, 0,
           "Everything you kill leaves a ghost on its corpse that drains your health"
           " while you stand near it." },
@@ -166,7 +166,7 @@ namespace
         // above and on the same test: Keen-nosed is a routing rule, answered by
         // hugging the edge of a path and pulling singles, and a level-10
         // character can do both.
-        { 13, "keen_nosed", "Keen-nosed", Family::Enemy, 0, 10, 55, 3,
+        { 13, "keen_nosed", "Keen-nosed", Family::Enemy, 0, 4, 55, 3,
           MF_None, "", Boon::BonusMoney, 0, 0,
           "Enemies notice you from further away." },
 
@@ -177,7 +177,7 @@ namespace
           MF_Timed, "", Boon::BonusMoveSpeed, 0, 0,
           "In combat, every 20 seconds the sky marks your spot; three seconds later it strikes." },
 
-        { 15, "frenzy", "Frenzy", Family::Tempo, 0, 15, 80, 3,
+        { 15, "frenzy", "Frenzy", Family::Tempo, 0, 8, 80, 3,
           MF_RewardShaped, "", Boon::BonusDamage, 0, 0,
           "Each kill within 8 seconds of the last stacks Frenzy: +6% damage dealt and +6% damage taken per stack." },
 
@@ -190,7 +190,7 @@ namespace
         // controls each pull"). So this is what fills the hole the deletion
         // left, it is the design's own candidate for it, and its counterplay --
         // pull one at a time -- needs no button at all.
-        { 16, "overextended", "Overextended", Family::Tempo, 0, 5, 60, 3,
+        { 16, "overextended", "Overextended", Family::Tempo, 0, 1, 60, 3,
           MF_None, "", Boon::BonusHealing, 0, 0,
           "Each enemy attacking you beyond the first increases the damage you take by 20%." },
 
@@ -198,7 +198,7 @@ namespace
           MF_Timed | MF_RoleTax, "roletax", Boon::BonusMaxHealth, 0, 0,
           "Every 45 seconds in combat your hands fail you for three seconds." },
 
-        { 18, "hubris", "Hubris", Family::Tempo, 0, 5, 50, 3,
+        { 18, "hubris", "Hubris", Family::Tempo, 0, 1, 50, 3,
           MF_RewardShaped, "", Boon::BonusExperience, 0, 0,
           "Enemies below your level give no experience; enemies above give 40% more." },
 
@@ -210,7 +210,7 @@ namespace
         // this row opens, and with it open tier 3 has four families like every
         // tier above it. Nothing about the mechanic changes: it is answered by
         // taking less damage, which a level-15 character can already do.
-        { 19, "deep_wounds", "Deep Wounds", Family::Attrition, 0, 15, 60, 3,
+        { 19, "deep_wounds", "Deep Wounds", Family::Attrition, 0, 10, 60, 3,
           MF_None, "", Boon::None, 0, 0,
           "A third of the damage you take becomes a wound that only rest can heal." },
 
@@ -226,7 +226,7 @@ namespace
         // is no longer contiguous and nothing may fill the holes.
 
         // --- Family R: rules -------------------------------------------
-        { 23, "self_found", "Self-found", Family::Rules, 0, 5, 20, 1,
+        { 23, "self_found", "Self-found", Family::Rules, 0, 1, 20, 1,
           MF_None, "rule", Boon::BonusMoney, 0, 0,
           "You cannot trade, mail, or use the auction house." },
 
@@ -236,7 +236,7 @@ namespace
         // mechanics/rules/LoneWolf.cpp; the short version is that this row's
         // window is levels 5-30, so the card does not make the levelling
         // dungeons harder, it deletes them for the rest of the run.
-        { 24, "lone_wolf", "Lone Wolf", Family::Rules, 0, 5, 30, 1,
+        { 24, "lone_wolf", "Lone Wolf", Family::Rules, 0, 1, 30, 1,
           MF_None, "rule", Boon::BonusExperience, 0, 0,
           "Half health in a group; more experience alone." },
 
@@ -246,7 +246,7 @@ namespace
         // -- a curse and a boon that cancel are worse than either alone. See
         // the head of mechanics/rules/IronPurse.cpp for why this row is kept
         // anyway despite being the weakest in the table.
-        { 25, "iron_purse", "Iron Purse", Family::Rules, 0, 5, 15, 1,
+        { 25, "iron_purse", "Iron Purse", Family::Rules, 0, 1, 15, 1,
           MF_None, "rule", Boon::None, 0, 0,
           "Repairs cost double." },
 

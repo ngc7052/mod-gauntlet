@@ -81,7 +81,7 @@ namespace
         // tiers, which put rank II at tier 7 and rank III at tier 13 -- levels
         // 35 and 65. This is the same two levels expressed on the new axis, so
         // a run's rank curve is exactly what it was.
-        uint32 const floor = 1u + (tier > 5 ? (tier - 5u) / 30u : 0u);
+        uint32 const floor = 1u + (tier > 5 ? (tier - 5u) / 30u : 0u);   // rank II at 35, III at 65
         return static_cast<uint8>(std::min<uint32>(floor, MAX_RANK));
     }
 
@@ -355,7 +355,19 @@ namespace
 
         if (relax < RELAX_FAMILY && ctx.IsFamilyUsed(def.family))
             return false;
-        if (relax < RELAX_MECHANIC && ctx.IsMechanicUsed(def.id))
+        // Never twice in one set, at any relaxation.
+        //
+        // RELAX_MECHANIC used to allow it as the last resort before giving up,
+        // on the reasoning that a filled slot beats an empty one. Played, it
+        // does not: a tier 39 offer came back as Cursed Hoard, Last Rites NEW,
+        // and Last Rites SWAP-out-Carrion -- and the third is not a choice, it
+        // is the second one with a price attached. Nobody takes the swap when
+        // the plain version is sitting above it, so the slot only looks like an
+        // option. An empty slot is at least honest about having nothing.
+        //
+        // RELAX_FAMILY stays: two Spawn affixes in one set are two real
+        // choices. It is the identical *mechanic* that is dominated.
+        if (ctx.IsMechanicUsed(def.id))
             return false;
 
         return true;
