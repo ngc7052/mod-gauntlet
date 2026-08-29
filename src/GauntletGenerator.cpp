@@ -51,6 +51,19 @@ namespace
     constexpr uint32 CAP_TEMPO   = 2;   // §4.1 "two tempo mechanics"
     constexpr uint32 CAP_BARGAIN = 2;   // §4.1 "two bargains"
 
+    // How many class curses a run may carry.
+    //
+    // The design gives each class four, "covering four verbs -- a threshold, a
+    // shortcut tax, a companion or anchor rule, and an identity rule", and the
+    // point of four is that a character can end up shaped by more than one of
+    // them. Three leaves room for the fourth to stay a live offer rather than
+    // becoming the only thing left to take.
+    //
+    // Before Phase 4 this was not a cap at all: every class row shared one
+    // exclusive key, which made it a limit of one. See the note at the head of
+    // GauntletRegistry.cpp.
+    constexpr uint32 CAP_CLASS = 3;   // TODO(design)
+
     // Design §4.6 and the note on Cursed Hoard's row: the bargain family opens
     // at tier 6 whatever a card's own minTier says.
     // Moved to the header so RegistryTest can assert against it. The two
@@ -206,6 +219,7 @@ namespace
         uint32                              onKill  = 0;
         uint32                              tempo   = 0;
         uint32                              bargain = 0;
+        uint32                              klass   = 0;   // `class` is a keyword
 
         AffixInstance const* Find(uint16 mechanic) const
         {
@@ -234,6 +248,8 @@ namespace
                 out.tempo++;
             if (def->family == Family::Bargain)
                 out.bargain++;
+            if (def->family == Family::Class)
+                out.klass++;
         }
 
         return out;
@@ -251,6 +267,8 @@ namespace
         if (def.family == Family::Tempo && carried.tempo >= CAP_TEMPO)
             return false;
         if (def.family == Family::Bargain && carried.bargain >= CAP_BARGAIN)
+            return false;
+        if (def.family == Family::Class && carried.klass >= CAP_CLASS)
             return false;
 
         return true;

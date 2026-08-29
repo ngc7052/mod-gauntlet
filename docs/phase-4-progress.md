@@ -21,8 +21,8 @@ decided without reading twenty commits.
 | 2j | Druid: C37 | 64 | **done** |
 | 2k | Common: C41 Faint | 68 | **done** |
 | 3 | Class bargains: Ankh Pact, Stone of the Damned | 70, 71 | |
-| 4 | The tier windows — the 14 `TODO(design)` upper bounds | — | in progress |
-| 5 | Class curses recorded as conducts | — | |
+| 4 | The tier windows, and the exclusive key behind them | — | **done** |
+| 5 | Class curses recorded as conducts | — | in progress |
 | 6 | `docs/phase-4-report.md` | — | |
 
 Wave A is twenty-one curses (the design's build-priority A). Wave B is not this
