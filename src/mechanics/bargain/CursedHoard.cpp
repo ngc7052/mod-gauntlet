@@ -135,6 +135,10 @@ namespace Gauntlet
             uint32 _calmMs  = 0;   // how long out of combat, while cursed
             uint32 _opened  = 0;
             bool   _engaged = false;   // has this curse been in a fight yet
+
+            // Diagnostics only; see OnLoot.
+            uint32 _lootWindows = 0;
+            uint32 _goWindows   = 0;
         };
 
         void CursedHoard::OnAttach(Ctx& ctx)
@@ -220,6 +224,15 @@ namespace Gauntlet
             Player* player = ctx.player;
             if (!player)
                 return;
+
+            // Counted before any filtering, and reported by Diagnose(), because
+            // "I looted a chest and got no curse" has two very different
+            // causes -- the hook never reached this mechanic, or it reached it
+            // and the guid was not a game object -- and no amount of reading
+            // the code tells them apart. `.gauntlet debug dump` now does.
+            ++_lootWindows;
+            if (lootGuid.IsGameObject())
+                ++_goWindows;
 
             // A game object and nothing else. OnLoot fires for every loot
             // window the player opens, corpses very much included, and a curse
@@ -331,15 +344,15 @@ namespace Gauntlet
             uint32 const kills = KILLS_TO_LIFT[i];
             uint32 const secs  = EscapeMs() / 1000u;
 
-            std::string out = "Chests hold twice as much, and opening one curses you: everything"
-                              " hits you three times as hard until you have killed "
-                            + std::to_string(kills) + ".";
+            std::string out = "Chests give twice as much loot. Opening one curses you: you take"
+                              " triple damage until you kill " + std::to_string(kills)
+                            + " enemies.";
 
             if (secs != 0)
-                out += " Once it has been in a fight, breaking away for " + std::to_string(secs)
-                     + " seconds out of combat lifts it too.";
+                out += " Once the curse has been in a fight, staying out of combat for "
+                     + std::to_string(secs) + " seconds also ends it.";
 
-            out += " Open at full health with easy kills in reach, or walk past.";
+            out += " Open a chest at full health with easy kills nearby, or leave it.";
 
             // No BoonClause: the boon is the doubled hoard, which the first
             // clause already promises, and Boon::BonusMoney here is the row's
@@ -355,7 +368,9 @@ namespace Gauntlet
                                              : std::string("not yet in combat, no escape open"))
                                 )
                               : std::string("clean");
-            out += ", " + std::to_string(_opened) + " chest(s) opened this session";
+            out += ", " + std::to_string(_opened) + " chest(s) opened this session ("
+                 + std::to_string(_lootWindows) + " loot window(s) seen, "
+                 + std::to_string(_goWindows) + " of them game objects)";
             (void)ctx;
             return out;
         }

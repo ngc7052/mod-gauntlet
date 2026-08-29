@@ -803,7 +803,22 @@ namespace Gauntlet
 
         AffixInstance* held = st->Find(chosen.mechanic);
 
-        if (chosen.kind == OfferKind::RankUp && held)
+        // `held`, not `kind == RankUp`. A pick of a mechanic the run already
+        // carries raises it in place whatever the offer called itself, and
+        // never attaches a second copy.
+        //
+        // It used to be the kind alone, and the else-branch below attached
+        // unconditionally -- so a New offer for a carried mechanic, which the
+        // builder does produce when it has relaxed GR_RepeatedMechanic to fill
+        // a slot, created a duplicate instance in a fresh slot. A level 80 run
+        // reported three Champions: three independent counters, three sets of
+        // OnTick state, three contributions to the same aggregate. At tier 16
+        // the live sweep relaxes 86% of sets, so this was not a rare corner.
+        //
+        // The relaxation itself is correct: when nothing else can fill a slot,
+        // offering something the player has is better than an empty row. What
+        // was wrong is what picking it did.
+        if (held)
         {
             // In place, in the same slot: plan section 3.1. The slot is the
             // tier the affix was first taken at and does not move when it
@@ -830,19 +845,25 @@ namespace Gauntlet
             // The condition is deliberately not copied. Nothing has rolled one
             // since Phase 2 and both sides are Condition::Always; writing a
             // dormant field here would be noise in the diff and in the table.
-            held->rank    = chosen.rank;
+            // Never downwards. A New offer for a carried mechanic carries the
+            // tier's rank floor, which can sit below a rank the run has
+            // already bought; accepting it must not take a rank away.
+            MechanicDef const* def = FindMechanic(chosen.mechanic);
+            uint8 const ceiling = def ? std::min<uint8>(def->maxRank, MAX_RANK) : MAX_RANK;
+
+            held->rank    = std::min<uint8>(std::max(chosen.rank, held->rank), ceiling);
             held->boon    = chosen.boon;
             held->boonMag = chosen.boonMag;
 
             trans->Append("UPDATE `gauntlet_affix` SET `rank` = {}, `boon` = {}, `boon_mag` = {} "
                           "WHERE `guid` = {} AND `slot` = {}",
-                          static_cast<uint32>(chosen.rank), static_cast<uint32>(chosen.boon),
+                          static_cast<uint32>(held->rank), static_cast<uint32>(chosen.boon),
                           static_cast<uint32>(chosen.boonMag), low, static_cast<uint32>(held->slot));
             trans->Append(
                 "INSERT INTO `gauntlet_affix_log` (`guid`, `tier`, `action`, `mechanic`, `rank`, `gen_version`) "
                 "VALUES ({}, {}, 'rankup', {}, {}, {})",
                 low, static_cast<uint32>(slot), static_cast<uint32>(chosen.mechanic),
-                static_cast<uint32>(chosen.rank), static_cast<uint32>(GeneratorVersion));
+                static_cast<uint32>(held->rank), static_cast<uint32>(GeneratorVersion));
         }
         else
         {

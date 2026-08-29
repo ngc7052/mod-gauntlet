@@ -522,6 +522,11 @@ public:
             { "fire",         HandleDebugFire,        SEC_GAMEMASTER, Console::No },
             { "set",          HandleDebugSet,         SEC_GAMEMASTER, Console::No },
             { "events",       HandleDebugEvents,      SEC_GAMEMASTER, Console::No },
+
+            // Phase 3. Deals a share of the caster's own maximum health
+            // through the real damage pipeline, which is the only way to
+            // exercise Last Rites without dying for it.
+            { "hurt",         HandleDebugHurt,        SEC_GAMEMASTER, Console::No },
         };
         static ChatCommandTable sub =
         {
@@ -1238,6 +1243,64 @@ public:
                                  key, value, was);
         handler->PSendSysMessage("  A carried mechanic reads its keys once, in OnAttach, so this reaches it on the "
                                  "next login -- or now, with .gauntlet debug remove <slot> and give.");
+        return true;
+    }
+
+    // `.gauntlet debug hurt <percent>` -- take a blow of your own choosing.
+    //
+    // It exists because of Last Rites. The affix only acts on a blow that
+    // would kill, and on a hardcore realm the only way to produce one is to
+    // stake the run on the answer: if the cheat death is broken, finding that
+    // out costs the character. That is not a test anyone can run twice.
+    //
+    // The damage goes through Unit::DealDamage -- the same static entry point
+    // every real blow takes -- so it passes through this module's own
+    // UnitScript override and therefore through IMechanic::OnLethal and
+    // OnDamageTaken exactly as a mob's swing would. Nothing here special-cases
+    // the caller; `hurt 100` is a genuine killing blow and will end the run if
+    // no bargain catches it.
+    //
+    // It is also the readiest way to see Deep Wounds make a wound, Cursed
+    // Hoard's triple actually triple, and the Mark's heal ceiling bite.
+    static bool HandleDebugHurt(ChatHandler* handler, Optional<uint32> pct)
+    {
+        if (!DebugAllowed(handler))
+            return false;
+
+        Player* player = handler->GetSession() ? handler->GetSession()->GetPlayer() : nullptr;
+        if (!player || !player->IsAlive())
+        {
+            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r No living character.");
+            return false;
+        }
+
+        uint32 const share = pct ? std::min<uint32>(*pct, 100u) : 100u;
+        uint32 const max   = uint32(player->GetMaxHealth());
+        uint32 const want  = uint32(uint64(max) * share / 100u);
+
+        if (want == 0)
+        {
+            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r That is no damage at all.");
+            return false;
+        }
+
+        uint32 const before = uint32(player->GetHealth());
+
+        handler->PSendSysMessage(
+            "|cffff2020[Gauntlet debug]|r Dealing {} damage ({}% of {} maximum). Health is {}.",
+            want, share, max, before);
+
+        // GM protection would swallow it, and a game master is exactly who
+        // runs this, so allowGM is set. Durability is spared: this is a test,
+        // not a death.
+        Unit::DealDamage(player, player, want, nullptr, DIRECT_DAMAGE, SPELL_SCHOOL_MASK_NORMAL,
+                         nullptr, /*durabilityLoss*/ false, /*allowGM*/ true);
+
+        if (player->IsAlive())
+            handler->PSendSysMessage(
+                "|cffff2020[Gauntlet debug]|r Still standing at {} of {}.",
+                uint32(player->GetHealth()), max);
+
         return true;
     }
 

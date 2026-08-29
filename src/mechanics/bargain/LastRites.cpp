@@ -266,18 +266,33 @@ namespace Gauntlet
 
         std::string LastRites::Describe(AffixInstance const& self) const
         {
-            uint8 const  i     = RankIndex(&self);
-            uint8 const  every = LEVELS_PER_CHARGE[i];
+            uint8 const every = LEVELS_PER_CHARGE[RankIndex(&self)];
 
-            std::string when = every == 1 ? "Once per level"
-                                          : "Once every " + std::to_string(every) + " levels";
+            std::string how_often = every == 1
+                ? std::string("once per level")
+                : "once every " + std::to_string(every) + " levels";
 
-            // No BoonClause. The boon *is* the first sentence -- Boon::SecondLife
-            // has no magnitude and no generic phrasing -- and a second sentence
-            // promising an upside would read as a third thing the affix does.
-            return when + ", a killing blow leaves you at one health instead of ending the run."
-                          " For ten minutes afterwards you take half again as much damage and"
-                          " cannot be healed above half. It is a chase, not a pardon.";
+            // Rewritten in Phase 3 after a player read it and had to ask
+            // whether it saves you from a killing blow -- which is the only
+            // thing it does.
+            //
+            // Three faults, and they are the ones to avoid in every card here.
+            // It opened on "Once per level," so the effect arrived in a
+            // subordinate clause after the reader had already spent their
+            // attention on a frequency. It said "half again as much damage",
+            // which is a phrase and not a number. And it ended on "It is a
+            // chase, not a pardon", which is the writer talking rather than
+            // the affix.
+            //
+            // The rule the rest of these should follow: first sentence says
+            // what happens to you, in plain words, with the number in digits.
+            //
+            // No BoonClause: the save *is* the boon (Boon::SecondLife has no
+            // magnitude), and a sentence promising an upside on top would read
+            // as a third thing the affix does.
+            return "When a hit would kill you, it leaves you at 1 health instead. This saves you "
+                 + how_often + ". For 10 minutes after a save you take 50% more damage and cannot"
+                   " be healed above half your health.";
         }
 
         std::string LastRites::Diagnose(Ctx& ctx) const

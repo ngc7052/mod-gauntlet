@@ -43,10 +43,18 @@ namespace Gauntlet
     {
         constexpr uint16 MECHANIC_REINFORCEMENTS = 4;
 
-        // One event, re-armed after every arrival. The tag is bumped whenever
-        // the fight ends so a Fire that was already handed out cannot act on
-        // the next fight.
-        constexpr uint32 EVENT_ARRIVE = 1;
+        // The first value of the per-arming tag. It is NOT the id armed with:
+        // _eventId is bumped on every Arm and on every Stop, and the scheduler
+        // is armed with the current value, so a Fire released for one fight can
+        // never be acted on in the next.
+        //
+        // Arming with this constant instead was a bug that made the affix fire
+        // exactly once per session. The tag was bumped and then ignored, so the
+        // scheduler always called back with 1 while _eventId had moved on --
+        // 3 by the second fight, 5 by the third -- and OnWarn and OnEvent both
+        // dropped every callback on the `eventId != _eventId` guard. The first
+        // fight worked, because one bump from 0 lands on 1 by luck.
+        constexpr uint32 EVENT_FIRST = 1;
 
         // The card's ladder: 45/15 s -> 30/15 s -> 20/10 s, cap 2 -> 3 -> 4.
         constexpr uint32 FIRST_MS[MAX_RANK]  = { 45000, 30000, 20000 };
@@ -136,7 +144,7 @@ namespace Gauntlet
             void Stop(Ctx& ctx);
             void Arrive(Ctx& ctx);
 
-            uint32 _eventId = 0;
+            uint32 _eventId = EVENT_FIRST - 1;   // Arm() pre-increments
             uint32 _spawned = 0;      // this fight only; the cap is per fight
             bool   _armed   = false;
         };
@@ -168,7 +176,7 @@ namespace Gauntlet
         void Reinforcements::Arm(Ctx& ctx, uint32 inMs)
         {
             ++_eventId;
-            ctx.clock->Arm(MECHANIC_REINFORCEMENTS, EVENT_ARRIVE, inMs, WARN_MS);
+            ctx.clock->Arm(MECHANIC_REINFORCEMENTS, _eventId, inMs, WARN_MS);
         }
 
         void Reinforcements::Stop(Ctx& ctx)

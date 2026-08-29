@@ -345,6 +345,52 @@ namespace Gauntlet
         Emit(player, f.Str());
     }
 
+    // "GNT\tODESC\t<index>\t" is thirteen bytes at three digits of index, and
+    // Frame refuses anything over MaxPayload, so this leaves a wide margin
+    // rather than sitting on the limit.
+    constexpr std::size_t DESC_CHUNK = 200;
+
+    // One mechanic's own sentence, sent as however many frames it takes.
+    //
+    // Both the offer list and the carried list need it and for the same
+    // reason: MechanicDef::blurb is one static line per registry row, so it
+    // says the same thing at rank I and rank III. Reinforcements III really
+    // draws an enemy after twenty seconds and then every ten, and the blurb
+    // said "longer than 30 seconds ... every 15 seconds" -- the rank I numbers
+    // -- in the panel of a player carrying rank III.
+    //
+    // Split on a space so a chunk boundary never lands inside a word, and drop
+    // the space itself: the addon rejoins the pieces with exactly one.
+    //
+    // Leaving it on the end of a chunk did not survive the trip. The first
+    // version broke "... in dungeons. In exchange, you have 5% more health."
+    // into a chunk ending in "dungeons. " and one starting "In exchange", and
+    // what arrived was "dungeons.In exchange" -- the trailing space is trimmed
+    // somewhere between here and CHAT_MSG_ADDON. Neither side may rely on a
+    // space at a message boundary, so neither side sends one.
+    template <typename Emitter>
+    void EmitDescription(char const* type, int64 key, std::string const& desc, Emitter&& emit)
+    {
+        for (std::size_t at = 0; at < desc.size(); )
+        {
+            std::size_t take = std::min<std::size_t>(DESC_CHUNK, desc.size() - at);
+            std::size_t skip = 0;
+
+            if (at + take < desc.size())
+            {
+                std::size_t const space = desc.rfind(' ', at + take);
+                if (space != std::string::npos && space > at)
+                {
+                    take = space - at;   // up to, not including, the space
+                    skip = 1;
+                }
+            }
+
+            emit(type, key, desc.substr(at, take));
+            at += take + skip;
+        }
+    }
+
     void Addon::SendAffixes(Player* player)
     {
         if (!CanSend(player))
@@ -364,6 +410,18 @@ namespace Gauntlet
             f.Num(static_cast<int64>(a.boon));
             f.Num(a.boonMag);
             Emit(player, f.Str());
+
+            // The carried affix's own sentence at the rank it is actually at,
+            // keyed by slot. Without it the panel's tooltip draws the registry
+            // blurb, which is the rank I wording for every rank.
+            EmitDescription("ADESC", a.slot, sGauntlet->DescribeOf(a),
+                            [this, player](char const* type, int64 key, std::string const& part)
+                            {
+                                Frame d(type);
+                                d.Num(key);
+                                d.Text(part, DESC_CHUNK);
+                                Emit(player, d.Str());
+                            });
         }
 
         // Always sent, even for an empty carried set: AFFIX_END is what makes
@@ -371,11 +429,6 @@ namespace Gauntlet
         // it. A run with nothing borne has to be able to say so.
         Emit(player, Frame("AFFIX_END").Str());
     }
-
-    // "GNT\tODESC\t<index>\t" is thirteen bytes at three digits of index, and
-    // Frame refuses anything over MaxPayload, so this leaves a wide margin
-    // rather than sitting on the limit.
-    constexpr std::size_t DESC_CHUNK = 200;
 
     void Addon::SendOffers(Player* player)
     {
@@ -421,27 +474,14 @@ namespace Gauntlet
             // arrive as several ODESC frames for the same index and the addon
             // joins them, so nothing has to be truncated at a word boundary
             // that a future rank might move.
-            std::string const desc = sGauntlet->DescribeOffer(o);
-            for (std::size_t at = 0; at < desc.size(); )
-            {
-                std::size_t take = std::min<std::size_t>(DESC_CHUNK, desc.size() - at);
-
-                // Break on a space when there is one to break on, so a chunk
-                // boundary never lands inside a word.
-                if (at + take < desc.size())
-                {
-                    std::size_t const space = desc.rfind(' ', at + take);
-                    if (space != std::string::npos && space > at)
-                        take = space - at + 1;
-                }
-
-                Frame d("ODESC");
-                d.Num(static_cast<int64>(i + 1));
-                d.Text(desc.substr(at, take), DESC_CHUNK);
-                Emit(player, d.Str());
-
-                at += take;
-            }
+            EmitDescription("ODESC", static_cast<int64>(i + 1), sGauntlet->DescribeOffer(o),
+                            [this, player](char const* type, int64 key, std::string const& part)
+                            {
+                                Frame d(type);
+                                d.Num(key);
+                                d.Text(part, DESC_CHUNK);
+                                Emit(player, d.Str());
+                            });
         }
 
         Emit(player, Frame("OFFER_END").Str());

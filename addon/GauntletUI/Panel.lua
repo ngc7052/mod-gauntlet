@@ -206,11 +206,12 @@ for i = 1, 16 do
     r.rank:SetPoint("LEFT", r.name, "RIGHT", 6, 0)
     r.rank:SetWidth(24); r.rank:SetJustifyH("LEFT")
 
-    r.cond = r:CreateTexture(nil, "OVERLAY")
-    r.cond:SetWidth(8); r.cond:SetHeight(8)
-    r.cond:SetPoint("LEFT", r.rank, "RIGHT", 6, 0)
-    r.cond:SetTexture("Interface\\Buttons\\WHITE8X8")
-    r.cond:Hide()
+    -- The condition light that used to sit here is gone. It showed whether an
+    -- affix's Condition was currently in force, which was meaningful while the
+    -- scalars existed; Phase 2 deleted them and nothing has rolled a condition
+    -- since, so every affix is Condition::Always and the light was a grey
+    -- square that never changed and never meant anything. A player asked what
+    -- it was for, which is the answer.
 
     r.tag = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     r.tag:SetPoint("RIGHT", r, "RIGHT", -6, 0)
@@ -257,11 +258,8 @@ local function RefreshMain()
             if a.rank then
                 rows[i].rank:SetText(RankText(a.rank))
                 rows[i].rank:Show()
-                rows[i].cond:Show()
-                rows[i].cond:SetVertexColor(0.4, 0.4, 0.4, 0.55)   -- neutral: COND is a Phase 1 no-op today
             else
                 rows[i].rank:SetText("")
-                rows[i].cond:Hide()
             end
             rows[i]:Show(); n = i
         else
@@ -382,6 +380,7 @@ local function ShowChooser()
                 descText = descText .. "  |cffff8040(swaps out " .. o.swapName .. ")|r"
             end
             cards[i].desc:SetText(descText)
+            cards[i].descH = cards[i].desc:GetStringHeight() or 0
             if o.kind then
                 local k = KIND_COLOR[o.kind] or { 0.7, 0.7, 0.7, o.kind:upper() }
                 cards[i].badge:SetText(k[4])
@@ -397,8 +396,31 @@ local function ShowChooser()
         end
     end
     if n == 0 then return end
+
+    -- Cards are sized to their text rather than to a fixed 48 pixels.
+    --
+    -- They were fixed-height while every description was the registry's
+    -- one-line blurb. The server now sends the mechanic's real sentence at the
+    -- offered rank, which runs to four wrapped lines for the longer ones, and
+    -- a fixed card clipped it and overlapped the row beneath.
+    --
+    -- NAME_H is the name line plus its padding above and below the block; the
+    -- 48 floor keeps a one-line offer looking the way it always has.
+    local NAME_H, GAP = 24, 6
+    local top = 50
+    for i = 1, 3 do
+        local c = cards[i]
+        if c:IsShown() then
+            local h = math.max(48, NAME_H + (c.descH or 0) + 10)
+            c:SetHeight(h)
+            c:ClearAllPoints()
+            c:SetPoint("TOPLEFT", chooser, "TOPLEFT", 14, -top)
+            top = top + h + GAP
+        end
+    end
+
     chooser.title:SetText("Tier " .. run.tier .. " - Choose Your Affix")
-    chooser:SetHeight(62 + n * 54)
+    chooser:SetHeight(top + 12)
     chooser:Show()
     PlaySound("igQuestListOpen")
     pendingOffer = false
@@ -500,6 +522,22 @@ GauntletProtocol.On("AFFIX", function(slot, id, rank, cond, boon, boonMag)
     pendingCarriedBySlot[rec.slot] = rec
 end)
 
+-- The same for a carried affix, keyed by slot. Reinforcements III really draws
+-- an enemy after twenty seconds and then every ten; the registry blurb said
+-- "longer than 30 seconds ... every 15 seconds", which is the rank I wording,
+-- and that is what the tooltip showed a player carrying rank III.
+GauntletProtocol.On("ADESC", function(slot, text)
+    local a = pendingCarriedBySlot[tonumber(slot)]
+    if not a then return end
+
+    if a.descFromServer then
+        a.desc = a.desc .. " " .. (text or "")
+    else
+        a.desc = text or ""
+        a.descFromServer = true
+    end
+end)
+
 GauntletProtocol.On("AFFIX_END", function()
     -- AFFIX_END marks a complete, authoritative snapshot; replace rather than
     -- merge, since the server may resend this after login, a pick or a swap.
@@ -540,8 +578,11 @@ GauntletProtocol.On("ODESC", function(i, text)
     local o = pendingOffers[tonumber(i)]
     if not o then return end
 
+    -- Joined with exactly one space. The server strips the space it split on,
+    -- because a space at the end of an addon message does not survive the trip
+    -- to CHAT_MSG_ADDON and "in dungeons.In exchange" is what came back.
     if o.descFromServer then
-        o.desc = o.desc .. (text or "")
+        o.desc = o.desc .. " " .. (text or "")
     else
         o.desc = text or ""
         o.descFromServer = true

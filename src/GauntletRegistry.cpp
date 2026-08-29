@@ -255,7 +255,7 @@ namespace
         // health, once per level, and the Mark that follows is the price.
         { 26, "last_rites", "Last Rites", Family::Bargain, 0, 8, 16, 3,
           MF_RewardShaped, "", Boon::SecondLife, 0, 0,
-          "Once per level, a killing blow leaves you at 1 health instead." },
+          "A hit that would kill you leaves you at 1 health instead, once per level." },
 
         // The card's window is tiers 4-14; the family rule that bargains are
         // only offered from tier 6 (sections 3 and 4.6) is the offer builder's
@@ -268,7 +268,8 @@ namespace
         // Do keeps the two from drifting apart again.
         { 27, "cursed_hoard", "Cursed Hoard", Family::Bargain, 0, 6, 14, 3,
           MF_RewardShaped, "", Boon::BonusMoney, 0, 0,
-          "Chests hold twice the loot, but opening one curses you until you kill three enemies." },
+          "Chests give twice as much loot, but opening one makes you take triple damage"
+          " until you kill three enemies." },
 
         // --- Family C: class curses ------------------------------------
         // Every row carries the "classcurse" token: section 4.1 allows one
