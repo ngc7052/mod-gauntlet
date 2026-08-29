@@ -1,0 +1,68 @@
+# Phase 4 — running plan and progress
+
+Live working document. Updated as each step lands so an interrupted session can
+be resumed from it, and so the user can see on return what was done and what was
+decided without reading twenty commits.
+
+## The plan
+
+| # | Step | Ids | State |
+|---|---|---|---|
+| 1 | The three shared primitives | — | **done** `b960fb9` |
+| 2a | Warrior: C1, C2, C4 | 28, 29, 31 | **done** `9b6b16c` |
+| 2b | Paladin: C5, C6 | 32, 33 | in progress |
+| 2c | Hunter: C9, C10, C11 | 36, 37, 38 | |
+| 2d | Rogue: C13, C15 | 40, 42 | |
+| 2e | Priest: C17, C20 | 44, 47 | |
+| 2f | Death Knight: C21, C22 | 48, 49 | |
+| 2g | Shaman: C25, C26 | 52, 53 | |
+| 2h | Mage: C29, C31 | 56, 58 | |
+| 2i | Warlock: C33 | 60 | |
+| 2j | Druid: C37 | 64 | |
+| 2k | Common: C41 Faint | 68 | |
+| 3 | Class bargains: Ankh Pact, Stone of the Damned | 70, 71 | |
+| 4 | The tier windows — the 14 `TODO(design)` upper bounds | — | |
+| 5 | Class curses recorded as conducts | — | |
+| 6 | `docs/phase-4-report.md` | — | |
+
+Wave A is twenty-one curses (the design's build-priority A). Wave B is not this
+phase.
+
+## Standing rules for this run
+
+- **One commit per class**, so a bad curse is one revert.
+- **`tests/compile-check.sh` on every file before committing.** The anchor audit
+  is what catches "the mechanic is offered and does nothing", which is the
+  failure mode this codebase produces most easily.
+- **Deploy in batches, not per commit.** The realm is live; a rebuild restarts
+  the worldserver and kicks the player out. Deploy at checkpoints only.
+- **Registry rows go `MF_NotImplemented` → live in the same commit as the
+  code**, and `OFFERABLE` in `tests/RegistryTest.cpp` with them.
+- **Where a card's boon does not match its registry row, the row changes** and
+  the reason goes in a comment. Two have already: Deafening Roar and, before
+  it, several in Phase 2. A row that promises a number the mechanic never pays
+  is the fault this redesign exists to remove.
+- **Where a card states a flat number the boon table would ladder, add a
+  `BoonTable` override.** Berserker's Bargain has one.
+
+## Decisions taken while working
+
+Recorded here as they happen, so the report can be written from facts rather
+than from memory.
+
+1. **Spell ids are 3.3.5a base ranks normalised through
+   `GetFirstSpellInChain`.** 3.3.5 spells live in DBC, not SQL, so most cannot
+   be confirmed from this machine. The failure mode is benign and visible — the
+   curse stops reacting to that one spell — and the in-game checklist is what
+   catches it. Ids that *are* confirmed carry a file:line.
+2. **A "cheaper ability" boon is delivered as a refund, not a discount.** The
+   cost is taken in `Spell::TakePower`, which runs before `OnPlayerSpellCast`,
+   so by the time this module hears about a cast the mana is gone. The bar lands
+   where a discount would have left it.
+3. **A curse that watches one of its own spells remembers the id it saw.**
+   `Unit::GetDynObject` takes a single spell id and Consecration has eight
+   ranks; the id of the cast that made the circle is something the module was
+   told, so it is used rather than a table of eight numbers guessed from memory.
+4. **An extended aura's tooltip still lies.** `SetDuration`/`SetMaxDuration`
+   move the client's timer but not the DBC, so every curse that stretches an
+   aura says the real number in its own `Describe()`.
