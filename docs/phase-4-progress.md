@@ -56,7 +56,14 @@ phase.
 | B5 | Warlock C34, C35, C36 | 61, 62, 63 | **done** |
 | B6 | Druid C38, C39, C40 | 65, 66, 67 | **done** |
 | B7 | Common C42 Unspent | 69 | **done** |
-| B8 | Sweep, report addendum | — | in progress |
+| B8 | Sweep, report addendum | — | **done** |
+
+## Status: phase complete
+
+Both waves are in, all sixty-nine registry rows have an implementation, and
+nothing carries MF_NotImplemented. See docs/phase-4-report.md, including the
+wave B addendum at section 7 and the three-way choice it leaves for the empty
+tiers 78-80.
 
 ## Status: wave A complete and deployed
 

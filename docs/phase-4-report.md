@@ -241,3 +241,70 @@ approximated one; the tiers 76–80 tail (§4); `docs/checklists.md` still unwri
 6. **The 36.9% of sets with no reward-shaped offer is the number to beat.** It
    is the clearest single statement of how thin the table still is for eighty
    tiers.
+
+
+---
+
+## 7. Addendum — wave B, and the family is finished
+
+Wave A was the design's build-priority A. Wave B is the other twenty-one, and
+they landed in the same session: `af76b48`, `2745c5a`, `e5865cf`, `a048be8`,
+`ff39afa`.
+
+**Sixty-nine of sixty-nine rows now have an implementation.** Four phases after
+the registry was written as pure data with nothing behind any of it, no row
+carries `MF_NotImplemented` and every one can be offered.
+
+### What wave B needed that wave A did not
+
+Three more dispatch points, all for the same reason as wave A's four — a card
+asked for something the module could not express:
+
+| Point | For |
+|---|---|
+| `OnPetDamaged` | Blood Bond — the mirror of wave A's `OnPetDamage` |
+| `OnPeriodicTick` | Poisoned Blades, Affliction of the Self, Blood Bond's boon |
+| `OnTalentPoints` | Unspent — declared since Phase 0, dispatched from nowhere |
+
+That is five Phase 0 seams closed across the phase: `OnAuraApply`,
+`OnShapeshift`, `OnResurrect`, `OnTalentPoints`, and `Boon::BonusPetDamage`.
+
+### Three implementations that are honestly narrower than their card
+
+- **Penance of Silence** applies a stun, not a silence. There is no `UNIT_STATE`
+  for silence — it is an aura mechanic — and applying one needs a spell id whose
+  tooltip would then describe something else. A stun of the same length is a
+  heavier price than the card asks for, and the file says so.
+- **Shard Economy** implements only the second half of its card. Shards from
+  under-level enemies are taken back, since the core has already created the
+  item by the time any kill hook runs; the summon-and-Healthstone cost is not
+  implemented, because it would double-charge a warlock also carrying Fel Pact.
+- **Cold Presence** does not deliver its "+25% presence effects", which lives
+  inside each presence's own aura with no seam to reach. Like Rune-starved, the
+  blurb does not promise it.
+
+### The measurement, and what twenty-one more curses did not fix
+
+```
+tier              41     51     61     71     80
+wave A end     30.30  56.20  70.40  99.50    100
+wave B end     27.50  53.05  70.95  99.55    100
+
+empty offer slots   96,225 -> 86,916
+```
+
+**Tiers 78–80 are unchanged at 100%, and that is the finding.** Twenty-one more
+curses moved the top of the run by nothing, which is much stronger evidence than
+§4 had that the tail is structural rather than a content shortage. A run at tier
+78 carries `MAX_CARRIED` = 16 of the roughly twenty-five rows its class can be
+offered, everything carried is at rank III, and the handful uncarried are not in
+window. Adding rows to the table cannot fix that; only one of three things can:
+
+1. **Raise `MAX_RANK` above 3.** Every mechanic's rank table grows, which is 69
+   files, but it turns the late run into deepening rather than collecting.
+2. **Raise `MAX_CARRIED`.** Cheapest, and it makes the aggregate caps bite
+   harder — the reason the cap exists at all.
+3. **Stop the tier axis before 80.** A tier per level to 70, then nothing, is an
+   honest statement that the run's building phase is over.
+
+That is a design decision and is left for the user rather than taken here.
