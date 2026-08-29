@@ -123,9 +123,13 @@ Every 5th / 4th / 3rd / 2nd corpse looted draws a pack of 2 / 2 / 3 / 4.
 - Boon is money; check a purse before and after.
 
 **S4 · Reinforcements** (`reinforcements`, 4) · tiers 25–80
-A fight past 45 / 30 / 20 / 15 s draws another enemy every 15 / 15 / 10 / 8 s,
+A fight past 45 / 30 / 20 / 15 s draws another enemy every 15 / 15 / 12 / 12 s,
 up to 2 / 3 / 4 / 6 — bounded by `Gauntlet.Summons.MaxAlive` across every spawn
 mechanic together.
+- The repeat stops at twelve because `Gauntlet.Events.MinSpacing` is twelve: a
+  cadence below the floor cannot be delivered, so ranks III and IV escalate on
+  the first arrival and the cap instead. If you lower `MinSpacing`, this ladder
+  should move with it.
 - **Known live bug once, fixed:** it fired once per session because `Arm()`
   armed a constant event id. Stay in one fight for three minutes and confirm it
   repeats, then start a second fight and confirm it repeats there too.

@@ -65,7 +65,27 @@ namespace Gauntlet
         // bounds what can be standing at once across every spawn mechanic.
         constexpr uint32 FIRST_MS[]  = { 45000, 30000, 20000, 15000 };
         static_assert(std::size(FIRST_MS) >= MAX_RANK, "FIRST_MS is short a rank");
-        constexpr uint32 REPEAT_MS[] = { 15000, 15000, 10000, 8000 };
+        // The repeat stops at twelve seconds and stays there, and the reason is
+        // not the card.
+        //
+        // Gauntlet.Events.MinSpacing is a floor on how close together *any* two
+        // of a player's events may land, and its default is 12 s. A cadence
+        // below it cannot be delivered: the scheduler holds the fire until the
+        // floor has passed. So the card's 10 s at rank III was already being
+        // played as 12, and Phase 6's 8 s at rank IV would have been 12 as well
+        // -- two ranks that differ on the offer card and not on screen, which is
+        // the fault this redesign exists to remove.
+        //
+        // Weakening the spacing was tried and is wrong: exempting a mechanic
+        // from being spaced against its own previous fire lets one fast re-armer
+        // monopolise the queue, and SchedulerStarvation.AShortLeadIsNotStarved
+        // ByTheSpacing catches it -- Falling Sky went to 39 warnings and 0 fires.
+        //
+        // So the repeat axis has no room left below twelve, and rank IV
+        // escalates on the two axes that do: the first arrival (20 -> 15 s) and
+        // the cap (4 -> 6). That is the same shape Half-Tamed and Grave Call
+        // take where one of their numbers has run out.
+        constexpr uint32 REPEAT_MS[] = { 15000, 15000, 12000, 12000 };
         static_assert(std::size(REPEAT_MS) >= MAX_RANK, "REPEAT_MS is short a rank");
         constexpr uint32 CAP[]       = { 2, 3, 4, 6 };
         static_assert(std::size(CAP) >= MAX_RANK, "CAP is short a rank");

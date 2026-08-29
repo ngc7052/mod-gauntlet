@@ -97,6 +97,12 @@ namespace Gauntlet
 
         // Plan section 2.3 and the config's Phase 1 defaults. Set from
         // Gauntlet.Events.MinSpacing and .BudgetStep by Mgr::LoadConfig.
+        // A floor on how close together any two of a player's *paced* events may
+        // land, and therefore a floor on every cadence a mechanic can actually
+        // deliver: a mechanic that asks for 8 s gets 12, whatever its card says.
+        // A rank ladder that steps below this number is two ranks that differ on
+        // the offer card and not on screen -- Reinforcements had one, see the
+        // note on REPEAT_MS there.
         static constexpr uint32 DEFAULT_MIN_SPACING_MS = 12000;
         static constexpr float  DEFAULT_BUDGET_STEP    = 0.25f;
 
