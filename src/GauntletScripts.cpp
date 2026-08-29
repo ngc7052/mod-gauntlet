@@ -782,8 +782,12 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_OneWard();            // 51  C24 death knight
     void AddSC_gauntlet_mechanic_OneTotem();           // 52  C25 shaman
     void AddSC_gauntlet_mechanic_TotemicAnchor();      // 53  C26 shaman
+    void AddSC_gauntlet_mechanic_ElementalOverload();  // 54  C27 shaman
+    void AddSC_gauntlet_mechanic_SpiritDebt();         // 55  C28 shaman
     void AddSC_gauntlet_mechanic_ColdFeet();           // 56  C29 mage
+    void AddSC_gauntlet_mechanic_FickleSheep();        // 57  C30 mage
     void AddSC_gauntlet_mechanic_ManaBurn();           // 58  C31 mage
+    void AddSC_gauntlet_mechanic_ArcaneFrailty();      // 59  C32 mage
     void AddSC_gauntlet_mechanic_FelPact();            // 60  C33 warlock
     void AddSC_gauntlet_mechanic_BoundSkin();          // 64  C37 druid
     void AddSC_gauntlet_mechanic_Faint();              // 68  C41 all mana users
@@ -847,8 +851,12 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_OneWard();
     AddSC_gauntlet_mechanic_OneTotem();
     AddSC_gauntlet_mechanic_TotemicAnchor();
+    AddSC_gauntlet_mechanic_ElementalOverload();
+    AddSC_gauntlet_mechanic_SpiritDebt();
     AddSC_gauntlet_mechanic_ColdFeet();
+    AddSC_gauntlet_mechanic_FickleSheep();
     AddSC_gauntlet_mechanic_ManaBurn();
+    AddSC_gauntlet_mechanic_ArcaneFrailty();
     AddSC_gauntlet_mechanic_FelPact();
     AddSC_gauntlet_mechanic_BoundSkin();
     AddSC_gauntlet_mechanic_Faint();

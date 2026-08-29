@@ -427,12 +427,12 @@ namespace
         // drops" -- Lava Burst is the Elemental 51-pointer, and an enhancement shaman
         // alternates anyway, so the curse would be free for them.
         { 54, "c27_elemental_overload", "Elemental Overload", Family::Class, CM_SHAMAN, 20, 80, 3,
-          MF_NotImplemented, "", Boon::BonusDamage, 0, 1,
+          MF_None, "", Boon::BonusDamage, 0, 1,
           "Casting the same spell twice in a row costs double." },
 
         // The boon is bespoke: both shields carry three more charges.
         { 55, "c28_spirit_debt", "Spirit Debt", Family::Class, CM_SHAMAN, 25, 80, 3,
-          MF_NotImplemented, "", Boon::BonusAbility, 324, 0,
+          MF_None, "", Boon::BonusAbility, 324, 0,
           "Every hit consumes a shield charge, and each consumed charge costs you 2% health." },
 
         // Mage
@@ -443,7 +443,7 @@ namespace
 
         // The boon is bespoke: Polymorph becomes instant.
         { 57, "c30_fickle_sheep", "Fickle Sheep", Family::Class, CM_MAGE, 20, 80, 3,
-          MF_NotImplemented, "", Boon::BonusAbility, 118, 0,
+          MF_None, "", Boon::BonusAbility, 118, 0,
           "Polymorph breaks after five seconds, and the sheep comes back angry." },
 
         { 58, "c31_mana_burn", "Mana Burn", Family::Class, CM_MAGE, 20, 80, 3,
@@ -451,7 +451,7 @@ namespace
           "Half the damage you take also burns your mana." },
 
         { 59, "c32_arcane_frailty", "Arcane Frailty", Family::Class, CM_MAGE, 30, 80, 3,
-          MF_NotImplemented, "", Boon::BonusDamage, 0, 0,
+          MF_None, "", Boon::BonusDamage, 0, 0,
           "Thirty percent less health, thirty percent more spell damage." },
 
         // Warlock

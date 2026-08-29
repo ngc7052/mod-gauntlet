@@ -7,18 +7,23 @@
 
 #include "GauntletAddon.h"
 #include "GauntletRegistry.h"
+#include "AuraDurationEdit.h"
 #include "PermanentCooldown.h"
 
 #include "Chat.h"
 #include "Player.h"
 #include "SharedDefines.h"
 #include "Spell.h"
+#include "ObjectGuid.h"
+#include "SpellAuras.h"
 #include "SpellInfo.h"
 #include "SpellMgr.h"
 #include "Unit.h"
 
 #include <algorithm>
+#include <algorithm>
 #include <string>
+#include <vector>
 
 // Design section 3, family C, mage. Both of these attack the same assumption
 // from different sides: that a mage never gets touched. One prices the escape,
@@ -240,8 +245,175 @@ namespace Gauntlet
                 return "mana burn: " + std::to_string(BURN_PCT[RankIndexOf(ctx.self)]) + "% of damage taken";
             }
         };
+
+        // ==================================================================
+        // C30 - Fickle Sheep (57)
+        //
+        // "Polymorph breaks after five seconds, and the sheep comes back
+        // angry."
+        //
+        // CC buys time, not neutralisation: sheep to reposition, to finish the
+        // first target, to bandage for three seconds -- then deal with an
+        // angrier second mob. The boon is that the sheep is instant, which is
+        // what makes it usable as a three-second tool at all.
+        // ==================================================================
+        constexpr uint32 SPELL_POLYMORPH = 118;
+        constexpr uint32 SPELL_ENRAGE    = 8599;
+
+        // The card's ladder, and it shortens as the affix worsens.
+        constexpr int32 SHEEP_MS[MAX_RANK] = { 5000, 4000, 3000 };
+
+        constexpr int32 ENRAGE_MS = 10000;
+
+        class FickleSheep final : public IMechanic
+        {
+        public:
+            void OnAuraApplied(Ctx& ctx, Unit* target, Aura* aura) override
+            {
+                Player* player = ctx.player;
+                if (!player || !aura || !target || target == player)
+                    return;
+
+                SpellInfo const* info = aura->GetSpellInfo();
+                if (!info || sSpellMgr->GetFirstSpellInChain(info->Id) != SPELL_POLYMORPH)
+                    return;
+
+                // Ours only. OnAuraApply fires for every unit on the map, and a
+                // second mage's sheep is not this affix's business.
+                if (aura->GetCasterGUID() != player->GetGUID())
+                    return;
+
+                AuraDurationEdit::Edit(aura, SHEEP_MS[RankIndexOf(ctx.self)]);
+                _sheeped.push_back(target->GetGUID());
+            }
+
+            void OnAuraRemoved(Ctx& ctx, Unit* target, AuraApplication* app) override;
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                uint32 const secs = uint32(SHEEP_MS[RankIndexOf(&self)] / 1000);
+
+                std::string out = "Your Polymorph lasts " + std::to_string(secs)
+                                + " seconds, whatever its tooltip says, and what comes out of it"
+                                  " is enraged for 10 seconds.";
+
+                if (self.boonMag != 0)
+                    out += " In exchange it is instant.";
+
+                return out;
+            }
+
+            std::string Diagnose(Ctx&) const override
+            {
+                return "fickle sheep: " + std::to_string(_sheeped.size()) + " tracked, "
+                     + std::to_string(_enraged) + " enraged";
+            }
+
+        private:
+            std::vector<ObjectGuid> _sheeped;
+            uint32                  _enraged = 0;
+        };
+
+        void FickleSheep::OnAuraRemoved(Ctx& ctx, Unit* target, AuraApplication* app)
+        {
+            Player* player = ctx.player;
+            if (!player || !target || !app || target == player)
+                return;
+
+            Aura* aura = app->GetBase();
+            SpellInfo const* info = aura ? aura->GetSpellInfo() : nullptr;
+            if (!info || sSpellMgr->GetFirstSpellInChain(info->Id) != SPELL_POLYMORPH)
+                return;
+
+            auto const it = std::find(_sheeped.begin(), _sheeped.end(), target->GetGUID());
+            if (it == _sheeped.end())
+                return;   // not one of ours
+
+            _sheeped.erase(it);
+            ++_enraged;
+
+            // 8599 Enrage is the core's own generic +damage aura, applied the
+            // way Falling Sky applies its speed buff: AddAura takes no cast, no
+            // global cooldown and no line of sight, and answers null rather
+            // than throwing for anything it cannot land on.
+            if (Aura* rage = target->AddAura(SPELL_ENRAGE, target))
+                AuraDurationEdit::Edit(rage, ENRAGE_MS);
+
+            if (player->GetSession())
+                ChatHandler(player->GetSession()).PSendSysMessage(
+                    "|cffff2020[Gauntlet]|r It wakes up angry.");
+        }
+
+        // ==================================================================
+        // C32 - Arcane Frailty (59)
+        //
+        // "Thirty percent less health, thirty percent more spell damage."
+        //
+        // The purest trade in the family: a smaller pool for a bigger hit, with
+        // no condition on either half. Both numbers are on the same card and
+        // both are real.
+        // ==================================================================
+        constexpr float FRAILTY_HEALTH[MAX_RANK] = { 0.80f, 0.70f, 0.60f };
+        constexpr uint32 FRAILTY_DAMAGE_PCT[MAX_RANK] = { 20, 30, 40 };
+
+        class ArcaneFrailty final : public IMechanic
+        {
+        public:
+            float AggregateFactor(AffixInstance const& self, AggregateKind kind) const override
+            {
+                if (kind != AggregateKind::MaxHealth)
+                    return 1.0f;
+
+                uint8 const rank = self.rank < 1 ? 1 : (self.rank > MAX_RANK ? MAX_RANK : self.rank);
+                return FRAILTY_HEALTH[rank - 1];
+            }
+
+            // Without this the floor eats the affix: Gauntlet.Caps.MaxHealth is
+            // 0.6 and rank III is exactly 0.6, so a wound or a grouped Lone
+            // Wolf alongside it would be clamped away. It relaxes to its own
+            // number and no further -- the same rule Lone Wolf and Cursed Hoard
+            // established in Phase 3.
+            void RelaxCaps(AffixInstance const& self, AggregateKind kind,
+                           AggregateCaps& caps) const override
+            {
+                if (kind != AggregateKind::MaxHealth)
+                    return;
+
+                uint8 const rank = self.rank < 1 ? 1 : (self.rank > MAX_RANK ? MAX_RANK : self.rank);
+                float const want = FRAILTY_HEALTH[rank - 1];
+                if (caps.maxHealthMin > want)
+                    caps.maxHealthMin = want;
+            }
+
+            float DamageDoneMult(Ctx& ctx, Unit*, SpellInfo const* info) override
+            {
+                if (!info)
+                    return 1.0f;   // spells only, which is what the card says
+
+                return 1.0f + float(FRAILTY_DAMAGE_PCT[RankIndexOf(ctx.self)]) / 100.0f;
+            }
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                uint8 const  i    = RankIndexOf(&self);
+                uint32 const less = uint32((1.0f - FRAILTY_HEALTH[i]) * 100.0f + 0.5f);
+
+                // No BoonClause: the damage is the other half of the same
+                // sentence, not a separate promise.
+                return std::to_string(less) + "% less health, and "
+                     + std::to_string(FRAILTY_DAMAGE_PCT[i]) + "% more spell damage.";
+            }
+
+            std::string Diagnose(Ctx& ctx) const override
+            {
+                return "arcane frailty: health x"
+                     + std::to_string(FRAILTY_HEALTH[RankIndexOf(ctx.self)]);
+            }
+        };
     }
 
+    GAUNTLET_MECHANIC(57, FickleSheep);
+    GAUNTLET_MECHANIC(59, ArcaneFrailty);
     GAUNTLET_MECHANIC(56, ColdFeet);
     GAUNTLET_MECHANIC(58, ManaBurn);
 }

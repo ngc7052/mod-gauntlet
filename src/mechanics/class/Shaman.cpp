@@ -13,6 +13,9 @@
 #include "Map.h"
 #include "Player.h"
 #include "SharedDefines.h"
+#include "SpellAuras.h"
+#include "SpellMgr.h"
+#include "Unit.h"
 #include "Spell.h"
 #include "SpellInfo.h"
 
@@ -290,8 +293,195 @@ namespace Gauntlet
             bool _anchored  = false;
             bool _published = false;
         };
+
+        // ==================================================================
+        // C27 - Elemental Overload (54)
+        //
+        // "Casting the same spell twice in a row costs double."
+        //
+        // The tempo verb. Lightning Bolt spam is the tax; weaving Bolt, shock,
+        // Lava Burst and totem drops is the reward -- the rotation the class
+        // should have, enforced.
+        // ==================================================================
+        constexpr float REPEAT_COST_MULT[MAX_RANK] = { 1.5f, 2.0f, 3.0f };
+
+        class ElementalOverload final : public IMechanic
+        {
+        public:
+            void OnSpellCast(Ctx& ctx, Spell* spell) override
+            {
+                Player* player = ctx.player;
+                if (!player || !spell)
+                    return;
+
+                SpellInfo const* info = spell->GetSpellInfo();
+                if (!info || info->ManaCost == 0)
+                    return;
+
+                // Ranks of the same spell are the same spell: a shaman who
+                // alternates Lightning Bolt rank 8 with rank 7 is spamming.
+                uint32 const base = sSpellMgr->GetFirstSpellInChain(info->Id);
+                bool const repeat = base == _lastCast;
+                _lastCast = base;
+
+                if (!repeat)
+                    return;
+                if (ctx.run && ctx.run->dead)
+                    return;
+
+                // The extra, taken after the fact for the reason every cost
+                // curse in this module takes it that way: Spell::TakePower runs
+                // before any hook here.
+                float const  mult  = REPEAT_COST_MULT[RankIndexOf(ctx.self)];
+                int32 const  extra = int32(float(info->ManaCost) * (mult - 1.0f));
+                if (extra <= 0)
+                    return;
+
+                player->SetPower(POWER_MANA,
+                                 std::max<int32>(0, player->GetPower(POWER_MANA) - extra));
+                ++_taxed;
+            }
+
+            // The boon, and it is the mirror image of the curse: alternating is
+            // rewarded exactly where repeating is punished.
+            float DamageDoneMult(Ctx& ctx, Unit*, SpellInfo const* info) override
+            {
+                if (!info || !ctx.self || ctx.self->boonMag == 0)
+                    return 1.0f;
+                if (sSpellMgr->GetFirstSpellInChain(info->Id) == _lastCast)
+                    return 1.0f;   // this is the repeat; no reward
+
+                return 1.0f + float(ctx.self->boonMag) / 100.0f;
+            }
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                float const  mult = REPEAT_COST_MULT[RankIndexOf(&self)];
+                uint32 const pct  = self.boonMag;
+
+                std::string out = "Casting the same spell twice in a row costs "
+                                + std::to_string(uint32(mult * 100.0f + 0.5f)) + "% of its mana.";
+
+                if (pct != 0)
+                    out += " In exchange, a spell that follows a different one deals "
+                         + std::to_string(pct) + "% more damage.";
+
+                return out;
+            }
+
+            std::string Diagnose(Ctx&) const override
+            {
+                return "elemental overload: last spell " + std::to_string(_lastCast) + ", "
+                     + std::to_string(_taxed) + " repeat(s) taxed";
+            }
+
+        private:
+            uint32 _lastCast = 0;
+            uint32 _taxed    = 0;
+        };
+
+        // ==================================================================
+        // C28 - Spirit Debt (55)
+        //
+        // "Earth Shield and Lightning Shield charges are consumed by every hit,
+        // and each consumed charge costs you 2% health."
+        //
+        // Shields become a resource with a price rather than a passive:
+        // reapply them when you need the heal or the proc, and get out of DoTs.
+        // Enemies that hit fast are the ones to control first.
+        // ==================================================================
+        constexpr uint32 DEBT_PCT[MAX_RANK] = { 2, 3, 4 };
+
+        constexpr uint32 SPELL_LIGHTNING_SHIELD = 324;
+        constexpr uint32 SPELL_EARTH_SHIELD     = 974;
+
+        class SpiritDebt final : public IMechanic
+        {
+        public:
+            void OnDamageTaken(Ctx& ctx, Unit* /*attacker*/, uint32 /*amount*/) override
+            {
+                Player* player = ctx.player;
+                if (!player || !player->IsAlive())
+                    return;
+                if (ctx.run && ctx.run->dead)
+                    return;
+
+                // Only while a shield is actually up: the card's price is for
+                // the charge, so no shield means no debt.
+                if (!player->HasAura(SPELL_LIGHTNING_SHIELD) && !player->HasAura(SPELL_EARTH_SHIELD))
+                    return;
+
+                uint32 const want   = uint32(uint64(player->GetMaxHealth())
+                                           * DEBT_PCT[RankIndexOf(ctx.self)] / 100u);
+                uint32 const health = uint32(player->GetHealth());
+                uint32 const cost   = health > 1 ? std::min(want, health - 1) : 0;
+                if (cost == 0)
+                    return;
+
+                bool* flag = ctx.run ? &ctx.run->selfDamage : nullptr;
+                if (flag)
+                    *flag = true;
+
+                Unit::DealDamage(player, player, cost, nullptr, SELF_DAMAGE,
+                                 SPELL_SCHOOL_MASK_NORMAL, nullptr, /*durabilityLoss*/ false);
+
+                if (flag)
+                    *flag = false;
+
+                ++_charges;
+            }
+
+            // The boon: the shields carry more charges, applied where the aura
+            // lands so it is the shield the shaman just cast that is deeper.
+            void OnAuraApplied(Ctx& ctx, Unit* target, Aura* aura) override
+            {
+                Player* player = ctx.player;
+                if (!player || !aura || target != player || !ctx.self || ctx.self->boonMag == 0)
+                    return;
+
+                SpellInfo const* info = aura->GetSpellInfo();
+                if (!info)
+                    return;
+
+                uint32 const base = sSpellMgr->GetFirstSpellInChain(info->Id);
+                if (base != SPELL_LIGHTNING_SHIELD && base != SPELL_EARTH_SHIELD)
+                    return;
+
+                uint8 const now = aura->GetCharges();
+                if (now != 0)
+                    aura->SetCharges(uint8(now + 3));
+            }
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                uint32 const pct = DEBT_PCT[RankIndexOf(&self)];
+
+                std::string out = "While a shield is on you, every hit you take also costs "
+                                + std::to_string(pct) + "% of your maximum health. It cannot kill"
+                                  " you.";
+
+                if (self.boonMag != 0)
+                    out += " In exchange your shields carry three more charges.";
+
+                return out;
+            }
+
+            std::string Diagnose(Ctx& ctx) const override
+            {
+                bool const shielded = ctx.player
+                                   && (ctx.player->HasAura(SPELL_LIGHTNING_SHIELD)
+                                    || ctx.player->HasAura(SPELL_EARTH_SHIELD));
+                return std::string("spirit debt: ") + (shielded ? "shielded, paying" : "no shield")
+                     + ", " + std::to_string(_charges) + " charge(s) paid";
+            }
+
+        private:
+            uint32 _charges = 0;
+        };
     }
 
+    GAUNTLET_MECHANIC(54, ElementalOverload);
+    GAUNTLET_MECHANIC(55, SpiritDebt);
     GAUNTLET_MECHANIC(52, OneTotem);
     GAUNTLET_MECHANIC(53, TotemicAnchor);
 }
