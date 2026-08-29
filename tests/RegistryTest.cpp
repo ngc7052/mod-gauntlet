@@ -50,14 +50,15 @@ namespace
     // rather than as a count: a row that gains the flag by accident, or loses
     // it before its dispatch is wired, is an affix offered to a live hardcore
     // character that silently does nothing.
-    constexpr std::array<uint16, 28> OFFERABLE = {
+    constexpr std::array<uint16, 30> OFFERABLE = {
         1, 2, 3, 4, 5,           // S1 Shade, S2 Echo, S3 Carrion, S4 Reinforcements, S5 Ambush
         6, 7, 8, 9, 10, 11, 12, 13,  // E1 Champions .. E8 Keen-nosed
         14, 15, 16, 17, 18,      // T1 Falling Sky .. T5 Hubris
         19, 20,                  // A1 Deep Wounds, A2 Blood Magic
         23, 24, 25,              // R1 Self-found, R2 Lone Wolf, R3 Iron Purse
         26, 27,                  // B1 Last Rites, B2 Cursed Hoard
-        28, 29, 31               // C1 Red Mist, C2 Berserker's Bargain, C4 Deafening Roar
+        28, 29, 31,              // C1 Red Mist, C2 Berserker's Bargain, C4 Deafening Roar
+        32, 33                   // C5 Long Forbearance, C6 Consecrated Ground
     };
 
     // CONTRACT.md section 8's id ranges, which are fixed forever. The Attrition

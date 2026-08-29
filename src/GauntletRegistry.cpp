@@ -301,13 +301,17 @@ namespace
           "Your shouts wake every enemy within thirty yards." },
 
         // Paladin
+        // Boon changed from BonusRegen in Phase 4: the card's upside is "Holy
+        // Light 10% cheaper", which is bespoke to one named ability rather than
+        // a regeneration rate, and BonusRegen would have laddered it 15/30/45%
+        // against a card that states one number.
         { 32, "c05_long_forbearance", "Long Forbearance", Family::Class, CM_PALADIN, 15, 70, 3,
-          MF_NotImplemented, "classcurse|shortcut:divine-shield", Boon::BonusRegen, 642, 0,
+          MF_None, "classcurse|shortcut:divine-shield", Boon::BonusAbility, 642, 0,
           "Forbearance lasts three minutes, and Divine Shield empties your mana." },
 
         // The boon is bespoke: Consecration lasts twice as long and costs half.
         { 33, "c06_consecrated_ground", "Consecrated Ground", Family::Class, CM_PALADIN, 25, 70, 3,
-          MF_NotImplemented, "classcurse", Boon::BonusAbility, 26573, 0,
+          MF_None, "classcurse", Boon::BonusAbility, 26573, 0,
           "You take 25% more damage while not standing in your own Consecration." },
 
         // The boon takes a minute off Divine Shield's cooldown.

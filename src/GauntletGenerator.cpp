@@ -120,6 +120,14 @@ namespace
             case 29:
                 return boon == Boon::BonusDamage ? 25u : 0u;
 
+            // C5 Long Forbearance: "Holy Light 10% cheaper". One number on the
+            // card, and Boon::BonusAbility has no category row of its own --
+            // the five fixed boons above LastGenericBoon are bespoke by
+            // definition, so the per-mechanic override is where their magnitude
+            // has to come from when they have one at all.
+            case 32:
+                return boon == Boon::BonusAbility ? 10u : 0u;
+
             default:
                 break;
         }
