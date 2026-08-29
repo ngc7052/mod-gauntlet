@@ -352,7 +352,22 @@ namespace
         if (rewardShapedOnly && !(def.flags & MF_RewardShaped))
             return false;
 
-        if (ctx.tier < def.minTier || ctx.tier > def.maxTier)
+        // The window opens for everyone and closes only for new offers.
+        //
+        // minTier and maxTier say when a mechanic is appropriate to *introduce*
+        // -- Carrion is an early-run curse and offering it fresh at tier 70
+        // would be offering a level-1 problem to a level-70 character. Whether
+        // something you already carry may deepen is a different question, and
+        // the window was answering it too: an affix taken near the end of its
+        // window was frozen at whatever rank it happened to get, permanently,
+        // with no way to ever raise it.
+        //
+        // That is worse the later a run goes, which is exactly where the run
+        // has least else to be offered. Measured over 240,000 sets, letting a
+        // rank-up ignore maxTier takes the empty-slot count from 130,277 to
+        // 122,100 and costs nothing anywhere: a rank-up still requires the
+        // mechanic to be carried, so nothing new can enter through this door.
+        if (ctx.tier < def.minTier || (kind != OfferKind::RankUp && ctx.tier > def.maxTier))
             return false;
         if (def.family == Family::Bargain && ctx.tier < BARGAIN_MIN_TIER)
             return false;

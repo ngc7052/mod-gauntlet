@@ -185,7 +185,13 @@ namespace Gauntlet
     // prefer an ordinary new mechanic in a clean family over a bargain it
     // could only place by relaxing a rule. The last of those alone changes
     // every offer set that contains a bargain slot.
-    constexpr uint16 GeneratorVersion = 6;
+    // 6 was Phase 5: a rank-up stopped being refused by its mechanic's maxTier.
+    // The window says when a mechanic may be *introduced*; whether something
+    // already carried may deepen is a different question, and answering both
+    // with one test froze an affix taken near the end of its window at whatever
+    // rank it happened to get. Every offer set that could contain a rank-up of
+    // an out-of-window mechanic moves.
+    constexpr uint16 GeneratorVersion = 7;
 
     constexpr uint8 MAX_RANK = 3;
 

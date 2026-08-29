@@ -96,7 +96,7 @@ namespace
         "an offer set does not hold exactly `count` offers",
         "a slot came back empty without GR_NoCandidate",
         "an offer names a mechanic the registry does not carry",
-        "an offer is outside its own tier window",
+        "a new offer is outside its own tier window",
         "an offer is for a class it does not apply to",
         "an offer requires a spell the character does not know",
         "an offer requires a talent tree the character has not taken",
@@ -312,7 +312,13 @@ namespace
             if (def->flags & MF_RewardShaped)
                 rewardShaped = true;
 
-            if (tier < def->minTier || tier > def->maxTier)
+            // maxTier binds a new offer, not a rank-up: the window says when a
+            // mechanic may be introduced, and something already carried may
+            // deepen whatever the tier. minTier still binds both, and binds a
+            // rank-up vacuously, since a mechanic below its own minTier cannot
+            // have been carried in the first place.
+            if (tier < def->minTier
+                || (offer.kind != OfferKind::RankUp && tier > def->maxTier))
                 tally.Fail(I_TIER_WINDOW, q);
 
             if (def->classMask != 0 && (def->classMask & view.GetClassMask()) == 0)
@@ -811,7 +817,12 @@ TEST(OfferInvariants, LiveRegistryView)
                         << "id " << offer.mechanic << " (" << def->key << ") is MF_NotImplemented "
                         << "and was offered to a player\n  " << Describe(q);
                     ASSERT_GE(tier, def->minTier) << Describe(q);
-                    ASSERT_LE(tier, def->maxTier) << Describe(q);
+                    if (offer.kind != OfferKind::RankUp)
+                    {
+                        // See the note in Check(): maxTier gates introducing a
+                        // mechanic, not deepening one already carried.
+                        ASSERT_LE(tier, def->maxTier) << Describe(q);
+                    }
                     ASSERT_GE(offer.rank, 1) << Describe(q);
                     ASSERT_LE(offer.rank, def->maxRank < MAX_RANK ? def->maxRank : MAX_RANK)
                         << Describe(q);

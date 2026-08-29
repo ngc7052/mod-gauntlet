@@ -206,15 +206,50 @@ namespace Gauntlet
                 Player* player = ctx.player;
                 if (!player || amount == 0)
                     return;
-                if (player->getPowerType() != POWER_MANA)
+
+                ++_blows;
+
+                // The pool, not the active bar.
+                //
+                // This was getPowerType() != POWER_MANA, which asks "is mana
+                // the bar you are spending right now" -- false for a druid in
+                // any form, and false for anyone the core has temporarily put
+                // on another power type. The card's question is whether there
+                // is a mana pool to burn, and GetMaxPower answers that one.
+                // For the mage the curse is written for the two are the same
+                // test, so this changes nothing there and stops the curse
+                // going silently inert anywhere else.
+                if (player->GetMaxPower(POWER_MANA) == 0)
+                {
+                    ++_noPool;
                     return;
+                }
 
                 uint32 const burn = uint32(uint64(amount) * BURN_PCT[RankIndexOf(ctx.self)] / 100u);
                 if (burn == 0)
                     return;
 
                 int32 const left = player->GetPower(POWER_MANA);
-                player->SetPower(POWER_MANA, std::max<int32>(0, left - int32(burn)));
+                int32 const took = std::min<int32>(left, int32(burn));
+                if (took <= 0)
+                {
+                    ++_dry;
+                    return;
+                }
+
+                player->SetPower(POWER_MANA, left - took);
+                _burned += uint64(took);
+
+                // Once per session, for Blood Magic's reason: a bar that
+                // silently drops is the invisible scalar this redesign exists
+                // to delete, and mana falling during a fight looks like mana
+                // being spent.
+                if (!_warned && player->GetSession())
+                {
+                    _warned = true;
+                    ChatHandler(player->GetSession()).PSendSysMessage(
+                        "|cffff2020[Gauntlet]|r Mana Burn: the blows you take come out of your mana too.");
+                }
             }
 
             // Boon::BonusDamage, on spells only, which is what the card says.
@@ -240,10 +275,26 @@ namespace Gauntlet
                 return out;
             }
 
+            // Counters, not just the configured number. "It is not working"
+            // and "it is working and you are not seeing it" are the two
+            // answers this has to tell apart, and the percentage alone told
+            // neither: _blows counts every blow the observer saw, so a zero
+            // there means the hook never reached this mechanic at all.
             std::string Diagnose(Ctx& ctx) const override
             {
-                return "mana burn: " + std::to_string(BURN_PCT[RankIndexOf(ctx.self)]) + "% of damage taken";
+                return "mana burn: " + std::to_string(BURN_PCT[RankIndexOf(ctx.self)])
+                     + "% of damage taken, " + std::to_string(_blows) + " blow(s) seen, "
+                     + std::to_string(_burned) + " mana burned"
+                     + (_noPool ? ", " + std::to_string(_noPool) + " skipped (no mana pool)" : "")
+                     + (_dry ? ", " + std::to_string(_dry) + " skipped (bar already empty)" : "");
             }
+
+        private:
+            uint64 _burned = 0;
+            uint32 _blows  = 0;
+            uint32 _noPool = 0;
+            uint32 _dry    = 0;
+            bool   _warned = false;
         };
 
         // ==================================================================
