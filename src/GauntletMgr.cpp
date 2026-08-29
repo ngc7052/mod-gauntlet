@@ -784,10 +784,35 @@ namespace Gauntlet
             // tier the affix was first taken at and does not move when it
             // grows, which is what makes gauntlet_affix_log the record of
             // when it grew.
-            held->rank = chosen.rank;
+            //
+            // The boon moves with the rank, and until Phase 3 it did not. Only
+            // `rank` was copied here and only `rank` was written below, so a
+            // rank-up raised the curse and left the boon at the magnitude it
+            // was first taken with -- in memory and in the database, for the
+            // rest of the run. Overextended went from "15% more damage per
+            // extra attacker, +10% healing" to "20% more damage per extra
+            // attacker, +10% healing", and the offer the player accepted had
+            // promised 20%.
+            //
+            // BoonTable scales every generic boon linearly by rank and gives
+            // Frenzy and Hubris their own per-rank rows, so this affected
+            // every mechanic with a magnitude -- most of the table. It is the
+            // exact failure the comment above BoonTable warns about: "the
+            // number the offer promises has to be the number the mechanic
+            // pays, or the card is lying at the one moment the player is
+            // reading it."
+            //
+            // The condition is deliberately not copied. Nothing has rolled one
+            // since Phase 2 and both sides are Condition::Always; writing a
+            // dormant field here would be noise in the diff and in the table.
+            held->rank    = chosen.rank;
+            held->boon    = chosen.boon;
+            held->boonMag = chosen.boonMag;
 
-            trans->Append("UPDATE `gauntlet_affix` SET `rank` = {} WHERE `guid` = {} AND `slot` = {}",
-                          static_cast<uint32>(chosen.rank), low, static_cast<uint32>(held->slot));
+            trans->Append("UPDATE `gauntlet_affix` SET `rank` = {}, `boon` = {}, `boon_mag` = {} "
+                          "WHERE `guid` = {} AND `slot` = {}",
+                          static_cast<uint32>(chosen.rank), static_cast<uint32>(chosen.boon),
+                          static_cast<uint32>(chosen.boonMag), low, static_cast<uint32>(held->slot));
             trans->Append(
                 "INSERT INTO `gauntlet_affix_log` (`guid`, `tier`, `action`, `mechanic`, `rank`, `gen_version`) "
                 "VALUES ({}, {}, 'rankup', {}, {}, {})",
