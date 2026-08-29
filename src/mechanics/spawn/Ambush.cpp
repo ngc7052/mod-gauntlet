@@ -213,7 +213,11 @@ namespace Gauntlet
                 return;
 
             _armed = true;
-            ctx.clock->Arm(MECHANIC_AMBUSH, EVENT_AMBUSH, WARN_MS, WARN_MS);
+            // Fixed: inMs == warnMs, so the whole interval is the telegraph, and
+            // the header has always promised a telegraph does not change
+            // length with how many affixes are carried.
+            ctx.clock->Arm(MECHANIC_AMBUSH, EVENT_AMBUSH, WARN_MS, WARN_MS,
+                           Pacing::Fixed);
         }
 
         void Ambush::OnWarn(Ctx& ctx, uint32 eventId)

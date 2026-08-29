@@ -232,7 +232,12 @@ namespace Gauntlet
             // and two seconds is too short for a countdown bar to say anything
             // a circle does not. EVT carries the two seconds so the addon can
             // still draw it.
-            ctx.clock->Arm(MECHANIC_DEATH_RATTLE, fuse.id, FUSE_MS, 0);
+            // Fixed: the two seconds are the counterplay, not a cadence. Paced,
+            // a run carrying six timed affixes turned them into four and a
+            // half, and the spacing could turn three kills in one pack into
+            // three bursts twelve seconds apart -- long after anyone is still
+            // standing on the corpse.
+            ctx.clock->Arm(MECHANIC_DEATH_RATTLE, fuse.id, FUSE_MS, 0, Pacing::Fixed);
 
             if (ctx.addon)
                 ctx.addon->SendEvent(player, MechanicKey(), FUSE_MS / 1000u, MechanicName());

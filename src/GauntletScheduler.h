@@ -43,12 +43,41 @@ namespace Gauntlet
 
     enum class EventKind : uint8 { Warn, Fire };
 
+    // Whether an interval is a cadence the run's event budget may stretch, or
+    // the mechanic's own short timing that it may not.
+    //
+    // The distinction was implicit and therefore wrong. The budget exists to
+    // stop *pressure* piling up as a run collects timed affixes -- design
+    // section 4.2's "effective interval = base x (1 + step x (timed - 1))" --
+    // and Arm() applied it to every interval anyone armed, including two kinds
+    // that are not pressure being scheduled at all:
+    //
+    //   - **A fuse.** Death Rattle's corpse bursts two seconds after the kill,
+    //     and those two seconds are the counterplay: the card's answer is to
+    //     step back. Scaled by a run carrying six timed affixes it became four
+    //     and a half, and spaced against other fires it could become twelve --
+    //     by which time the player has walked away and the mechanic has
+    //     silently stopped existing. Killing three of a pack armed three fuses
+    //     twelve seconds apart.
+    //   - **A telegraph's own arrival.** Ambush and Carrion arm with
+    //     inMs == warnMs, so the whole interval *is* the telegraph. The header
+    //     has always said "a five second telegraph stays five seconds however
+    //     many affixes are carried, because it is information rather than
+    //     pressure" -- and it did not, because the lead was left alone while
+    //     the fire it belonged to was stretched away from it.
+    //
+    // Fixed skips both the budget and the minimum spacing, because both are
+    // rules about pacing a run's events against each other and neither applies
+    // to a two-second consequence of something the player did two seconds ago.
+    enum class Pacing : uint8 { Paced, Fixed };
+
     struct ScheduledEvent
     {
         uint32    dueMs    = 0;
         uint16    mechanic = MECHANIC_NONE;
         uint32    id       = 0;      // the mechanic's own tag for this event
         EventKind kind     = EventKind::Warn;
+        Pacing    pacing   = Pacing::Paced;
 
         // Arming order, assigned once and never changed -- a re-telegraph keeps
         // it. Two events due at the same instant are ordered by this rather
@@ -81,15 +110,21 @@ namespace Gauntlet
         // mechanic that arms in a loop, not to ration honest use.
         static constexpr size_t MAX_QUEUED = 64;
 
-        // Arms a warning at `inMs - warnMs` and the fire at `inMs`, both scaled
-        // by Budget(). warnMs == 0 arms only the fire.
+        // Arms a warning at `inMs - warnMs` and the fire at `inMs`, the fire
+        // scaled by Budget() unless `pacing` is Fixed. warnMs == 0 arms only
+        // the fire.
         //
         // Budget() stretches the interval, never the warning's lead: a five
         // second telegraph stays five seconds however many affixes are carried,
         // because it is information rather than pressure. Arming (mechanic, id)
         // again replaces whatever that pair already had queued -- `id` is the
         // mechanic's tag for one event, so a second Arm is a reschedule.
-        void Arm(uint16 mechanic, uint32 id, uint32 inMs, uint32 warnMs);
+        //
+        // Pacing::Fixed is for an interval that is the mechanic's own timing
+        // rather than its cadence -- a fuse, or a telegraph whose whole length
+        // is the warning. See the note on Pacing.
+        void Arm(uint16 mechanic, uint32 id, uint32 inMs, uint32 warnMs,
+                 Pacing pacing = Pacing::Paced);
         void Cancel(uint16 mechanic);
         void CancelAll();
 
@@ -165,6 +200,16 @@ namespace Gauntlet
             bool   warnIssued     = false;
             uint32 warnIssuedAtMs = 0;
         };
+
+    public:
+        // What the run's timed affixes are doing to every paced cadence, and
+        // the floor under two consecutive fires. Read by `.gauntlet status` and
+        // by the addon, because a mechanic that says "every 20 seconds" and
+        // delivers every forty-five is indistinguishable from a broken one.
+        uint32 TimedAffixes() const { return _timedAffixes; }
+        uint32 MinSpacingMs() const { return _minSpacingMs; }
+
+    private:
 
         // One 500 ms boundary's worth of work.
         void Step(std::vector<ScheduledEvent>& out, Suppression const& s);

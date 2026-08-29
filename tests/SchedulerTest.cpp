@@ -891,3 +891,105 @@ TEST(Scheduler, ATieGoesToWhicheverWasArmedFirst)
     EXPECT_EQ(14u, order[1]);
     EXPECT_EQ(6u,  order[2]) << "armed last, so it goes last -- not first for having the lowest id";
 }
+
+namespace
+{
+    using namespace Gauntlet;
+
+    // -----------------------------------------------------------------
+    // Pacing::Fixed. The budget and the minimum spacing are rules about
+    // pacing a run's events against one another; a fuse tied to a corpse the
+    // player just made is neither, and treating it as one is what turned Death
+    // Rattle's two-second counterplay window into twelve seconds on a run
+    // carrying a few timed affixes.
+    // -----------------------------------------------------------------
+
+    TEST(SchedulerPacing, AFixedIntervalIsNotStretchedByTheBudget)
+    {
+        for (uint32 affixes : { 1u, 2u, 4u, 8u })
+        {
+            Scheduler s;
+            s.SetTimedAffixCount(affixes);
+            s.Arm(MECH_A, 1, 2000, 0, Pacing::Fixed);
+
+            std::vector<Released> const out = Advance(s, 20000);
+            ASSERT_EQ(1u, out.size()) << "affixes=" << affixes << " " << Describe(out);
+            EXPECT_EQ(2000u, out[0].atMs)
+                << "affixes=" << affixes
+                << ": a fuse is the mechanic's own timing and the budget must not touch it";
+        }
+    }
+
+    TEST(SchedulerPacing, APacedIntervalStillIs)
+    {
+        // The other half of the pair, so a change that made everything Fixed
+        // would fail here rather than silently removing the budget.
+        Scheduler s;
+        s.SetTimedAffixCount(4);
+        s.Arm(MECH_A, 1, 2000, 0, Pacing::Paced);
+
+        std::vector<Released> const out = Advance(s, 20000);
+        ASSERT_EQ(1u, out.size()) << Describe(out);
+        EXPECT_EQ(3500u, out[0].atMs) << "2000 x (1 + 0.25 x 3)";
+    }
+
+    TEST(SchedulerPacing, FixedFiresAreNotSpacedAgainstEachOther)
+    {
+        // Three kills in one pack, three fuses. Before Pacing existed the
+        // spacing walked them out to 0, 12 and 24 seconds.
+        Scheduler s;
+        s.SetMinSpacingMs(12000);
+
+        s.Arm(MECH_A, 1, 2000, 0, Pacing::Fixed);
+        s.Arm(MECH_A, 2, 2500, 0, Pacing::Fixed);
+        s.Arm(MECH_A, 3, 3000, 0, Pacing::Fixed);
+
+        std::vector<Released> const out = Advance(s, 30000);
+        ASSERT_EQ(3u, out.size()) << Describe(out);
+        EXPECT_LE(out[0].atMs, 2000u) << Describe(out);
+        EXPECT_LE(out[1].atMs, 2500u) << Describe(out);
+        EXPECT_LE(out[2].atMs, 3000u) << Describe(out);
+    }
+
+    TEST(SchedulerPacing, AFixedFireDoesNotPushThePacedOneOut)
+    {
+        // A mechanic exempt from a rule must not be able to enforce it on
+        // everything else: if a Fixed fire reset the spacing clock, a corpse
+        // bursting would delay the next paced event by a full MinSpacing.
+        Scheduler s;
+        s.SetMinSpacingMs(12000);
+
+        s.Arm(MECH_A, 1, 1000, 0, Pacing::Fixed);
+        s.Arm(MECH_B, 1, 2000, 0, Pacing::Paced);
+
+        std::vector<Released> const out = Advance(s, 30000);
+        ASSERT_EQ(2u, out.size()) << Describe(out);
+        EXPECT_LE(out[1].atMs, 2000u)
+            << "the paced fire waited on a Fixed one\n" << Describe(out);
+    }
+
+    TEST(SchedulerPacing, PacedFiresAreStillSpacedAgainstEachOther)
+    {
+        // The rule Fixed is exempt from must still hold for everything else.
+        Scheduler s;
+        s.SetMinSpacingMs(12000);
+
+        s.Arm(MECH_A, 1, 1000, 0, Pacing::Paced);
+        s.Arm(MECH_B, 1, 2000, 0, Pacing::Paced);
+
+        std::vector<Released> const out = Advance(s, 40000);
+        ASSERT_EQ(2u, out.size()) << Describe(out);
+        EXPECT_GE(out[1].atMs - out[0].atMs, 12000u) << Describe(out);
+    }
+
+    TEST(SchedulerPacing, PacedIsTheDefaultSoAnUnmarkedArmKeepsItsOldBehaviour)
+    {
+        Scheduler s;
+        s.SetTimedAffixCount(4);
+        s.Arm(MECH_A, 1, 20000, 0);              // no pacing argument
+
+        std::vector<Released> const out = Advance(s, 60000);
+        ASSERT_EQ(1u, out.size()) << Describe(out);
+        EXPECT_EQ(35000u, out[0].atMs) << "the default must still be Paced";
+    }
+}

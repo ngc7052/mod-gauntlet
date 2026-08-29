@@ -138,7 +138,8 @@ namespace Gauntlet
         return true;
     }
 
-    void Scheduler::Arm(uint16 mechanic, uint32 id, uint32 inMs, uint32 warnMs)
+    void Scheduler::Arm(uint16 mechanic, uint32 id, uint32 inMs, uint32 warnMs,
+                        Pacing pacing)
     {
         // MECHANIC_NONE means "no mechanic" everywhere else in the module and
         // there is nothing to deliver an event to.
@@ -157,7 +158,8 @@ namespace Gauntlet
         if (_queue.size() + 2 > MAX_QUEUED)
             return;
 
-        uint32 const fireIn = Scale(inMs);
+        // Fixed keeps the number the mechanic asked for. See Pacing.
+        uint32 const fireIn = pacing == Pacing::Paced ? Scale(inMs) : inMs;
         uint32 const fireAt = _nowMs + fireIn;
 
         // Budget() stretches the interval; the warning's lead is left alone,
@@ -176,6 +178,7 @@ namespace Gauntlet
         ev.mechanic = mechanic;
         ev.id       = id;
         ev.seq      = ++_seq;
+        ev.pacing   = pacing;
 
         if (lead > 0)
         {
@@ -304,7 +307,15 @@ namespace Gauntlet
             }
 
             // The earliest moment the spacing would let this one out.
-            uint32 const earliest = (!_everFired || _nowMs - _lastFireMs >= _minSpacingMs)
+            //
+            // A Fixed event is not spaced at all: spacing keeps a run's paced
+            // events from landing on top of each other, and a fuse tied to a
+            // corpse the player just made is not one of them. Three kills in a
+            // pack armed three Death Rattle fuses and the spacing walked them
+            // out to twelve seconds apart, which is long past the point where
+            // anyone is still standing on the corpse.
+            uint32 const earliest = (_queue[i].pacing == Pacing::Fixed
+                                     || !_everFired || _nowMs - _lastFireMs >= _minSpacingMs)
                                     ? _nowMs
                                     : _lastFireMs + _minSpacingMs;
 
@@ -360,8 +371,15 @@ namespace Gauntlet
             Drop(fire.mechanic, fire.id);
             out.push_back(fire);
 
-            _lastFireMs = _nowMs;
-            _everFired  = true;
+            // A Fixed fire does not reset the spacing clock either. If it did,
+            // a corpse bursting would push the next paced event out by a full
+            // MinSpacing, and a mechanic that is exempt from a rule must not be
+            // able to enforce it on everything else.
+            if (fire.pacing == Pacing::Paced)
+            {
+                _lastFireMs = _nowMs;
+                _everFired  = true;
+            }
 
             // With a spacing set, the loop's own test stops the next fire from
             // also going out now. A spacing of zero deliberately lets them all

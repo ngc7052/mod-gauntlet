@@ -177,7 +177,8 @@ namespace Gauntlet
             if (ctx.clock && Loots(ctx) >= Threshold(ctx))
             {
                 _pending = true;
-                ctx.clock->Arm(MECHANIC_CARRION, EVENT_SCAVENGERS, WARN_MS, WARN_MS);
+                ctx.clock->Arm(MECHANIC_CARRION, EVENT_SCAVENGERS, WARN_MS, WARN_MS,
+                               Pacing::Fixed);
             }
 
             ShowCounter(ctx);
@@ -232,7 +233,8 @@ namespace Gauntlet
                 return;
 
             _pending = true;
-            ctx.clock->Arm(MECHANIC_CARRION, EVENT_SCAVENGERS, WARN_MS, WARN_MS);
+            ctx.clock->Arm(MECHANIC_CARRION, EVENT_SCAVENGERS, WARN_MS, WARN_MS,
+                               Pacing::Fixed);
         }
 
         void Carrion::OnWarn(Ctx& ctx, uint32 eventId)
@@ -260,7 +262,8 @@ namespace Gauntlet
 
             if (!player->IsInWorld() || !player->IsAlive())
             {
-                ctx.clock->Arm(MECHANIC_CARRION, EVENT_SCAVENGERS, DEFER_MS, 0);
+                ctx.clock->Arm(MECHANIC_CARRION, EVENT_SCAVENGERS, DEFER_MS, 0,
+                               Pacing::Fixed);
                 return;
             }
 
@@ -300,7 +303,8 @@ namespace Gauntlet
                 // Nothing could be put into the world, so the counter is not
                 // spent: the player is still owed the pack their looting paid
                 // for.
-                ctx.clock->Arm(MECHANIC_CARRION, EVENT_SCAVENGERS, DEFER_MS, 0);
+                ctx.clock->Arm(MECHANIC_CARRION, EVENT_SCAVENGERS, DEFER_MS, 0,
+                               Pacing::Fixed);
                 return;
             }
 
