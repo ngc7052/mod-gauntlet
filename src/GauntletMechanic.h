@@ -128,6 +128,22 @@ namespace Gauntlet
         // and what the player does to the world, and a hunter's pet is neither.
         virtual void  OnPetDamage(Ctx&, Unit* /*victim*/, uint32& /*damage*/) {}
         virtual uint32 OnLethal(Ctx&, uint32 damage) { return damage; }              // UnitScript::DealDamage
+
+        // The two halves of a bargain that buys back a death, and the seam
+        // Phase 0 left open with a comment naming Phase 3 and Phase 4.
+        //
+        // WillBuyDeath answers "if this player is resurrected right now, will I
+        // pay for it" and must not change anything: Mgr asks it from the
+        // resurrection *veto*, which the core consults before it has committed
+        // to anything, and a mechanic that spent its charge there would spend
+        // it on a resurrection that never happened.
+        //
+        // OnResurrect is where the price is actually paid, from the hook the
+        // core fires once the player is back on their feet. The mechanic that
+        // pays is responsible for calling Mgr::CancelPendingDeath -- which is
+        // what makes the run survive -- and for saying so to the player.
+        virtual bool  WillBuyDeath(Ctx&) const { return false; }
+        virtual void  OnResurrect(Ctx&) {}
         virtual void  OnSpellCast(Ctx&, Spell*) {}
         virtual void  OnAuraApplied(Ctx&, Unit* /*target*/, Aura*) {}
         virtual void  OnAuraRemoved(Ctx&, Unit* /*target*/, AuraApplication*) {}

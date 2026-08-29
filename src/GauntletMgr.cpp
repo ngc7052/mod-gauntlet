@@ -1595,6 +1595,40 @@ namespace Gauntlet
         return allowed;
     }
 
+    bool Mgr::AnyWillBuyDeath(Player* player)
+    {
+        if (!_enabled || !IsEligible(player))
+            return false;
+
+        RunState* st = Get(player);
+        if (!st || st->dead)
+            return false;
+
+        bool willing = false;
+        ForEachMechanic(player, st, [&willing](Ctx& ctx, AffixInstance& a)
+        {
+            if (!willing && a.impl->WillBuyDeath(ctx))
+                willing = true;
+        });
+
+        return willing;
+    }
+
+    void Mgr::OnResurrect(Player* player)
+    {
+        if (!_enabled || !IsEligible(player))
+            return;
+
+        RunState* st = Get(player);
+        if (!st)
+            return;
+
+        ForEachMechanic(player, st, [](Ctx& ctx, AffixInstance& a)
+        {
+            a.impl->OnResurrect(ctx);
+        });
+    }
+
     void Mgr::OnShapeshift(Player* player, uint8 form)
     {
         if (!_enabled || !IsEligible(player))
@@ -1680,7 +1714,14 @@ namespace Gauntlet
         // there is: the Shade that killed you is named by name rather than by
         // whatever multiplied the last blow.
         if (Creature* creature = attacker ? attacker->ToCreature() : nullptr)
+        {
             NoteActor(player, sGauntletSummons->MechanicOf(creature));
+
+            // And who it was, for the one bargain whose price is fighting them
+            // again. Recorded on every blow rather than on the killing one,
+            // because by the time the player is dead the attacker may be gone.
+            st->lastKillerEntry = creature->GetEntry();
+        }
 
         ForEachMechanic(player, st, [attacker, amount](Ctx& ctx, AffixInstance& a)
         {

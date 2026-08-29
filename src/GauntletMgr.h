@@ -93,6 +93,13 @@ namespace Gauntlet
         // The druid's forms, for the curse that puts a cooldown on changing.
         void OnShapeshift(Player* player, uint8 form);
 
+        // Whether any carried mechanic will pay for a resurrection now. Asked
+        // by the hardcore veto, and it changes nothing.
+        bool AnyWillBuyDeath(Player* player);
+
+        // The player is back on their feet: whoever offered to pay, pays.
+        void OnResurrect(Player* player);
+
         // Damage a player's pet is dealing, for the boons that pay it.
         void OnPetDamage(Player* player, Unit* victim, uint32& damage);
 

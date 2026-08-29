@@ -509,14 +509,14 @@ namespace
         // The boon is the second life: Reincarnation answers once, and burns
         // away every boon the run carries when it does.
         { 70, "c43_ankh_pact", "Ankh Pact", Family::Class, CM_SHAMAN, 40, 80, 3,
-          MF_RewardShaped | MF_NotImplemented, "", Boon::SecondLife, 20608, 0,
+          MF_RewardShaped, "", Boon::SecondLife, 20608, 0,
           "Reincarnation works once in this run, and when it does every boon you carry is burned away." },
 
         // The boon is the second life, as C43. TODO(design): the card gives no
         // ladder of its own, saying only "as C43", so maxRank follows Ankh
         // Pact's three.
         { 71, "c44_stone_of_the_damned", "Stone of the Damned", Family::Class, CM_WARLOCK, 40, 80, 3,
-          MF_RewardShaped | MF_NotImplemented, "", Boon::SecondLife, 693, 0,
+          MF_RewardShaped, "", Boon::SecondLife, 693, 0,
           "A Soulstone will bring you back once, and whoever kills you will be waiting." },
 
         };

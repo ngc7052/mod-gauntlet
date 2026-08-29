@@ -293,6 +293,12 @@ namespace Gauntlet
         uint16 lastActor   = MECHANIC_NONE;
         uint32 lastActorMs = 0;
 
+        // The entry of the last creature to hit this player, for the one
+        // bargain whose price is fighting it again. Not persisted: a warlock
+        // who logs out between dying and returning has had their rematch
+        // cancelled by something bigger than an affix.
+        uint32 lastKillerEntry = 0;
+
         // How long a claim on "the last affix to act" stays true. Design
         // section 4.8's fourth question is answered from it, and the pair
         // exists rather than a single field because a Falling Sky that struck

@@ -193,8 +193,15 @@ public:
     // would mean that any future path reaching here, or any relaxation of the
     // veto, silently stops the module being hardcore. Phase 3 spends the
     // charge here and calls Mgr::CancelPendingDeath.
-    void OnPlayerResurrect(Player* /*player*/, float /*restorePercent*/, bool& /*applySickness*/) override
+    void OnPlayerResurrect(Player* player, float /*restorePercent*/, bool& /*applySickness*/) override
     {
+        // Phase 4 spends the seam. Whoever offered to pay in the veto below now
+        // pays: it zeroes the run's boons, or summons what killed you, and
+        // calls Mgr::CancelPendingDeath, which is what makes the run survive.
+        if (!sGauntlet->Enabled() || !sGauntlet->IsEligible(player))
+            return;
+
+        sGauntlet->OnResurrect(player);
     }
 
     // The module's one clock. Everything with a cadence hangs off it: the
@@ -233,13 +240,18 @@ public:
             return true;
 
         RunState* st = sGauntlet->Get(player);
-        if (st && (st->dead || st->pendingDeath))
-        {
-            ChatHandler(player->GetSession()).PSendSysMessage(
-                "|cffff2020[Gauntlet]|r {}", GAUNTLET_RETIRED_MSG);
-            return false;
-        }
-        return true;
+        if (!st || !(st->dead || st->pendingDeath))
+            return true;
+
+        // Phase 4: a carried bargain may buy this one back. Asked before the
+        // refusal, and the asking changes nothing -- the charge is spent in
+        // OnPlayerResurrect above, once the core has actually raised them.
+        if (st->pendingDeath && sGauntlet->AnyWillBuyDeath(player))
+            return true;
+
+        ChatHandler(player->GetSession()).PSendSysMessage(
+            "|cffff2020[Gauntlet]|r {}", GAUNTLET_RETIRED_MSG);
+        return false;
     }
 
     // Releasing, by contrast, stays allowed while the timer runs: it is the
@@ -740,6 +752,8 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_FelPact();            // 60  C33 warlock
     void AddSC_gauntlet_mechanic_BoundSkin();          // 64  C37 druid
     void AddSC_gauntlet_mechanic_Faint();              // 68  C41 all mana users
+    void AddSC_gauntlet_mechanic_AnkhPact();           // 70  C43 shaman
+    void AddSC_gauntlet_mechanic_StoneOfTheDamned();   // 71  C44 warlock
     void AddSC_gauntlet_mechanic_SelfFound();          // 23
     void AddSC_gauntlet_mechanic_LoneWolf();           // 24
     void AddSC_gauntlet_mechanic_IronPurse();          // 25
@@ -793,6 +807,8 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_FelPact();
     AddSC_gauntlet_mechanic_BoundSkin();
     AddSC_gauntlet_mechanic_Faint();
+    AddSC_gauntlet_mechanic_AnkhPact();
+    AddSC_gauntlet_mechanic_StoneOfTheDamned();
     AddSC_gauntlet_mechanic_IronPurse();
     AddSC_gauntlet_mechanic_SelfFound();
     AddSC_gauntlet_mechanic_LoneWolf();

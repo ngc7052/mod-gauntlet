@@ -20,7 +20,7 @@ decided without reading twenty commits.
 | 2i | Warlock: C33 | 60 | **done** |
 | 2j | Druid: C37 | 64 | **done** |
 | 2k | Common: C41 Faint | 68 | **done** |
-| 3 | Class bargains: Ankh Pact, Stone of the Damned | 70, 71 | |
+| 3 | Class bargains: Ankh Pact, Stone of the Damned | 70, 71 | **done** |
 | 4 | The tier windows, and the exclusive key behind them | — | **done** |
 | 5 | Class curses recorded as conducts | — | in progress |
 | 6 | `docs/phase-4-report.md` | — | |

@@ -81,6 +81,15 @@ local READINGS = {
     -- Family C, wave A.
     c01_red_mist   = { "Rage",           "%",    true  },
     c02_berserkers_bargain = { "Bargain", "flag", true },
+    c06_consecrated_ground = { "Off the circle", "flag", true },
+    c09_half_tamed = { "Half-Tamed",  "flag", true  },
+    c21_rune_starved = { "Rune-starved", "flag", true },
+    c25_one_totem  = { "Totems",         "",     true  },
+    c26_totemic_anchor = { "Adrift",     "flag", true },
+    c31_mana_burn  = { "Mana Burn",      "%",    true  },
+    c33_fel_pact   = { "Fel Pact",       "n/m",  true  },
+    c22_grave_call = { "Unclaimed dead", "n/m",  true  },
+    second_life    = { "Second life",    "n/m",  false },
 
     shade          = { "The Shade",      "",     true  },
     ambush         = { "Ambusher",       "",     true  },
