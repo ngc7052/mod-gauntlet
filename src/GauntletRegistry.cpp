@@ -438,7 +438,7 @@ namespace
         // Mage
         // The boon takes a quarter off Frost Nova's cooldown.
         { 56, "c29_cold_feet", "Cold Feet", Family::Class, CM_MAGE, 15, 80, 3,
-          MF_NotImplemented, "classcurse", Boon::BonusCooldown, 1953, 0,
+          MF_None, "classcurse", Boon::BonusCooldown, 1953, 0,
           "Blink costs 15% of your maximum health." },
 
         // The boon is bespoke: Polymorph becomes instant.
@@ -447,7 +447,7 @@ namespace
           "Polymorph breaks after five seconds, and the sheep comes back angry." },
 
         { 58, "c31_mana_burn", "Mana Burn", Family::Class, CM_MAGE, 20, 70, 3,
-          MF_NotImplemented, "classcurse", Boon::BonusDamage, 0, 0,
+          MF_None, "classcurse", Boon::BonusDamage, 0, 0,
           "Half the damage you take also burns your mana." },
 
         { 59, "c32_arcane_frailty", "Arcane Frailty", Family::Class, CM_MAGE, 30, 80, 3,
@@ -457,7 +457,7 @@ namespace
         // Warlock
         // As Half-Tamed: the card's +10% is the demon's damage, not yours.
         { 60, "c33_fel_pact", "Fel Pact", Family::Class, CM_WARLOCK, 20, 80, 3,
-          MF_NotImplemented, "classcurse", Boon::BonusPetDamage, 0, 0,
+          MF_None, "classcurse", Boon::BonusPetDamage, 0, 0,
           "Your demon's binding frays with every kill it makes, and after twenty it turns on you." },
 
         { 61, "c34_affliction_of_the_self", "Affliction of the Self", Family::Class, CM_WARLOCK, 20, 70, 3,
@@ -475,7 +475,7 @@ namespace
 
         // Druid
         { 64, "c37_bound_skin", "Bound Skin", Family::Class, CM_DRUID, 15, 70, 3,
-          MF_NotImplemented, "classcurse|shortcut:shapeshift", Boon::BonusMaxHealth, 0, 0,
+          MF_None, "classcurse|shortcut:shapeshift", Boon::BonusMaxHealth, 0, 0,
           "Shapeshifting has a six-second cooldown." },
 
         // TODO(design): tree 2 = Feral Combat. Reading: the curse only fires on a kill
@@ -496,7 +496,7 @@ namespace
 
         // Every class
         { 68, "c41_faint", "Faint", Family::Class, CM_MANA_USERS, 15, 70, 3,
-          MF_NotImplemented, "classcurse", Boon::BonusRegen, 0, 0,
+          MF_None, "classcurse", Boon::BonusRegen, 0, 0,
           "When your mana hits zero in combat you black out for two seconds." },
 
         { 69, "c42_unspent", "Unspent", Family::Class, 0, 10, 40, 3,

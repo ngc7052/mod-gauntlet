@@ -90,6 +90,9 @@ namespace Gauntlet
         // from nowhere until Phase 4 needed it.
         void OnAuraApplied(Player* player, Unit* target, Aura* aura);
 
+        // The druid's forms, for the curse that puts a cooldown on changing.
+        void OnShapeshift(Player* player, uint8 form);
+
         // Damage a player's pet is dealing, for the boons that pay it.
         void OnPetDamage(Player* player, Unit* victim, uint32& damage);
 

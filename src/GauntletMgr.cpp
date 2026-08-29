@@ -1595,6 +1595,21 @@ namespace Gauntlet
         return allowed;
     }
 
+    void Mgr::OnShapeshift(Player* player, uint8 form)
+    {
+        if (!_enabled || !IsEligible(player))
+            return;
+
+        RunState* st = Get(player);
+        if (!st || st->dead)
+            return;
+
+        ForEachMechanic(player, st, [form](Ctx& ctx, AffixInstance& a)
+        {
+            a.impl->OnShapeshift(ctx, form);
+        });
+    }
+
     void Mgr::OnPetDamage(Player* player, Unit* victim, uint32& damage)
     {
         if (!_enabled || damage == 0 || !IsEligible(player))

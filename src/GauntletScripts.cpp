@@ -504,6 +504,14 @@ public:
         return damage;
     }
 
+    // Shapeshifting, for the one class curse that prices it. IMechanic::
+    // OnShapeshift has been declared since Phase 0 and dispatched from nowhere.
+    void OnUnitSetShapeshiftForm(Unit* unit, uint8 form) override
+    {
+        if (Player* p = unit ? unit->ToPlayer() : nullptr)
+            sGauntlet->OnShapeshift(p, form);
+    }
+
     // Auras landing on our own player, for the class curses that change how
     // long one lasts.
     //
@@ -727,6 +735,11 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_GraveCall();          // 49  C22 death knight
     void AddSC_gauntlet_mechanic_OneTotem();           // 52  C25 shaman
     void AddSC_gauntlet_mechanic_TotemicAnchor();      // 53  C26 shaman
+    void AddSC_gauntlet_mechanic_ColdFeet();           // 56  C29 mage
+    void AddSC_gauntlet_mechanic_ManaBurn();           // 58  C31 mage
+    void AddSC_gauntlet_mechanic_FelPact();            // 60  C33 warlock
+    void AddSC_gauntlet_mechanic_BoundSkin();          // 64  C37 druid
+    void AddSC_gauntlet_mechanic_Faint();              // 68  C41 all mana users
     void AddSC_gauntlet_mechanic_SelfFound();          // 23
     void AddSC_gauntlet_mechanic_LoneWolf();           // 24
     void AddSC_gauntlet_mechanic_IronPurse();          // 25
@@ -775,6 +788,11 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_GraveCall();
     AddSC_gauntlet_mechanic_OneTotem();
     AddSC_gauntlet_mechanic_TotemicAnchor();
+    AddSC_gauntlet_mechanic_ColdFeet();
+    AddSC_gauntlet_mechanic_ManaBurn();
+    AddSC_gauntlet_mechanic_FelPact();
+    AddSC_gauntlet_mechanic_BoundSkin();
+    AddSC_gauntlet_mechanic_Faint();
     AddSC_gauntlet_mechanic_IronPurse();
     AddSC_gauntlet_mechanic_SelfFound();
     AddSC_gauntlet_mechanic_LoneWolf();

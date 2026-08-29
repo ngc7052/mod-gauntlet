@@ -16,12 +16,12 @@ decided without reading twenty commits.
 | 2e | Priest: C17, C20 | 44, 47 | **done** |
 | 2f | Death Knight: C21, C22 | 48, 49 | **done** |
 | 2g | Shaman: C25, C26 | 52, 53 | **done** |
-| 2h | Mage: C29, C31 | 56, 58 | in progress |
-| 2i | Warlock: C33 | 60 | |
-| 2j | Druid: C37 | 64 | |
-| 2k | Common: C41 Faint | 68 | |
+| 2h | Mage: C29, C31 | 56, 58 | **done** |
+| 2i | Warlock: C33 | 60 | **done** |
+| 2j | Druid: C37 | 64 | **done** |
+| 2k | Common: C41 Faint | 68 | **done** |
 | 3 | Class bargains: Ankh Pact, Stone of the Damned | 70, 71 | |
-| 4 | The tier windows — the 14 `TODO(design)` upper bounds | — | |
+| 4 | The tier windows — the 14 `TODO(design)` upper bounds | — | in progress |
 | 5 | Class curses recorded as conducts | — | |
 | 6 | `docs/phase-4-report.md` | — | |
 
