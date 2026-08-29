@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <iterator>
 
 // Registry id 10. Design section 3, card E5: "The dead linger. Standing where an
 // enemy died saps you."
@@ -43,7 +44,8 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_GRUDGE = 10;
 
         // The card's ladder: 2 -> 3 -> 5% of maximum health per second.
-        constexpr uint32 DRAIN_PCT[MAX_RANK] = { 2, 3, 5 };
+        constexpr uint32 DRAIN_PCT[] = { 2, 3, 5 };
+        static_assert(std::size(DRAIN_PCT) >= MAX_RANK, "DRAIN_PCT is short a rank");
 
         // The card's other numbers, which do not ladder: 25 s, 4 yd, and half
         // the healing while inside one.

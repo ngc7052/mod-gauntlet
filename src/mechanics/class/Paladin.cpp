@@ -21,6 +21,7 @@
 #include "SpellMgr.h"
 
 #include <string>
+#include <iterator>
 
 // Design section 3, family C, paladin. Engine: Seal and Judgement, melee, Holy
 // Light, Consecration. The classic death the design names is trusting the
@@ -98,7 +99,8 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_FORBEARANCE = 32;
 
         // The card's ladder: 2 -> 3 -> 5 minutes.
-        constexpr int32 FORBEARANCE_MS[MAX_RANK] = { 120000, 180000, 300000 };
+        constexpr int32 FORBEARANCE_MS[] = { 120000, 180000, 300000 };
+        static_assert(std::size(FORBEARANCE_MS) >= MAX_RANK, "FORBEARANCE_MS is short a rank");
 
         class LongForbearance final : public IMechanic
         {
@@ -194,7 +196,8 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_CONSECRATED = 33;
 
         // The card's ladder for the damage taken off the circle.
-        constexpr float OFF_CIRCLE_MULT[MAX_RANK] = { 1.15f, 1.25f, 1.40f };
+        constexpr float OFF_CIRCLE_MULT[] = { 1.15f, 1.25f, 1.40f };
+        static_assert(std::size(OFF_CIRCLE_MULT) >= MAX_RANK, "OFF_CIRCLE_MULT is short a rank");
 
         // The card's own eight yards. Consecration's real radius is smaller;
         // this is the affix's circle, and it is deliberately the more generous
@@ -435,7 +438,8 @@ namespace Gauntlet
         constexpr uint32 SPELL_HAMMER_OF_JUSTICE = 853;
 
         // The card's ladder, in seconds of root on the paladin.
-        constexpr uint32 COMMIT_MS[MAX_RANK] = { 3000, 4000, 6000 };
+        constexpr uint32 COMMIT_MS[] = { 3000, 4000, 6000 };
+        static_assert(std::size(COMMIT_MS) >= MAX_RANK, "COMMIT_MS is short a rank");
 
         class Commitment final : public IMechanic
         {

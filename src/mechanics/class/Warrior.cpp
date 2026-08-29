@@ -24,6 +24,7 @@
 
 #include <array>
 #include <string>
+#include <iterator>
 
 // Design section 3, family C, warrior. The family's own three rules are worth
 // keeping in view while reading these:
@@ -101,7 +102,8 @@ namespace Gauntlet
         // 100 -> 90 -> 80 rage. Rage is stored times ten
         // (Player::GetPower(POWER_RAGE) counts in tenths), so these are the
         // stored values.
-        constexpr uint32 RAGE_TRIGGER[MAX_RANK] = { 1000, 900, 800 };
+        constexpr uint32 RAGE_TRIGGER[] = { 1000, 900, 800 };
+        static_assert(std::size(RAGE_TRIGGER) >= MAX_RANK, "RAGE_TRIGGER is short a rank");
 
         // The card's two fixed numbers.
         constexpr uint32 MIST_MS     = 3000;
@@ -254,7 +256,9 @@ namespace Gauntlet
         // ==================================================================
         constexpr uint16 MECHANIC_BERSERKERS = 29;
 
-        constexpr uint32 LINE_PCT[MAX_RANK] = { 30, 35, 40 };
+        constexpr uint32 LINE_PCT[] = { 30, 35, 40 };
+
+        static_assert(std::size(LINE_PCT) >= MAX_RANK, "LINE_PCT is short a rank");
 
         // The card's number, and it does not ladder.
         constexpr float BARGAIN_DAMAGE_MULT = 1.25f;
@@ -385,7 +389,8 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_ROAR = 31;
 
         // The card's ladder, in yards.
-        constexpr float ROAR_YARDS[MAX_RANK] = { 20.0f, 30.0f, 40.0f };
+        constexpr float ROAR_YARDS[] = { 20.0f, 30.0f, 40.0f };
+        static_assert(std::size(ROAR_YARDS) >= MAX_RANK, "ROAR_YARDS is short a rank");
 
         // The boon: "shouts free and long". Four minutes is the card's number.
         constexpr int32 SHOUT_DURATION_MS = 4 * 60 * 1000;
@@ -515,7 +520,8 @@ namespace Gauntlet
         // ==================================================================
 
         // The card's ladder, in seconds of lockout on the other two stances.
-        constexpr uint32 STANCE_LOCK_MS[MAX_RANK] = { 6000, 10000, 20000 };
+        constexpr uint32 STANCE_LOCK_MS[] = { 6000, 10000, 20000 };
+        static_assert(std::size(STANCE_LOCK_MS) >= MAX_RANK, "STANCE_LOCK_MS is short a rank");
 
         constexpr uint32 SPELL_BATTLE_STANCE     = 2457;
         constexpr uint32 SPELL_DEFENSIVE_STANCE  = 71;

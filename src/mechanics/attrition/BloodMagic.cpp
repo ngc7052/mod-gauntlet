@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <string>
+#include <iterator>
 
 // Registry id 20. Design section 3, card A2: "Spells cost 3% of your maximum
 // health in addition to mana."
@@ -42,7 +43,8 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_BLOOD_MAGIC = 20;
 
         // The card's ladder: 2 -> 3 -> 5% of the maximum pool per cast.
-        constexpr uint32 PCT_OF_MAX[MAX_RANK] = { 2, 3, 5 };
+        constexpr uint32 PCT_OF_MAX[] = { 2, 3, 5 };
+        static_assert(std::size(PCT_OF_MAX) >= MAX_RANK, "PCT_OF_MAX is short a rank");
 
         uint8 RankIndex(AffixInstance const* self)
         {

@@ -17,6 +17,7 @@
 #include "Unit.h"
 
 #include <string>
+#include <iterator>
 
 // Registry id 17. Design section 3, card T4: "Every 45 seconds in combat your
 // hands fail you for three seconds: disarmed if you fight with weapons, silenced
@@ -39,8 +40,10 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_FALTER = 17;
 
         // The card's ladders: cadence 60 -> 45 -> 30 s, duration 2 -> 3 -> 4 s.
-        constexpr uint32 CADENCE_MS[MAX_RANK]  = { 60000, 45000, 30000 };
-        constexpr uint32 DURATION_MS[MAX_RANK] = { 2000, 3000, 4000 };
+        constexpr uint32 CADENCE_MS[]  = { 60000, 45000, 30000 };
+        static_assert(std::size(CADENCE_MS) >= MAX_RANK, "CADENCE_MS is short a rank");
+        constexpr uint32 DURATION_MS[] = { 2000, 3000, 4000 };
+        static_assert(std::size(DURATION_MS) >= MAX_RANK, "DURATION_MS is short a rank");
 
         // "You are warned two seconds ahead."
         constexpr uint32 WARN_MS = 2000;

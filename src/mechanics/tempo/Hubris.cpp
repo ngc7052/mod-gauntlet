@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <limits>
 #include <string>
+#include <iterator>
 
 // Registry id 18. Design section 3, card T5: "Enemies below your level give no
 // experience; enemies above give 40% more."
@@ -39,13 +40,15 @@ namespace Gauntlet
 
         // The card's ladder: x0.5/x1.2 -> x0.25/x1.3 -> x0/x1.4. The penalty is
         // a percentage kept, so 50 -> 25 -> 0.
-        constexpr uint32 BELOW_KEEP_PCT[MAX_RANK] = { 50, 25, 0 };
+        constexpr uint32 BELOW_KEEP_PCT[] = { 50, 25, 0 };
+        static_assert(std::size(BELOW_KEEP_PCT) >= MAX_RANK, "BELOW_KEEP_PCT is short a rank");
 
         // The bonus half, and the fallback when an instance carries no boon
         // magnitude. The generator gives this row its own BoonTable entry so
         // that boonMag is 20/30/40 and the offer card promises exactly what the
         // mechanic pays; this array is what a hand-built instance falls back to.
-        constexpr uint32 ABOVE_BONUS_PCT[MAX_RANK] = { 20, 30, 40 };
+        constexpr uint32 ABOVE_BONUS_PCT[] = { 20, 30, 40 };
+        static_assert(std::size(ABOVE_BONUS_PCT) >= MAX_RANK, "ABOVE_BONUS_PCT is short a rank");
 
         uint8 RankIndex(AffixInstance const* self)
         {

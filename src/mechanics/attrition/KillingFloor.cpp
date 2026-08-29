@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <string>
+#include <iterator>
 
 // Registry id 74. It replaces Unspent (69), which was retired rather than
 // rewritten -- an id is never reused -- and the reasoning is in
@@ -81,12 +82,14 @@ namespace Gauntlet
         // with rank, because the curse half is fixed -- healing is blocked, at
         // every rank -- and the only axis left to make a rank harder is how
         // much the release is worth.
-        constexpr uint32 KILL_HEAL_PCT[MAX_RANK] = { 10, 8, 6 };
+        constexpr uint32 KILL_HEAL_PCT[] = { 10, 8, 6 };
+        static_assert(std::size(KILL_HEAL_PCT) >= MAX_RANK, "KILL_HEAL_PCT is short a rank");
 
         // Rank III keeps the block up after the fight, so disengaging is no
         // longer an instant out. Zero at ranks I and II: leaving combat lifts
         // it at once.
-        constexpr uint32 LINGER_MS[MAX_RANK] = { 0, 0, 10000 };
+        constexpr uint32 LINGER_MS[] = { 0, 0, 10000 };
+        static_assert(std::size(LINGER_MS) >= MAX_RANK, "LINGER_MS is short a rank");
 
         class KillingFloor final : public IMechanic
         {

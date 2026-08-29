@@ -57,7 +57,8 @@ namespace Gauntlet
         constexpr uint32 EVENT_RISE = 1;
 
         // The card's severity ladder: interval 15 -> 10 -> 7 minutes.
-        constexpr uint32 INTERVAL_MS[MAX_RANK] = { 900000u, 600000u, 420000u };
+        constexpr uint32 INTERVAL_MS[] = { 900000u, 600000u, 420000u };
+        static_assert(std::size(INTERVAL_MS) >= MAX_RANK, "INTERVAL_MS is short a rank");
 
         // The card's other ladder is health x1.5 -> x2 -> x2.5 of a normal mob.
         // creature_template row 900001 already carries HealthModifier 1.5, so
@@ -65,7 +66,8 @@ namespace Gauntlet
         // own comment. Damage is a single figure on the card (~1.2x) with no
         // ladder, and the template carries that too, so rank alone changes
         // nothing about how hard it hits.
-        constexpr float HEALTH_RATIO[MAX_RANK] = { 1.0f, 4.0f / 3.0f, 5.0f / 3.0f };
+        constexpr float HEALTH_RATIO[] = { 1.0f, 4.0f / 3.0f, 5.0f / 3.0f };
+        static_assert(std::size(HEALTH_RATIO) >= MAX_RANK, "HEALTH_RATIO is short a rank");
 
         // The card's numbers, unaltered. The 150 yd / 15 s leash is absent
         // because it is not this mechanic's to enforce: GauntletSummons.h

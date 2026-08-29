@@ -25,6 +25,7 @@
 #include <limits>
 #include <string>
 #include <vector>
+#include <iterator>
 
 // Registry id 3. Design section 3, card S3: "Every 4th corpse you loot draws
 // scavengers. Corpses are richer."
@@ -50,8 +51,10 @@ namespace Gauntlet
         constexpr uint32 EVENT_SCAVENGERS = 1;
 
         // The card's ladder: every 5 -> 4 -> 3 loots, 2 -> 2 -> 3 scavengers.
-        constexpr int32  LOOTS_PER_PACK[MAX_RANK] = { 5, 4, 3 };
-        constexpr uint32 PACK_SIZE[MAX_RANK]      = { 2, 2, 3 };
+        constexpr int32 LOOTS_PER_PACK[] = { 5, 4, 3 };
+        static_assert(std::size(LOOTS_PER_PACK) >= MAX_RANK, "LOOTS_PER_PACK is short a rank");
+        constexpr uint32 PACK_SIZE[]      = { 2, 2, 3 };
+        static_assert(std::size(PACK_SIZE) >= MAX_RANK, "PACK_SIZE is short a rank");
 
         // The card's other fixed number: they arrive 25 yards away and charge.
         constexpr float SPAWN_YARDS = 25.0f;

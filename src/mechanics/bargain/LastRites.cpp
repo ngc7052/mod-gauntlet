@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <string>
+#include <iterator>
 
 // Registry id 26. Design section 3, card B1: "Once per level, a killing blow
 // leaves you at 1 health instead. For ten minutes afterwards you take 50% more
@@ -43,7 +44,8 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_LAST_RITES = 26;
 
         // The card's ladder, as scarcity: a charge every N levels.
-        constexpr uint8 LEVELS_PER_CHARGE[MAX_RANK] = { 1, 2, 3 };
+        constexpr uint8 LEVELS_PER_CHARGE[] = { 1, 2, 3 };
+        static_assert(std::size(LEVELS_PER_CHARGE) >= MAX_RANK, "LEVELS_PER_CHARGE is short a rank");
 
         // The card's two fixed numbers.
         constexpr uint32 MARK_MS          = 600000;   // ten minutes

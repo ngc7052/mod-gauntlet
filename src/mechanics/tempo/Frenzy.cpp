@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <string>
+#include <iterator>
 
 // Registry id 15. Design section 3, card T2: "Each kill within 8 seconds of the
 // last stacks Frenzy: +6% damage dealt and +6% damage taken per stack."
@@ -39,7 +40,8 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_FRENZY = 15;
 
         // The card's ladder: 4 -> 6 -> 8% per stack, both ways.
-        constexpr uint32 PCT_PER_STACK[MAX_RANK] = { 4, 6, 8 };
+        constexpr uint32 PCT_PER_STACK[] = { 4, 6, 8 };
+        static_assert(std::size(PCT_PER_STACK) >= MAX_RANK, "PCT_PER_STACK is short a rank");
 
         // The card's two fixed numbers.
         constexpr uint32 MAX_STACKS = 5;

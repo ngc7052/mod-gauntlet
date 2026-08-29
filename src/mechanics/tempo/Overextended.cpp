@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <string>
+#include <iterator>
 
 // Registry id 16. Design section 3, card T3: "Each enemy attacking you beyond
 // the first increases the damage you take by 20%."
@@ -35,7 +36,8 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_OVEREXTENDED = 16;
 
         // The card's ladder: 15 -> 20 -> 30% per extra attacker.
-        constexpr uint32 PER_ATTACKER_PCT[MAX_RANK] = { 15, 20, 30 };
+        constexpr uint32 PER_ATTACKER_PCT[] = { 15, 20, 30 };
+        static_assert(std::size(PER_ATTACKER_PCT) >= MAX_RANK, "PER_ATTACKER_PCT is short a rank");
 
         // The readout's ceiling, for the addon's counter. Not a cap on the
         // effect -- plan section 2.5's damage-taken ceiling is what bounds that,

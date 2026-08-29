@@ -22,6 +22,7 @@
 
 #include <limits>
 #include <string>
+#include <iterator>
 
 // Registry id 13. Design section 3, card E8: "Enemies notice you from further
 // away."
@@ -46,7 +47,8 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_KEEN_NOSED = 13;
 
         // The card's ladder: +5 -> +8 -> +12 yd.
-        constexpr float BONUS_YARDS[MAX_RANK] = { 5.0f, 8.0f, 12.0f };
+        constexpr float BONUS_YARDS[] = { 5.0f, 8.0f, 12.0f };
+        static_assert(std::size(BONUS_YARDS) >= MAX_RANK, "BONUS_YARDS is short a rank");
 
         // How wide a net the grid search casts. It has to reach past the
         // widest aggro range a creature can have plus the widest bonus above;

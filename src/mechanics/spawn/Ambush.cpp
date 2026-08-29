@@ -20,6 +20,7 @@
 
 #include <cmath>
 #include <string>
+#include <iterator>
 
 // Registry id 5. Design section 3, card S5: "Resting in the wild attracts an
 // ambush."
@@ -42,7 +43,8 @@ namespace Gauntlet
         constexpr uint32 EVENT_AMBUSH = 1;
 
         // The card's ladder: 30 -> 20 -> 12 seconds of stillness.
-        constexpr uint32 STILL_MS[MAX_RANK] = { 30000, 20000, 12000 };
+        constexpr uint32 STILL_MS[] = { 30000, 20000, 12000 };
+        static_assert(std::size(STILL_MS) >= MAX_RANK, "STILL_MS is short a rank");
 
         // The card's fixed numbers: a four-second warning, twelve yards, and a
         // rest clock that resets to sixty seconds afterwards.

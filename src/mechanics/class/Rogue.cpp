@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cmath>
 #include <string>
+#include <iterator>
 
 // Design section 3, family C, rogue. Engine: Stealth, energy, combo points,
 // Sinister Strike and Eviscerate. The classic death the design names is "a
@@ -54,7 +55,8 @@ namespace Gauntlet
         // every tick.
         // ==================================================================
         // 10 min, 30 min, then gone.
-        constexpr uint32 VANISH_COOLDOWN_MS[MAX_RANK] = { 600000, 1800000, 0 };
+        constexpr uint32 VANISH_COOLDOWN_MS[] = { 600000, 1800000, 0 };
+        static_assert(std::size(VANISH_COOLDOWN_MS) >= MAX_RANK, "VANISH_COOLDOWN_MS is short a rank");
 
         class ColdTrail final : public IMechanic
         {
@@ -150,7 +152,8 @@ namespace Gauntlet
         // itself. Back to a wall, Blind the second mob, Gouge and reposition.
         // ==================================================================
         // The card's ladder for damage taken from outside the front arc.
-        constexpr float BEHIND_MULT[MAX_RANK] = { 1.30f, 1.50f, 1.75f };
+        constexpr float BEHIND_MULT[] = { 1.30f, 1.50f, 1.75f };
+        static_assert(std::size(BEHIND_MULT) >= MAX_RANK, "BEHIND_MULT is short a rank");
 
         class ExposedBack final : public IMechanic
         {
@@ -220,7 +223,8 @@ namespace Gauntlet
         // Multi-DoTting a camp is the greedy play and bleeds accordingly, and
         // unpoisoned blades are always an option.
         // ==================================================================
-        constexpr uint32 POISON_SHARE_PCT[MAX_RANK] = { 25, 35, 50 };
+        constexpr uint32 POISON_SHARE_PCT[] = { 25, 35, 50 };
+        static_assert(std::size(POISON_SHARE_PCT) >= MAX_RANK, "POISON_SHARE_PCT is short a rank");
 
         class PoisonedBlades final : public IMechanic
         {
@@ -314,7 +318,8 @@ namespace Gauntlet
         // being for escaping rather than for repositioning every three seconds.
         // ==================================================================
         // The card's ladder: half, then none, then none plus no combo points.
-        constexpr float MOVING_REGEN[MAX_RANK] = { 0.5f, 0.0f, 0.0f };
+        constexpr float MOVING_REGEN[] = { 0.5f, 0.0f, 0.0f };
+        static_assert(std::size(MOVING_REGEN) >= MAX_RANK, "MOVING_REGEN is short a rank");
 
         // The boon's flat addition to the energy bar.
         constexpr uint32 EXTRA_ENERGY = 20;

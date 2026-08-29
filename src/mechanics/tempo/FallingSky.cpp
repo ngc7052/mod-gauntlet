@@ -19,6 +19,7 @@
 #include "SpellAuras.h"
 
 #include <string>
+#include <iterator>
 
 // Registry id 14, key "falling_sky", design section 4 T1: "In combat, every
 // 20 seconds the sky marks your spot; three seconds later it strikes."
@@ -43,8 +44,10 @@ namespace Gauntlet
 
         // Both ladders are stated on the card -- cadence 25/20/15 s, severity
         // 25/35/50% of maximum health -- so neither is a chosen number.
-        constexpr uint32 CADENCE_MS[MAX_RANK]   = { 25000, 20000, 15000 };
-        constexpr uint32 SEVERITY_PCT[MAX_RANK] = { 25, 35, 50 };
+        constexpr uint32 CADENCE_MS[]   = { 25000, 20000, 15000 };
+        static_assert(std::size(CADENCE_MS) >= MAX_RANK, "CADENCE_MS is short a rank");
+        constexpr uint32 SEVERITY_PCT[] = { 25, 35, 50 };
+        static_assert(std::size(SEVERITY_PCT) >= MAX_RANK, "SEVERITY_PCT is short a rank");
 
         // The card's three seconds. Handed to Scheduler::Arm as the warning's
         // lead rather than counted here; Budget() stretches the cadence and
@@ -175,7 +178,8 @@ namespace Gauntlet
         // cannot disagree about what rank II is worth, and it exists at all for
         // the same reason ScalarMagnitude has a fallback: an affix whose card
         // promises an upside must never silently deliver nothing.
-        constexpr uint8 FALLBACK_SPEED_PCT[MAX_RANK] = { 5, 10, 15 };   // TODO(design)
+        constexpr uint8 FALLBACK_SPEED_PCT[] = { 5, 10, 15 };   // TODO(design)
+        static_assert(std::size(FALLBACK_SPEED_PCT) >= MAX_RANK, "FALLBACK_SPEED_PCT is short a rank");
 
         uint8 RankIndex(uint8 rank)
         {

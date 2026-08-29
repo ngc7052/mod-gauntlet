@@ -24,6 +24,7 @@
 
 #include <algorithm>
 #include <string>
+#include <iterator>
 
 // Design section 3, family C, warlock. The engine is the demon and the shard
 // economy; Fel Pact makes the second pay for the first, which is the resource
@@ -69,7 +70,8 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_FEL_PACT = 60;
 
         // The card's ladder: 20 -> 15 -> 10 kills before the binding goes.
-        constexpr uint32 PACT_KILLS[MAX_RANK] = { 20, 15, 10 };
+        constexpr uint32 PACT_KILLS[] = { 20, 15, 10 };
+        static_assert(std::size(PACT_KILLS) >= MAX_RANK, "PACT_KILLS is short a rank");
 
         constexpr uint32 HOSTILE_MS = 15000;
 
@@ -274,7 +276,8 @@ namespace Gauntlet
         // the demon stay free, so the number of targets you dot becomes a
         // health decision rather than a reflex.
         // ==================================================================
-        constexpr uint32 AFFLICTION_PCT[MAX_RANK] = { 20, 30, 40 };
+        constexpr uint32 AFFLICTION_PCT[] = { 20, 30, 40 };
+        static_assert(std::size(AFFLICTION_PCT) >= MAX_RANK, "AFFLICTION_PCT is short a rank");
 
         class AfflictionOfTheSelf final : public IMechanic
         {
@@ -368,7 +371,8 @@ namespace Gauntlet
         // two hooks, and the summon half is already Fel Pact's territory in a
         // way that would double-charge a warlock carrying both. TODO(design)
         // ==================================================================
-        constexpr int32 SHARD_LEVEL_DELTA[MAX_RANK] = { -2, 0, 1 };
+        constexpr int32 SHARD_LEVEL_DELTA[] = { -2, 0, 1 };
+        static_assert(std::size(SHARD_LEVEL_DELTA) >= MAX_RANK, "SHARD_LEVEL_DELTA is short a rank");
 
         constexpr uint32 ITEM_SOUL_SHARD  = 6265;
 
@@ -445,7 +449,8 @@ namespace Gauntlet
         // card means it to be: a warlock who cannot afford the damage fights
         // without one, which is a style rather than a failure.
         // ==================================================================
-        constexpr float SHARED_TAKEN[MAX_RANK] = { 1.15f, 1.25f, 1.40f };
+        constexpr float SHARED_TAKEN[] = { 1.15f, 1.25f, 1.40f };
+        static_assert(std::size(SHARED_TAKEN) >= MAX_RANK, "SHARED_TAKEN is short a rank");
 
         class SharedBlood final : public IMechanic
         {

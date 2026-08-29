@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <iterator>
 
 // Registry id 7. Design section 3, card E2: "Enemies flee at 25% health, and
 // come back with friends."
@@ -46,8 +47,10 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_CRAVEN = 7;
 
         // The card's ladder: flee at 20 -> 25 -> 35%, fetches 1 -> 1 -> 2.
-        constexpr uint32 FLEE_PCT[MAX_RANK]  = { 20, 25, 35 };
-        constexpr uint32 FETCHES[MAX_RANK]   = { 1, 1, 2 };
+        constexpr uint32 FLEE_PCT[]  = { 20, 25, 35 };
+        static_assert(std::size(FLEE_PCT) >= MAX_RANK, "FLEE_PCT is short a rank");
+        constexpr uint32 FETCHES[]   = { 1, 1, 2 };
+        static_assert(std::size(FETCHES) >= MAX_RANK, "FETCHES is short a rank");
 
         // The card's fixed numbers: five seconds of running, and fifteen yards
         // of camp to fetch from when the running stops.

@@ -17,6 +17,7 @@
 #include "Player.h"
 
 #include <string>
+#include <iterator>
 
 // Registry id 27. Design section 3, card B2: "Chests hold twice the loot, but
 // opening one curses you: until you kill three enemies, any hit deals triple
@@ -51,7 +52,8 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_CURSED_HOARD = 27;
 
         // The card's ladder: 3 -> 4 -> 5 kills to lift it.
-        constexpr uint32 KILLS_TO_LIFT[MAX_RANK] = { 3, 4, 5 };
+        constexpr uint32 KILLS_TO_LIFT[] = { 3, 4, 5 };
+        static_assert(std::size(KILLS_TO_LIFT) >= MAX_RANK, "KILLS_TO_LIFT is short a rank");
 
         // The card's one damage number, and it is real: see RelaxCaps.
         constexpr float CURSE_DAMAGE_MULT = 3.0f;

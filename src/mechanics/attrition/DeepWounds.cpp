@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <limits>
 #include <string>
+#include <iterator>
 
 // Registry id 19. Design section 5 replaces Withering with this one: the same
 // attrition, but the answer stops being "have more healing" and becomes "get
@@ -42,7 +43,8 @@ namespace Gauntlet
     {
         // The design card's severity ladder: 30 -> 40 -> 50% of the damage
         // taken becomes wound, at ranks I, II and III.
-        constexpr int32 WOUND_PCT[MAX_RANK] = { 30, 40, 50 };
+        constexpr int32 WOUND_PCT[] = { 30, 40, 50 };
+        static_assert(std::size(WOUND_PCT) >= MAX_RANK, "WOUND_PCT is short a rank");
 
         // ...capped at 40% of the pool, which is the same number plan section
         // 2.5 states as the floor on maximum health ("max health >= 0.6 x base

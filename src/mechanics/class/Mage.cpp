@@ -24,6 +24,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <iterator>
 
 // Design section 3, family C, mage. Both of these attack the same assumption
 // from different sides: that a mage never gets touched. One prices the escape,
@@ -65,7 +66,8 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_COLD_FEET = 56;
 
         // 15%, 25%, then gone -- price, higher price, removal, in one row.
-        constexpr uint32 BLINK_COST_PCT[MAX_RANK] = { 15, 25, 0 };
+        constexpr uint32 BLINK_COST_PCT[] = { 15, 25, 0 };
+        static_assert(std::size(BLINK_COST_PCT) >= MAX_RANK, "BLINK_COST_PCT is short a rank");
 
         class ColdFeet final : public IMechanic
         {
@@ -180,7 +182,9 @@ namespace Gauntlet
         // ==================================================================
         constexpr uint16 MECHANIC_MANA_BURN = 58;
 
-        constexpr uint32 BURN_PCT[MAX_RANK] = { 30, 50, 100 };
+        constexpr uint32 BURN_PCT[] = { 30, 50, 100 };
+
+        static_assert(std::size(BURN_PCT) >= MAX_RANK, "BURN_PCT is short a rank");
 
         class ManaBurn final : public IMechanic
         {
@@ -312,7 +316,8 @@ namespace Gauntlet
         constexpr uint32 SPELL_ENRAGE    = 8599;
 
         // The card's ladder, and it shortens as the affix worsens.
-        constexpr int32 SHEEP_MS[MAX_RANK] = { 5000, 4000, 3000 };
+        constexpr int32 SHEEP_MS[] = { 5000, 4000, 3000 };
+        static_assert(std::size(SHEEP_MS) >= MAX_RANK, "SHEEP_MS is short a rank");
 
         constexpr int32 ENRAGE_MS = 10000;
 
@@ -404,8 +409,10 @@ namespace Gauntlet
         // no condition on either half. Both numbers are on the same card and
         // both are real.
         // ==================================================================
-        constexpr float FRAILTY_HEALTH[MAX_RANK] = { 0.80f, 0.70f, 0.60f };
-        constexpr uint32 FRAILTY_DAMAGE_PCT[MAX_RANK] = { 20, 30, 40 };
+        constexpr float FRAILTY_HEALTH[] = { 0.80f, 0.70f, 0.60f };
+        static_assert(std::size(FRAILTY_HEALTH) >= MAX_RANK, "FRAILTY_HEALTH is short a rank");
+        constexpr uint32 FRAILTY_DAMAGE_PCT[] = { 20, 30, 40 };
+        static_assert(std::size(FRAILTY_DAMAGE_PCT) >= MAX_RANK, "FRAILTY_DAMAGE_PCT is short a rank");
 
         class ArcaneFrailty final : public IMechanic
         {

@@ -19,6 +19,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <iterator>
 
 // Registry id 11. Design section 3, card E6: "Enemies move 30% faster."
 //
@@ -39,7 +40,8 @@ namespace Gauntlet
     namespace
     {
         // The card's ladder: 20 -> 30 -> 40% faster.
-        constexpr uint32 SPEED_PCT[MAX_RANK] = { 20, 30, 40 };
+        constexpr uint32 SPEED_PCT[] = { 20, 30, 40 };
+        static_assert(std::size(SPEED_PCT) >= MAX_RANK, "SPEED_PCT is short a rank");
 
         // How many creatures are hurried at once. A pull bigger than this is
         // already a death; the cap bounds the bookkeeping, not the affix.

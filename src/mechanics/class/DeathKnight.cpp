@@ -24,6 +24,7 @@
 #include <array>
 #include <string>
 #include <vector>
+#include <iterator>
 
 // Design section 3, family C, death knight. Engine: runes and runic power,
 // diseases, Death Strike, the ghoul. The classic death: every rune spent with
@@ -66,7 +67,9 @@ namespace Gauntlet
         // ==================================================================
         constexpr uint16 MECHANIC_RUNE_STARVED = 48;
 
-        constexpr float STARVED_MULT[MAX_RANK] = { 1.20f, 1.30f, 1.40f };
+        constexpr float STARVED_MULT[] = { 1.20f, 1.30f, 1.40f };
+
+        static_assert(std::size(STARVED_MULT) >= MAX_RANK, "STARVED_MULT is short a rank");
 
         bool AllRunesSpent(Player* player)
         {
@@ -149,11 +152,13 @@ namespace Gauntlet
 
         // The card's ladder, and it runs the interesting way: the window to
         // claim a corpse shrinks as the affix worsens.
-        constexpr uint32 CLAIM_MS[MAX_RANK] = { 8000, 5000, 3000 };
+        constexpr uint32 CLAIM_MS[] = { 8000, 5000, 3000 };
+        static_assert(std::size(CLAIM_MS) >= MAX_RANK, "CLAIM_MS is short a rank");
 
         // Rank III's risen are not weak. The first two ranks are, and the
         // mechanic does that at runtime rather than with a second template.
-        constexpr float WEAK_HEALTH_PCT[MAX_RANK] = { 0.5f, 0.5f, 1.0f };
+        constexpr float WEAK_HEALTH_PCT[] = { 0.5f, 0.5f, 1.0f };
+        static_assert(std::size(WEAK_HEALTH_PCT) >= MAX_RANK, "WEAK_HEALTH_PCT is short a rank");
 
         constexpr uint32 RISEN_LIFETIME_MS = 120000;   // TODO(design)
 
@@ -367,7 +372,9 @@ namespace Gauntlet
             SPELL_BLOOD_PRESENCE, SPELL_FROST_PRESENCE, SPELL_UNHOLY_PRESENCE
         } };
 
-        constexpr uint32 PRESENCE_LOCK_MS[MAX_RANK] = { 6000, 10000, 20000 };
+        constexpr uint32 PRESENCE_LOCK_MS[] = { 6000, 10000, 20000 };
+
+        static_assert(std::size(PRESENCE_LOCK_MS) >= MAX_RANK, "PRESENCE_LOCK_MS is short a rank");
 
         bool IsPresence(uint32 spellId)
         {

@@ -13,6 +13,7 @@
 #include "Player.h"
 
 #include <string>
+#include <iterator>
 
 // Design section 3, family C. Most of the family is one class's; these are the
 // ones written against a resource rather than a kit, so they belong to whoever
@@ -53,7 +54,8 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_FAINT = 68;
 
         // The card's ladder: 2 -> 3 -> 4 seconds.
-        constexpr uint32 FAINT_MS[MAX_RANK] = { 2000, 3000, 4000 };
+        constexpr uint32 FAINT_MS[] = { 2000, 3000, 4000 };
+        static_assert(std::size(FAINT_MS) >= MAX_RANK, "FAINT_MS is short a rank");
 
         // The card's own once-per-ten-seconds, so a caster who is genuinely out
         // is not stun-locked by their own empty bar.

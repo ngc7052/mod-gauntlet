@@ -24,6 +24,7 @@
 #include <limits>
 #include <string>
 #include <vector>
+#include <iterator>
 
 // Registry id 9. Design section 3, card E4: "Corpses burst two seconds after
 // death, hurting anyone within five yards."
@@ -56,7 +57,8 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_DEATH_RATTLE = 9;
 
         // The card's damage ladder: 8/12/18% of maximum health.
-        constexpr uint32 SEVERITY_PCT[MAX_RANK] = { 8, 12, 18 };
+        constexpr uint32 SEVERITY_PCT[] = { 8, 12, 18 };
+        static_assert(std::size(SEVERITY_PCT) >= MAX_RANK, "SEVERITY_PCT is short a rank");
 
         // "Two seconds after a kill".
         constexpr uint32 FUSE_MS = 2000;

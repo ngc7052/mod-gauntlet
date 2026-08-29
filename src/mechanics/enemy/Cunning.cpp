@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <iterator>
 
 // Registry id 12. Design section 3, card E7: "Enemies in melee range kick the
 // spell you are casting, once every 12 seconds each."
@@ -48,8 +49,10 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_CUNNING = 12;
 
         // The card's ladder: cooldown 15 -> 12 -> 8 s, lock 2 -> 3 -> 4 s.
-        constexpr uint32 KICK_CD_MS[MAX_RANK] = { 15000, 12000, 8000 };
-        constexpr uint32 LOCK_MS[MAX_RANK]    = { 2000, 3000, 4000 };
+        constexpr uint32 KICK_CD_MS[] = { 15000, 12000, 8000 };
+        static_assert(std::size(KICK_CD_MS) >= MAX_RANK, "KICK_CD_MS is short a rank");
+        constexpr uint32 LOCK_MS[]    = { 2000, 3000, 4000 };
+        static_assert(std::size(LOCK_MS) >= MAX_RANK, "LOCK_MS is short a rank");
 
         // The card's two fixed numbers: five yards of reach, and the half
         // second at each end of the cast that decides whether the kick lands.

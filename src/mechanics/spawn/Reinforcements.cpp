@@ -20,6 +20,7 @@
 #include "Unit.h"
 
 #include <string>
+#include <iterator>
 
 // Registry id 4. Design section 3, card S4: "Fights longer than 30 seconds draw
 // another enemy every 15 seconds."
@@ -57,9 +58,12 @@ namespace Gauntlet
         constexpr uint32 EVENT_FIRST = 1;
 
         // The card's ladder: 45/15 s -> 30/15 s -> 20/10 s, cap 2 -> 3 -> 4.
-        constexpr uint32 FIRST_MS[MAX_RANK]  = { 45000, 30000, 20000 };
-        constexpr uint32 REPEAT_MS[MAX_RANK] = { 15000, 15000, 10000 };
-        constexpr uint32 CAP[MAX_RANK]       = { 2, 3, 4 };
+        constexpr uint32 FIRST_MS[]  = { 45000, 30000, 20000 };
+        static_assert(std::size(FIRST_MS) >= MAX_RANK, "FIRST_MS is short a rank");
+        constexpr uint32 REPEAT_MS[] = { 15000, 15000, 10000 };
+        static_assert(std::size(REPEAT_MS) >= MAX_RANK, "REPEAT_MS is short a rank");
+        constexpr uint32 CAP[]       = { 2, 3, 4 };
+        static_assert(std::size(CAP) >= MAX_RANK, "CAP is short a rank");
 
         // "spawns 20 yd away and attacks the owner".
         constexpr float SPAWN_YARDS = 20.0f;
