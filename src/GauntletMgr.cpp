@@ -1660,6 +1660,21 @@ namespace Gauntlet
         });
     }
 
+    void Mgr::OnTalentPoints(Player* player, uint32& points)
+    {
+        if (!_enabled || !IsEligible(player))
+            return;
+
+        RunState* st = Get(player);
+        if (!st || st->dead)
+            return;
+
+        ForEachMechanic(player, st, [&points](Ctx& ctx, AffixInstance& a)
+        {
+            a.impl->OnTalentPoints(ctx, points);
+        });
+    }
+
     void Mgr::OnShapeshift(Player* player, uint8 form)
     {
         if (!_enabled || !IsEligible(player))

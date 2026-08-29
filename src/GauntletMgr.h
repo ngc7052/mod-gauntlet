@@ -93,6 +93,10 @@ namespace Gauntlet
         // The druid's forms, for the curse that puts a cooldown on changing.
         void OnShapeshift(Player* player, uint8 form);
 
+        // How many talent points a level grants, for the one curse that
+        // changes the number.
+        void OnTalentPoints(Player* player, uint32& points);
+
         // Whether any carried mechanic will pay for a resurrection now. Asked
         // by the hardcore veto, and it changes nothing.
         bool AnyWillBuyDeath(Player* player);

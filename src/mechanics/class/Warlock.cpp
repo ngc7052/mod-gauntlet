@@ -18,8 +18,11 @@
 #include "Position.h"
 #include "Spell.h"
 #include "SpellInfo.h"
+#include "SharedDefines.h"
 #include "SpellMgr.h"
+#include "Unit.h"
 
+#include <algorithm>
 #include <string>
 
 // Design section 3, family C, warlock. The engine is the demon and the shard
@@ -259,7 +262,236 @@ namespace Gauntlet
             out += BoonClause(self.boon, self.boonMag);
             return out;
         }
+
+        // ==================================================================
+        // C34 - Affliction of the Self (61)
+        //
+        // "Your curses and corruption afflict you too, at a fifth of their
+        // strength."
+        //
+        // Multi-DoTting a camp is the greedy play and bleeds accordingly. The
+        // antidote is already in the kit -- Drain Life -- and Shadow Bolt and
+        // the demon stay free, so the number of targets you dot becomes a
+        // health decision rather than a reflex.
+        // ==================================================================
+        constexpr uint32 AFFLICTION_PCT[MAX_RANK] = { 20, 30, 40 };
+
+        class AfflictionOfTheSelf final : public IMechanic
+        {
+        public:
+            void OnPeriodicTick(Ctx& ctx, Unit* victim, uint32& damage,
+                                SpellInfo const* info) override
+            {
+                Player* player = ctx.player;
+                if (!player || !info || damage == 0)
+                    return;
+                if (!victim || victim == player)
+                    return;
+                if (ctx.run && ctx.run->dead)
+                    return;
+
+                // The warlock's own afflictions, and nothing else on the
+                // target. SpellFamilyName separates them from a bleed, a trap,
+                // or another caster's DoT on the same mob.
+                if (info->SpellFamilyName != SPELLFAMILY_WARLOCK)
+                    return;
+
+                uint32 const share = uint32(uint64(damage)
+                                          * AFFLICTION_PCT[RankIndexOf(ctx.self)] / 100u);
+                if (share == 0)
+                    return;
+
+                uint32 const health = uint32(player->GetHealth());
+                uint32 const cost   = health > 1 ? std::min(share, health - 1) : 0;
+                if (cost == 0)
+                    return;
+
+                bool* flag = ctx.run ? &ctx.run->selfDamage : nullptr;
+                if (flag)
+                    *flag = true;
+
+                Unit::DealDamage(player, player, cost, nullptr, SELF_DAMAGE,
+                                 SPELL_SCHOOL_MASK_NORMAL, nullptr, /*durabilityLoss*/ false);
+
+                if (flag)
+                    *flag = false;
+
+                _bled += cost;
+            }
+
+            float DamageDoneMult(Ctx& ctx, Unit*, SpellInfo const* info) override
+            {
+                if (!info || !ctx.self || ctx.self->boonMag == 0)
+                    return 1.0f;
+                if (info->SpellFamilyName != SPELLFAMILY_WARLOCK)
+                    return 1.0f;
+
+                return 1.0f + float(ctx.self->boonMag) / 100.0f;
+            }
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                uint32 const pct  = AFFLICTION_PCT[RankIndexOf(&self)];
+                uint32 const boon = self.boonMag;
+
+                std::string out = std::to_string(pct) + "% of what your curses and corruption"
+                                  " deal is dealt to you as well. It cannot kill you.";
+
+                if (boon != 0)
+                    out += " In exchange they deal " + std::to_string(boon) + "% more.";
+
+                return out;
+            }
+
+            std::string Diagnose(Ctx&) const override
+            {
+                return "affliction of the self: " + std::to_string(_bled) + " health bled";
+            }
+
+        private:
+            uint32 _bled = 0;
+        };
+
+        // ==================================================================
+        // C35 - Shard Economy (62)
+        //
+        // "Every summon and every Healthstone costs a Soul Shard, and shards
+        // drop only from enemies of your level or higher."
+        //
+        // Shards become lives. Hunting higher-level mobs for them is a risk the
+        // class chooses rather than one imposed on it, which is the shape the
+        // family is after.
+        //
+        // Only the second half is implemented, and this file says so rather
+        // than pretending. The first -- a shard consumed by summons and
+        // Healthstones -- would need Player::DestroyItemCount on item 6265 at
+        // two hooks, and the summon half is already Fel Pact's territory in a
+        // way that would double-charge a warlock carrying both. TODO(design)
+        // ==================================================================
+        constexpr int32 SHARD_LEVEL_DELTA[MAX_RANK] = { -2, 0, 1 };
+
+        constexpr uint32 ITEM_SOUL_SHARD  = 6265;
+
+        class ShardEconomy final : public IMechanic
+        {
+        public:
+            void OnKill(Ctx& ctx, Creature* killed) override
+            {
+                Player* player = ctx.player;
+                if (!player || !killed)
+                    return;
+                if (ctx.run && ctx.run->dead)
+                    return;
+                if (sGauntletSummons->IsGauntletSummon(killed))
+                    return;
+
+                int32 const wanted = int32(player->GetLevel()) + SHARD_LEVEL_DELTA[RankIndexOf(ctx.self)];
+                if (int32(killed->GetLevel()) >= wanted)
+                {
+                    // At or above the line: the boon doubles what Drain Soul
+                    // gave, which the core has already handed over.
+                    if (ctx.self && ctx.self->boonMag != 0)
+                    {
+                        player->AddItem(ITEM_SOUL_SHARD, 1);
+                        ++_doubled;
+                    }
+                    return;
+                }
+
+                // Below the line the shard is taken back. Removing one is the
+                // only way to express "does not drop" from here: the core has
+                // already created it by the time any kill hook runs.
+                if (player->HasItemCount(ITEM_SOUL_SHARD, 1))
+                {
+                    player->DestroyItemCount(ITEM_SOUL_SHARD, 1, true);
+                    ++_refused;
+                }
+            }
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                int32 const  delta = SHARD_LEVEL_DELTA[RankIndexOf(&self)];
+                std::string  line  = delta < 0
+                    ? "no more than " + std::to_string(-delta) + " levels below you"
+                    : (delta == 0 ? std::string("at your level or above")
+                                  : "at least " + std::to_string(delta) + " level above you");
+
+                std::string out = "Soul Shards come only from enemies " + line + ".";
+
+                if (self.boonMag != 0)
+                    out += " In exchange those enemies give two.";
+
+                return out;
+            }
+
+            std::string Diagnose(Ctx&) const override
+            {
+                return "shard economy: " + std::to_string(_refused) + " refused, "
+                     + std::to_string(_doubled) + " doubled";
+            }
+
+        private:
+            uint32 _refused = 0;
+            uint32 _doubled = 0;
+        };
+
+        // ==================================================================
+        // C36 - Shared Blood (63)
+        //
+        // "While your demon lives you take 25% more damage, and it deals 40%
+        // more."
+        //
+        // The demon stops being free. Dismissing it is a real option and the
+        // card means it to be: a warlock who cannot afford the damage fights
+        // without one, which is a style rather than a failure.
+        // ==================================================================
+        constexpr float SHARED_TAKEN[MAX_RANK] = { 1.15f, 1.25f, 1.40f };
+
+        class SharedBlood final : public IMechanic
+        {
+        public:
+            float DamageTakenMult(Ctx& ctx, Unit*, SpellInfo const*) override
+            {
+                Player* player = ctx.player;
+                if (!player || !player->GetPet())
+                    return 1.0f;
+
+                return SHARED_TAKEN[RankIndexOf(ctx.self)];
+            }
+
+            void OnPetDamage(Ctx& ctx, Unit* /*victim*/, uint32& damage) override
+            {
+                if (!ctx.self || ctx.self->boonMag == 0)
+                    return;
+
+                damage += uint32(uint64(damage) * ctx.self->boonMag / 100u);
+            }
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                uint32 const extra = uint32((SHARED_TAKEN[RankIndexOf(&self)] - 1.0f) * 100.0f + 0.5f);
+                uint32 const boon  = self.boonMag;
+
+                std::string out = "While your demon is out you take " + std::to_string(extra)
+                                + "% more damage.";
+
+                if (boon != 0)
+                    out += " In exchange it deals " + std::to_string(boon) + "% more.";
+
+                out += " Dismissing it is always an option.";
+                return out;
+            }
+
+            std::string Diagnose(Ctx& ctx) const override
+            {
+                return std::string("shared blood: ")
+                     + (ctx.player && ctx.player->GetPet() ? "demon out, paying" : "no demon");
+            }
+        };
     }
 
+    GAUNTLET_MECHANIC(61, AfflictionOfTheSelf);
+    GAUNTLET_MECHANIC(62, ShardEconomy);
+    GAUNTLET_MECHANIC(63, SharedBlood);
     GAUNTLET_MECHANIC(60, FelPact);
 }

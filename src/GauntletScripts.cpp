@@ -296,6 +296,22 @@ public:
         sGauntlet->OnSpellCast(player, spell);
     }
 
+    // Talent points, for the one curse that touches character building rather
+    // than combat. IMechanic::OnTalentPoints has been declared since Phase 0
+    // and dispatched from nowhere.
+    //
+    // The hook is const on the player and this module only reads the level from
+    // it, so the const_cast is confined to finding the run -- the same shape
+    // OnItemRoll and OnLootGroupAmount already use.
+    void OnPlayerCalculateTalentsPoints(Player const* player, uint32& points) override
+    {
+        Player* mutablePlayer = const_cast<Player*>(player);
+        if (!sGauntlet->Enabled() || !sGauntlet->IsEligible(mutablePlayer))
+            return;
+
+        sGauntlet->OnTalentPoints(mutablePlayer, points);
+    }
+
     void OnPlayerGiveXP(Player* player, uint32& amount, Unit* victim, uint8 /*source*/) override
     {
         sGauntlet->OnGiveXP(player, amount, victim);
@@ -789,8 +805,15 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_ManaBurn();           // 58  C31 mage
     void AddSC_gauntlet_mechanic_ArcaneFrailty();      // 59  C32 mage
     void AddSC_gauntlet_mechanic_FelPact();            // 60  C33 warlock
+    void AddSC_gauntlet_mechanic_AfflictionOfTheSelf(); // 61 C34 warlock
+    void AddSC_gauntlet_mechanic_ShardEconomy();       // 62  C35 warlock
+    void AddSC_gauntlet_mechanic_SharedBlood();        // 63  C36 warlock
     void AddSC_gauntlet_mechanic_BoundSkin();          // 64  C37 druid
+    void AddSC_gauntlet_mechanic_NaturesToll();        // 65  C38 druid
+    void AddSC_gauntlet_mechanic_CommitmentOfRoots();  // 66  C39 druid
+    void AddSC_gauntlet_mechanic_TwoFaces();           // 67  C40 druid
     void AddSC_gauntlet_mechanic_Faint();              // 68  C41 all mana users
+    void AddSC_gauntlet_mechanic_Unspent();            // 69  C42 all classes
     void AddSC_gauntlet_mechanic_AnkhPact();           // 70  C43 shaman
     void AddSC_gauntlet_mechanic_StoneOfTheDamned();   // 71  C44 warlock
     void AddSC_gauntlet_mechanic_SelfFound();          // 23
@@ -858,8 +881,15 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_ManaBurn();
     AddSC_gauntlet_mechanic_ArcaneFrailty();
     AddSC_gauntlet_mechanic_FelPact();
+    AddSC_gauntlet_mechanic_AfflictionOfTheSelf();
+    AddSC_gauntlet_mechanic_ShardEconomy();
+    AddSC_gauntlet_mechanic_SharedBlood();
     AddSC_gauntlet_mechanic_BoundSkin();
+    AddSC_gauntlet_mechanic_NaturesToll();
+    AddSC_gauntlet_mechanic_CommitmentOfRoots();
+    AddSC_gauntlet_mechanic_TwoFaces();
     AddSC_gauntlet_mechanic_Faint();
+    AddSC_gauntlet_mechanic_Unspent();
     AddSC_gauntlet_mechanic_AnkhPact();
     AddSC_gauntlet_mechanic_StoneOfTheDamned();
     AddSC_gauntlet_mechanic_IronPurse();

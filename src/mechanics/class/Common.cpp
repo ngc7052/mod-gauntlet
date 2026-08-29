@@ -166,7 +166,111 @@ namespace Gauntlet
 
             return out;
         }
+
+        // ==================================================================
+        // C42 - Unspent (69), all classes
+        //
+        // "You receive a talent point every second level. Each point you leave
+        // unspent makes you 2% stronger."
+        //
+        // The only affix in the module that touches character building rather
+        // than combat, which is why its window is early: it needs the run ahead
+        // of it to mean anything.
+        //
+        // The decision it creates recurs every level. The 31-point capstone now
+        // arrives at 60 rather than 40, so is it worth it -- or is a bank of
+        // ten unspent points and the twenty percent they carry the better
+        // character?
+        // ==================================================================
+        constexpr uint16 MECHANIC_UNSPENT = 69;
+
+        // The card's ladder, as a fraction of the points a level would give:
+        // two in three, one in two, one in three.
+        constexpr uint32 GRANT_NUM[MAX_RANK] = { 2, 1, 1 };
+        constexpr uint32 GRANT_DEN[MAX_RANK] = { 3, 2, 3 };
+
+        // The card's own figure per unspent point.
+        constexpr uint32 PER_POINT_PCT = 2;
+
+        class Unspent final : public IMechanic
+        {
+        public:
+            void OnDetach(Ctx& ctx) override
+            {
+                if (ctx.addon && ctx.player)
+                    ctx.addon->QueueStat(ctx.player, KeyOf(MECHANIC_UNSPENT, "c42_unspent"), 0);
+            }
+
+            void OnTalentPoints(Ctx& ctx, uint32& points) override
+            {
+                uint8 const i = RankIndexOf(ctx.self);
+                points = points * GRANT_NUM[i] / GRANT_DEN[i];
+            }
+
+            void OnTick(Ctx& ctx, uint32 /*diffMs*/) override
+            {
+                Player* player = ctx.player;
+                if (!player)
+                    return;
+
+                uint32 const bank = player->GetFreeTalentPoints();   // Player.h:1741
+                if (bank == _shown)
+                    return;
+
+                _shown = bank;
+
+                // The card asks for this by name -- "the addon shows the bank"
+                // -- and it is the whole of the decision: a number the player
+                // watches and chooses whether to spend.
+                AddonFor(ctx)->QueueStat(player, KeyOf(MECHANIC_UNSPENT, "c42_unspent"),
+                                         int32(bank));
+            }
+
+            // The boon is the bank, and it is paid on everything: the card says
+            // damage and healing, and healing is a heal the player receives
+            // from themselves, so it goes through the two multipliers rather
+            // than through AggregateFactor -- which is Player-free and cannot
+            // read a talent bank.
+            float DamageDoneMult(Ctx& ctx, Unit*, SpellInfo const*) override
+            {
+                return 1.0f + Bonus(ctx);
+            }
+
+            float HealTakenMult(Ctx& ctx, Unit* healer, SpellInfo const*) override
+            {
+                return healer == ctx.player ? 1.0f + Bonus(ctx) : 1.0f;
+            }
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                uint8 const i = RankIndexOf(&self);
+
+                return "You receive only " + std::to_string(GRANT_NUM[i]) + " talent point"
+                     + (GRANT_NUM[i] == 1 ? "" : "s") + " every " + std::to_string(GRANT_DEN[i])
+                     + " levels. Every point you leave unspent makes you "
+                     + std::to_string(PER_POINT_PCT) + "% stronger.";
+            }
+
+            std::string Diagnose(Ctx& ctx) const override
+            {
+                uint32 const bank = ctx.player ? ctx.player->GetFreeTalentPoints() : 0;
+                return "unspent: " + std::to_string(bank) + " point(s) banked, +"
+                     + std::to_string(bank * PER_POINT_PCT) + "%";
+            }
+
+        private:
+            static float Bonus(Ctx& ctx)
+            {
+                if (!ctx.player)
+                    return 0.0f;
+
+                return float(ctx.player->GetFreeTalentPoints() * PER_POINT_PCT) / 100.0f;
+            }
+
+            uint32 _shown = 0;
+        };
     }
 
+    GAUNTLET_MECHANIC(69, Unspent);
     GAUNTLET_MECHANIC(68, Faint);
 }

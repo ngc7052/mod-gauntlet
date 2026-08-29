@@ -57,11 +57,14 @@ namespace
     // Forgetful -- were the four flat scalars and were deleted in Phase 2, so
     // 69 rows carry 71 ids and the table is not contiguous.
     //
-    // Twenty-three rows lack MF_NotImplemented: Phase 1's vertical slice --
-    // The Shade (1), Champions (6), Falling Sky (14) and Deep Wounds (19) --
-    // and Phase 2's fifteen, which is everything left in families S, E and T.
-    // What still carries the flag is families R, B and C, which are Phase 3
-    // and Phase 4.
+    // No row carries MF_NotImplemented any more. Phase 1 brought four, Phase 2
+    // fifteen, Phase 3 six across two new families, and Phase 4 finished family
+    // C in two waves -- so every one of the sixty-nine rows has an
+    // implementation behind it, and every one can be offered.
+    //
+    // The flag stays in the enum and IsImplemented stays a real test, because
+    // the next row added will need both and because a run migrated from a
+    // future registry can legitimately carry an id this build has no code for.
     //
     // Clearing the flag is the last switch of a phase and nothing else: it is
     // what puts a mechanic into a live player's offers, so it is thrown only
@@ -461,16 +464,16 @@ namespace
           "Your demon's binding frays with every kill it makes, and after twenty it turns on you." },
 
         { 61, "c34_affliction_of_the_self", "Affliction of the Self", Family::Class, CM_WARLOCK, 20, 80, 3,
-          MF_NotImplemented, "", Boon::BonusDamage, 0, 0,
+          MF_None, "", Boon::BonusDamage, 0, 0,
           "Your curses and corruption afflict you too, at a fifth of their strength." },
 
         { 62, "c35_shard_economy", "Shard Economy", Family::Class, CM_WARLOCK, 20, 80, 3,
-          MF_NotImplemented, "", Boon::BonusRegen, 0, 0,
+          MF_None, "", Boon::BonusRegen, 0, 0,
           "Every summon and every Healthstone costs a Soul Shard, and shards drop only from your level up." },
 
         // The +40% the blurb names is the demon's, so the boon is its damage.
         { 63, "c36_shared_blood", "Shared Blood", Family::Class, CM_WARLOCK, 25, 80, 3,
-          MF_NotImplemented, "", Boon::BonusPetDamage, 0, 0,
+          MF_None, "", Boon::BonusPetDamage, 0, 0,
           "While your demon lives you take 25% more damage, and it deals 40% more." },
 
         // Druid
@@ -482,16 +485,16 @@ namespace
         // made in Cat or Bear and its boon is "+10% feral damage", so a balance or
         // restoration druid would carry it for free.
         { 65, "c38_natures_toll", "Nature's Toll", Family::Class, CM_DRUID, 20, 80, 3,
-          MF_NotImplemented, "shortcut:shapeshift", Boon::BonusDamage, 0, 2,
+          MF_None, "shortcut:shapeshift", Boon::BonusDamage, 0, 2,
           "Every kill made as a beast leaves you bleeding until you calm." },
 
         // TODO(design): the card gives no severity ladder, so this is binary at rank 1.
         { 66, "c39_commitment_of_roots", "Commitment of Roots", Family::Class, CM_DRUID, 15, 60, 1,
-          MF_NotImplemented, "", Boon::BonusRegen, 339, 0,
+          MF_None, "", Boon::BonusRegen, 339, 0,
           "Entangling Roots holds you as long as it holds them." },
 
         { 67, "c40_two_faces", "Two Faces", Family::Class, CM_DRUID, 15, 60, 3,
-          MF_NotImplemented, "", Boon::BonusDamage, 0, 0,
+          MF_None, "", Boon::BonusDamage, 0, 0,
           "By day your spells are weaker; by night your claws are." },
 
         // Every class
@@ -500,7 +503,7 @@ namespace
           "When your mana hits zero in combat you black out for two seconds." },
 
         { 69, "c42_unspent", "Unspent", Family::Class, 0, 10, 40, 3,
-          MF_NotImplemented, "", Boon::BonusDamage, 0, 0,
+          MF_None, "", Boon::BonusDamage, 0, 0,
           "You receive a talent point every second level, and each unspent point makes you 2% stronger." },
 
         // Class bargains. The design files these under family C but says they
