@@ -143,7 +143,7 @@ local function BoonText(boon, mag)
     return f
 end
 
-local RANK_PIP = { [1] = "I", [2] = "II", [3] = "III" }
+local RANK_PIP = { [1] = "I", [2] = "II", [3] = "III", [4] = "IV" }
 local function RankText(rank) return RANK_PIP[rank] or "" end
 
 -- Colour/icon for either a fallback record { name, desc } or a protocol

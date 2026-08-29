@@ -111,19 +111,19 @@ namespace
         return {
 
         // --- Family S: things that spawn -------------------------------
-        { 1, "shade", "The Shade", Family::Spawn, 0, 20, 80, 3,
+        { 1, "shade", "The Shade", Family::Spawn, 0, 20, 80, 4,
           MF_Timed | MF_Stalker, "stalker", Boon::BonusExperience, 0, 0,
           "A Shade rises behind you every few minutes and hunts you until you kill it or leave it behind." },
 
-        { 2, "echo", "Echo", Family::Spawn, 0, 30, 80, 3,
+        { 2, "echo", "Echo", Family::Spawn, 0, 30, 80, 4,
           MF_Timed | MF_Stalker | MF_RewardShaped, "stalker", Boon::BonusExperience, 0, 0,
           "Every 25th enemy you kill returns as an echo of yourself." },
 
-        { 3, "carrion", "Carrion", Family::Spawn, 0, 1, 50, 3,
+        { 3, "carrion", "Carrion", Family::Spawn, 0, 1, 50, 4,
           MF_Timed | MF_OnKill | MF_RewardShaped, "", Boon::BonusMoney, 0, 0,
           "Every 4th corpse you loot draws scavengers." },
 
-        { 4, "reinforcements", "Reinforcements", Family::Spawn, 0, 25, 80, 3,
+        { 4, "reinforcements", "Reinforcements", Family::Spawn, 0, 25, 80, 4,
           MF_Timed, "", Boon::BonusDamage, 0, 0,
           "Fights longer than 30 seconds draw another enemy every 15 seconds." },
 
@@ -137,28 +137,28 @@ namespace
         // and is what the registry's "stalker" exclusive key holds -- and its
         // counterplay is standing up and moving three steps, which needs no
         // button, no cooldown and no crowd control. Tier 2 is level 10.
-        { 5, "ambush", "Ambush", Family::Spawn, 0, 4, 45, 3,
+        { 5, "ambush", "Ambush", Family::Spawn, 0, 4, 45, 4,
           MF_Timed | MF_Stalker, "", Boon::BonusMaxHealth, 0, 0,
           "Resting in the wild attracts an ambush." },
 
         // --- Family E: enemies that behave differently -----------------
-        { 6, "champions", "Champions", Family::Enemy, 0, 1, 80, 3,
+        { 6, "champions", "Champions", Family::Enemy, 0, 1, 80, 4,
           MF_RewardShaped, "", Boon::BonusExperience, 0, 0,
           "Every 8th fight you start opens against a Champion: twice the health, harder hits, double the reward." },
 
-        { 7, "craven", "Craven", Family::Enemy, 0, 12, 60, 3,
+        { 7, "craven", "Craven", Family::Enemy, 0, 12, 60, 4,
           MF_None, "", Boon::BonusDamage, 0, 0,
           "Enemies flee at 25% health, and come back with friends." },
 
-        { 8, "call_to_arms", "Call to Arms", Family::Enemy, 0, 25, 65, 3,
+        { 8, "call_to_arms", "Call to Arms", Family::Enemy, 0, 25, 65, 4,
           MF_OnKill, "", Boon::BonusExperience, 0, 0,
           "Killing an enemy alerts its nearest kin." },
 
-        { 9, "death_rattle", "Death Rattle", Family::Enemy, CM_MELEE, 20, 60, 3,
+        { 9, "death_rattle", "Death Rattle", Family::Enemy, CM_MELEE, 20, 60, 4,
           MF_Timed | MF_OnKill, "onkill-positional", Boon::BonusMoney, 0, 0,
           "Corpses burst two seconds after death, hurting anyone within five yards." },
 
-        { 10, "grudge", "Grudge", Family::Enemy, CM_MELEE, 8, 50, 3,
+        { 10, "grudge", "Grudge", Family::Enemy, CM_MELEE, 8, 50, 4,
           MF_OnKill, "onkill-positional", Boon::BonusHealing, 0, 0,
           "Everything you kill leaves a ghost on its corpse that drains your health"
           " while you stand near it." },
@@ -167,7 +167,7 @@ namespace
           MF_None, "", Boon::BonusMaxHealth, 0, 0,
           "Enemies move 30% faster." },
 
-        { 12, "cunning", "Cunning", Family::Enemy, CM_CAST_TIME, 30, 80, 3,
+        { 12, "cunning", "Cunning", Family::Enemy, CM_CAST_TIME, 30, 80, 4,
           MF_RoleTax, "roletax", Boon::BonusDamage, 0, 0,
           "Enemies in melee range kick the spell you are casting, once every 12 seconds each." },
 
@@ -175,18 +175,18 @@ namespace
         // above and on the same test: Keen-nosed is a routing rule, answered by
         // hugging the edge of a path and pulling singles, and a level-10
         // character can do both.
-        { 13, "keen_nosed", "Keen-nosed", Family::Enemy, 0, 4, 55, 3,
+        { 13, "keen_nosed", "Keen-nosed", Family::Enemy, 0, 4, 55, 4,
           MF_None, "", Boon::BonusMoney, 0, 0,
           "Enemies notice you from further away." },
 
         // --- Family T: tempo and position ------------------------------
         // TODO(design): the card only floats the boon -- "a small speed reward for a
         // clean dodge is worth testing" -- so BonusMoveSpeed is a reading, not a value.
-        { 14, "falling_sky", "Falling Sky", Family::Tempo, 0, 25, 80, 3,
+        { 14, "falling_sky", "Falling Sky", Family::Tempo, 0, 25, 80, 4,
           MF_Timed, "", Boon::BonusMoveSpeed, 0, 0,
           "In combat, every 20 seconds the sky marks your spot; three seconds later it strikes." },
 
-        { 15, "frenzy", "Frenzy", Family::Tempo, 0, 8, 80, 3,
+        { 15, "frenzy", "Frenzy", Family::Tempo, 0, 8, 80, 4,
           MF_RewardShaped, "", Boon::BonusDamage, 0, 0,
           "Each kill within 8 seconds of the last stacks Frenzy: +6% damage dealt and +6% damage taken per stack." },
 
@@ -199,15 +199,15 @@ namespace
         // controls each pull"). So this is what fills the hole the deletion
         // left, it is the design's own candidate for it, and its counterplay --
         // pull one at a time -- needs no button at all.
-        { 16, "overextended", "Overextended", Family::Tempo, 0, 1, 60, 3,
+        { 16, "overextended", "Overextended", Family::Tempo, 0, 1, 60, 4,
           MF_None, "", Boon::BonusHealing, 0, 0,
           "Each enemy attacking you beyond the first increases the damage you take by 20%." },
 
-        { 17, "falter", "Falter", Family::Tempo, 0, 25, 65, 3,
+        { 17, "falter", "Falter", Family::Tempo, 0, 25, 65, 4,
           MF_Timed | MF_RoleTax, "roletax", Boon::BonusMaxHealth, 0, 0,
           "Every 45 seconds in combat your hands fail you for three seconds." },
 
-        { 18, "hubris", "Hubris", Family::Tempo, 0, 1, 50, 3,
+        { 18, "hubris", "Hubris", Family::Tempo, 0, 1, 50, 4,
           MF_RewardShaped, "", Boon::BonusExperience, 0, 0,
           "Enemies below your level give no experience; enemies above give 40% more." },
 
@@ -219,11 +219,11 @@ namespace
         // this row opens, and with it open tier 3 has four families like every
         // tier above it. Nothing about the mechanic changes: it is answered by
         // taking less damage, which a level-15 character can already do.
-        { 19, "deep_wounds", "Deep Wounds", Family::Attrition, 0, 10, 60, 3,
+        { 19, "deep_wounds", "Deep Wounds", Family::Attrition, 0, 10, 60, 4,
           MF_None, "", Boon::None, 0, 0,
           "A third of the damage you take becomes a wound that only rest can heal." },
 
-        { 20, "blood_magic", "Blood Magic", Family::Attrition, CM_MANA_USERS, 25, 60, 3,
+        { 20, "blood_magic", "Blood Magic", Family::Attrition, CM_MANA_USERS, 25, 60, 4,
           MF_None, "", Boon::BonusDamage, 0, 0,
           "Spells cost 3% of your maximum health in addition to mana." },
 
@@ -263,7 +263,7 @@ namespace
         // --- Family B: bargains ----------------------------------------
         // The boon is the cheat death itself: a killing blow leaves you at one
         // health, once per level, and the Mark that follows is the price.
-        { 26, "last_rites", "Last Rites", Family::Bargain, 0, 40, 80, 3,
+        { 26, "last_rites", "Last Rites", Family::Bargain, 0, 40, 80, 4,
           MF_RewardShaped, "", Boon::SecondLife, 0, 0,
           "A hit that would kill you leaves you at 1 health instead, once per level." },
 
@@ -276,7 +276,7 @@ namespace
         // of dead letter: the row said 4, the constant said 6, and the
         // constant won every time. Registry.BargainsOpenWhereTheGeneratorSaysThey
         // Do keeps the two from drifting apart again.
-        { 27, "cursed_hoard", "Cursed Hoard", Family::Bargain, 0, 30, 80, 3,
+        { 27, "cursed_hoard", "Cursed Hoard", Family::Bargain, 0, 30, 80, 4,
           MF_RewardShaped, "", Boon::BonusMoney, 0, 0,
           "Chests give twice as much loot, but opening one makes you take triple damage"
           " until you kill three enemies." },
@@ -288,17 +288,17 @@ namespace
         // that cap.
 
         // Warrior
-        { 28, "c01_red_mist", "Red Mist", Family::Class, CM_WARRIOR, 15, 80, 3,
+        { 28, "c01_red_mist", "Red Mist", Family::Class, CM_WARRIOR, 15, 80, 4,
           MF_None, "", Boon::BonusRegen, 0, 0,
           "At 100 rage you lose your mind for three seconds and your rage empties." },
 
         // TODO(design): requiresSpell picks Shield Wall of the card's three panic buttons.
-        { 29, "c02_berserkers_bargain", "Berserker's Bargain", Family::Class, CM_WARRIOR, 25, 80, 3,
+        { 29, "c02_berserkers_bargain", "Berserker's Bargain", Family::Class, CM_WARRIOR, 25, 80, 4,
           MF_RewardShaped, "", Boon::BonusDamage, 871, 0,
           "Below 35% health you deal 25% more damage, but your panic buttons will not answer." },
 
         // TODO(design): requiresSpell is Defensive Stance, the second stance a warrior trains.
-        { 30, "c03_iron_discipline", "Iron Discipline", Family::Class, CM_WARRIOR, 20, 80, 3,
+        { 30, "c03_iron_discipline", "Iron Discipline", Family::Class, CM_WARRIOR, 20, 80, 4,
           MF_None, "", Boon::BonusRegen, 71, 0,
           "Changing stance has a ten-second cooldown." },
 
@@ -306,7 +306,7 @@ namespace
         // free and long", which is a bespoke upside to named abilities and is
         // exactly what Boon::BonusAbility is for; BonusRegen would have had the
         // offer promise a regeneration percentage the mechanic never pays.
-        { 31, "c04_deafening_roar", "Deafening Roar", Family::Class, CM_WARRIOR, 20, 80, 3,
+        { 31, "c04_deafening_roar", "Deafening Roar", Family::Class, CM_WARRIOR, 20, 80, 4,
           MF_None, "", Boon::BonusAbility, 0, 0,
           "Your shouts wake every enemy within thirty yards." },
 
@@ -315,12 +315,12 @@ namespace
         // Light 10% cheaper", which is bespoke to one named ability rather than
         // a regeneration rate, and BonusRegen would have laddered it 15/30/45%
         // against a card that states one number.
-        { 32, "c05_long_forbearance", "Long Forbearance", Family::Class, CM_PALADIN, 15, 80, 3,
+        { 32, "c05_long_forbearance", "Long Forbearance", Family::Class, CM_PALADIN, 15, 80, 4,
           MF_None, "shortcut:divine-shield", Boon::BonusAbility, 642, 0,
           "Forbearance lasts three minutes, and Divine Shield empties your mana." },
 
         // The boon is bespoke: Consecration lasts twice as long and costs half.
-        { 33, "c06_consecrated_ground", "Consecrated Ground", Family::Class, CM_PALADIN, 25, 80, 3,
+        { 33, "c06_consecrated_ground", "Consecrated Ground", Family::Class, CM_PALADIN, 25, 80, 4,
           MF_None, "", Boon::BonusAbility, 26573, 0,
           "You take 25% more damage while not standing in your own Consecration." },
 
@@ -330,7 +330,7 @@ namespace
           "Your Hearthstone will not answer under Divine Shield." },
 
         // The boon halves Hammer of Justice's cooldown.
-        { 35, "c08_commitment", "Commitment", Family::Class, CM_PALADIN, 20, 80, 3,
+        { 35, "c08_commitment", "Commitment", Family::Class, CM_PALADIN, 20, 80, 4,
           MF_None, "", Boon::BonusCooldown, 853, 0,
           "Hammer of Justice roots you for its duration." },
 
@@ -339,7 +339,7 @@ namespace
         // not the hunter's. BonusDamage was wrong for it in a way that would
         // have paid out: GauntletAggregate reads that value as DamageDone and
         // would have handed the bonus to the player.
-        { 36, "c09_half_tamed", "Half-Tamed", Family::Class, CM_HUNTER, 15, 80, 3,
+        { 36, "c09_half_tamed", "Half-Tamed", Family::Class, CM_HUNTER, 15, 80, 4,
           MF_None, "", Boon::BonusPetDamage, 883, 0,
           "An unhappy pet turns on you." },
 
@@ -348,11 +348,11 @@ namespace
           MF_None, "shortcut:kiting", Boon::BonusCooldown, 5384, 0,
           "Feign Death has a three-minute cooldown." },
 
-        { 38, "c11_wide_dead_zone", "Wide Dead Zone", Family::Class, CM_HUNTER, 20, 80, 3,
+        { 38, "c11_wide_dead_zone", "Wide Dead Zone", Family::Class, CM_HUNTER, 20, 80, 4,
           MF_None, "shortcut:kiting", Boon::BonusDamage, 0, 0,
           "Ranged attacks cannot be used within ten yards." },
 
-        { 39, "c12_blood_bond", "Blood Bond", Family::Class, CM_HUNTER, 25, 80, 3,
+        { 39, "c12_blood_bond", "Blood Bond", Family::Class, CM_HUNTER, 25, 80, 4,
           MF_None, "", Boon::BonusHealing, 883, 0,
           "A fifth of the damage your pet takes is dealt to you." },
 
@@ -363,12 +363,12 @@ namespace
           "Vanish has a ten-minute cooldown." },
 
         // TODO(design): rogue poisons have no spell id in the plan's Appendix A, so no gate.
-        { 41, "c14_poisoned_blades", "Poisoned Blades", Family::Class, CM_ROGUE, 20, 80, 3,
+        { 41, "c14_poisoned_blades", "Poisoned Blades", Family::Class, CM_ROGUE, 20, 80, 4,
           MF_None, "", Boon::BonusDamage, 0, 0,
           "A quarter of the poison damage you deal ticks on you as well." },
 
         // The boon is +5% dodge.
-        { 42, "c15_exposed_back", "Exposed Back", Family::Class, CM_ROGUE, 15, 80, 3,
+        { 42, "c15_exposed_back", "Exposed Back", Family::Class, CM_ROGUE, 15, 80, 4,
           MF_None, "", Boon::BonusAvoidance, 0, 0,
           "Attacks from behind you deal 50% more damage." },
 
@@ -377,7 +377,7 @@ namespace
           "Energy does not regenerate while you move in combat." },
 
         // Priest
-        { 44, "c17_frail_soul", "Frail Soul", Family::Class, CM_PRIEST, 15, 80, 3,
+        { 44, "c17_frail_soul", "Frail Soul", Family::Class, CM_PRIEST, 15, 80, 4,
           MF_None, "", Boon::BonusHealing, 17, 0,
           "Weakened Soul lasts 30 seconds." },
 
@@ -385,32 +385,32 @@ namespace
         // 30-point Shadow talent, so only a shadow priest can ever feel it. The design
         // names this exact case -- "Faithless Form for a priest without Shadowform" is
         // the example it gives of a curse that must not be offered.
-        { 45, "c18_faithless_form", "Faithless Form", Family::Class, CM_PRIEST, 30, 80, 3,
+        { 45, "c18_faithless_form", "Faithless Form", Family::Class, CM_PRIEST, 30, 80, 4,
           MF_None, "", Boon::BonusDamage, 15473, 3,
           "Leaving Shadowform has a thirty-second cooldown." },
 
-        { 46, "c19_penance_of_silence", "Penance of Silence", Family::Class, CM_PRIEST, 20, 80, 3,
+        { 46, "c19_penance_of_silence", "Penance of Silence", Family::Class, CM_PRIEST, 20, 80, 4,
           MF_None, "", Boon::BonusHealing, 0, 0,
           "Healing yourself silences you for two seconds." },
 
         // The boon halves Fear Ward's cooldown.
-        { 47, "c20_whispers_of_the_deep", "Whispers of the Deep", Family::Class, CM_PRIEST, 25, 80, 3,
+        { 47, "c20_whispers_of_the_deep", "Whispers of the Deep", Family::Class, CM_PRIEST, 25, 80, 4,
           MF_None, "", Boon::BonusCooldown, 0, 0,
           "Below 20% health you lose your mind and flee for three seconds, once per fight." },
 
         // Death Knight
-        { 48, "c21_rune_starved", "Rune-starved", Family::Class, CM_DEATH_KNIGHT, 60, 80, 3,
+        { 48, "c21_rune_starved", "Rune-starved", Family::Class, CM_DEATH_KNIGHT, 60, 80, 4,
           MF_None, "", Boon::BonusRegen, 0, 0,
           "While all six runes are on cooldown you take 30% more damage." },
 
         // The boon halves Raise Dead's cooldown.
-        { 49, "c22_grave_call", "Grave Call", Family::Class, CM_DEATH_KNIGHT, 60, 80, 3,
+        { 49, "c22_grave_call", "Grave Call", Family::Class, CM_DEATH_KNIGHT, 60, 80, 4,
           MF_None, "", Boon::BonusCooldown, 46584, 0,
           "The dead you do not claim rise against you." },
 
         // The boon is bespoke: every presence is 25% stronger. requiresSpell is
         // Frost Presence, the second presence a death knight trains.
-        { 50, "c23_cold_presence", "Cold Presence", Family::Class, CM_DEATH_KNIGHT, 60, 80, 3,
+        { 50, "c23_cold_presence", "Cold Presence", Family::Class, CM_DEATH_KNIGHT, 60, 80, 4,
           MF_None, "", Boon::BonusAbility, 48263, 0,
           "Changing presence costs all your runic power and has a ten-second cooldown." },
 
@@ -423,12 +423,12 @@ namespace
 
         // Shaman
         // The boon is bespoke: the one totem still standing lasts twice as long.
-        { 52, "c25_one_totem", "One Totem", Family::Class, CM_SHAMAN, 15, 80, 3,
+        { 52, "c25_one_totem", "One Totem", Family::Class, CM_SHAMAN, 15, 80, 4,
           MF_None, "", Boon::BonusAbility, 0, 0,
           "Only one totem may stand at a time." },
 
         // The boon is bespoke: your totems' effects are 30% stronger.
-        { 53, "c26_totemic_anchor", "Totemic Anchor", Family::Class, CM_SHAMAN, 20, 80, 3,
+        { 53, "c26_totemic_anchor", "Totemic Anchor", Family::Class, CM_SHAMAN, 20, 80, 4,
           MF_None, "", Boon::BonusAbility, 0, 0,
           "You take 30% more damage when more than fifteen yards from your totems." },
 
@@ -436,12 +436,12 @@ namespace
         // spell twice and its counterplay is "weaving Bolt, shock, Lava Burst and totem
         // drops" -- Lava Burst is the Elemental 51-pointer, and an enhancement shaman
         // alternates anyway, so the curse would be free for them.
-        { 54, "c27_elemental_overload", "Elemental Overload", Family::Class, CM_SHAMAN, 20, 80, 3,
+        { 54, "c27_elemental_overload", "Elemental Overload", Family::Class, CM_SHAMAN, 20, 80, 4,
           MF_None, "", Boon::BonusDamage, 0, 1,
           "Casting the same spell twice in a row costs double." },
 
         // The boon is bespoke: both shields carry three more charges.
-        { 55, "c28_spirit_debt", "Spirit Debt", Family::Class, CM_SHAMAN, 25, 80, 3,
+        { 55, "c28_spirit_debt", "Spirit Debt", Family::Class, CM_SHAMAN, 25, 80, 4,
           MF_None, "", Boon::BonusAbility, 324, 0,
           "Every hit consumes a shield charge, and each consumed charge costs you 2% health." },
 
@@ -452,7 +452,7 @@ namespace
           "Blink costs 15% of your maximum health." },
 
         // The boon is bespoke: Polymorph becomes instant.
-        { 57, "c30_fickle_sheep", "Fickle Sheep", Family::Class, CM_MAGE, 20, 80, 3,
+        { 57, "c30_fickle_sheep", "Fickle Sheep", Family::Class, CM_MAGE, 20, 80, 4,
           MF_None, "", Boon::BonusAbility, 118, 0,
           "Polymorph breaks after five seconds, and the sheep comes back angry." },
 
@@ -460,38 +460,38 @@ namespace
           MF_None, "", Boon::BonusDamage, 0, 0,
           "Half the damage you take also burns your mana." },
 
-        { 59, "c32_arcane_frailty", "Arcane Frailty", Family::Class, CM_MAGE, 30, 80, 3,
+        { 59, "c32_arcane_frailty", "Arcane Frailty", Family::Class, CM_MAGE, 30, 80, 4,
           MF_None, "", Boon::BonusDamage, 0, 0,
           "Thirty percent less health, thirty percent more spell damage." },
 
         // Warlock
         // As Half-Tamed: the card's +10% is the demon's damage, not yours.
-        { 60, "c33_fel_pact", "Fel Pact", Family::Class, CM_WARLOCK, 20, 80, 3,
+        { 60, "c33_fel_pact", "Fel Pact", Family::Class, CM_WARLOCK, 20, 80, 4,
           MF_None, "", Boon::BonusPetDamage, 0, 0,
           "Your demon's binding frays with every kill it makes, and after twenty it turns on you." },
 
-        { 61, "c34_affliction_of_the_self", "Affliction of the Self", Family::Class, CM_WARLOCK, 20, 80, 3,
+        { 61, "c34_affliction_of_the_self", "Affliction of the Self", Family::Class, CM_WARLOCK, 20, 80, 4,
           MF_None, "", Boon::BonusDamage, 0, 0,
           "Your curses and corruption afflict you too, at a fifth of their strength." },
 
-        { 62, "c35_shard_economy", "Shard Economy", Family::Class, CM_WARLOCK, 20, 80, 3,
+        { 62, "c35_shard_economy", "Shard Economy", Family::Class, CM_WARLOCK, 20, 80, 4,
           MF_None, "", Boon::BonusRegen, 0, 0,
           "Every summon and every Healthstone costs a Soul Shard, and shards drop only from your level up." },
 
         // The +40% the blurb names is the demon's, so the boon is its damage.
-        { 63, "c36_shared_blood", "Shared Blood", Family::Class, CM_WARLOCK, 25, 80, 3,
+        { 63, "c36_shared_blood", "Shared Blood", Family::Class, CM_WARLOCK, 25, 80, 4,
           MF_None, "", Boon::BonusPetDamage, 0, 0,
           "While your demon lives you take 25% more damage, and it deals 40% more." },
 
         // Druid
-        { 64, "c37_bound_skin", "Bound Skin", Family::Class, CM_DRUID, 15, 80, 3,
+        { 64, "c37_bound_skin", "Bound Skin", Family::Class, CM_DRUID, 15, 80, 4,
           MF_None, "shortcut:shapeshift", Boon::BonusMaxHealth, 0, 0,
           "Shapeshifting has a six-second cooldown." },
 
         // TODO(design): tree 2 = Feral Combat. Reading: the curse only fires on a kill
         // made in Cat or Bear and its boon is "+10% feral damage", so a balance or
         // restoration druid would carry it for free.
-        { 65, "c38_natures_toll", "Nature's Toll", Family::Class, CM_DRUID, 20, 80, 3,
+        { 65, "c38_natures_toll", "Nature's Toll", Family::Class, CM_DRUID, 20, 80, 4,
           MF_None, "shortcut:shapeshift", Boon::BonusDamage, 0, 2,
           "Every kill made as a beast leaves you bleeding until you calm." },
 
@@ -500,12 +500,12 @@ namespace
           MF_None, "", Boon::BonusRegen, 339, 0,
           "Entangling Roots holds you as long as it holds them." },
 
-        { 67, "c40_two_faces", "Two Faces", Family::Class, CM_DRUID, 15, 60, 3,
+        { 67, "c40_two_faces", "Two Faces", Family::Class, CM_DRUID, 15, 60, 4,
           MF_None, "", Boon::BonusDamage, 0, 0,
           "By day your spells are weaker; by night your claws are." },
 
         // Every class
-        { 68, "c41_faint", "Faint", Family::Class, CM_MANA_USERS, 15, 80, 3,
+        { 68, "c41_faint", "Faint", Family::Class, CM_MANA_USERS, 15, 80, 4,
           MF_None, "", Boon::BonusRegen, 0, 0,
           "When your mana hits zero in combat you black out for two seconds." },
 
@@ -514,14 +514,14 @@ namespace
         // Class here and reward-shaped for the offer builder's guarantee.
         // The boon is the second life: Reincarnation answers once, and burns
         // away every boon the run carries when it does.
-        { 70, "c43_ankh_pact", "Ankh Pact", Family::Class, CM_SHAMAN, 40, 80, 3,
+        { 70, "c43_ankh_pact", "Ankh Pact", Family::Class, CM_SHAMAN, 40, 80, 4,
           MF_RewardShaped, "", Boon::SecondLife, 20608, 0,
           "Reincarnation works once in this run, and when it does every boon you carry is burned away." },
 
         // The boon is the second life, as C43. TODO(design): the card gives no
         // ladder of its own, saying only "as C43", so maxRank follows Ankh
         // Pact's three.
-        { 71, "c44_stone_of_the_damned", "Stone of the Damned", Family::Class, CM_WARLOCK, 40, 80, 3,
+        { 71, "c44_stone_of_the_damned", "Stone of the Damned", Family::Class, CM_WARLOCK, 40, 80, 4,
           MF_RewardShaped, "", Boon::SecondLife, 693, 0,
           "A Soulstone will bring you back once, and whoever kills you will be waiting." },
 
@@ -550,7 +550,7 @@ namespace
         // CAP_ON_KILL", and the curse here is the continuous healing block. The
         // kill is the release.
         // ---------------------------------------------------------------
-        { 74, "a05_killing_floor", "Killing Floor", Family::Attrition, 0, 10, 80, 3,
+        { 74, "a05_killing_floor", "Killing Floor", Family::Attrition, 0, 10, 80, 4,
           MF_RewardShaped, "", Boon::None, 0, 0,
           "Nothing heals you while something you have wounded still lives. Every kill gives health back instead." },
 

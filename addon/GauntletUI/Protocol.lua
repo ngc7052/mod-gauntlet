@@ -14,7 +14,7 @@ GauntletProtocol = GauntletProtocol or {}
 local P = GauntletProtocol
 
 local ADDON_PREFIX = "GNT"
-P.PROTOCOL_VERSION = 8   -- must match Gauntlet::GeneratorVersion (src/Gauntlet.h) and Data.lua's version field
+P.PROTOCOL_VERSION = 9   -- must match Gauntlet::GeneratorVersion (src/Gauntlet.h) and Data.lua's version field
 
 -- mode: "pending" (waiting to find out), "protocol" (GNT confirmed live),
 -- "fallback" (chat-scraping; either no HELLO arrived in time, or the

@@ -621,7 +621,7 @@ TEST_F(FullTableSweep, RelaxationRatesAreWhereTheyWereMeasured)
                "are the first four levels of every run and the only tiers where three distinct "
                "families are guaranteed; if this fails the opening of the game has gone hollow.";
 
-    // Measured 46.288% and 78.389%; see the note above for why they moved.
+    // Tiers 1-4 have relaxed nothing since Phase 2 and still do not.
 
     // "At least one reward-shaped offer per tier" (design section 4.4.5) is a
     // guarantee the builder keeps whenever anything reward-shaped is eligible
@@ -649,12 +649,27 @@ TEST_F(FullTableSweep, RelaxationRatesAreWhereTheyWereMeasured)
 
     double const noRewardRate = allSets ? 100.0 * double(noReward) / double(allSets) : 0.0;
     std::printf("[ census   ] %.2f%% of sets have no reward-shaped offer\n", noRewardRate);
-    // Measured at 44.6%, and that number is the clearest single statement of
-    // how thin this table is for eighty tiers: half of all offer sets contain
-    // nothing that pays the player back for engaging with it. It is recorded
-    // here rather than tuned away, and closing it is Phase 4's job -- more
-    // rows, and upper windows that were never chosen deliberately.
-    EXPECT_LE(noRewardRate, 55.0)
+    // 44.6% when this was written, and 8.68% now. The bound moves with it,
+    // because a ceiling forty-six points above the measurement is not a
+    // regression test -- it is a number that will pass whatever happens.
+    //
+    // The journey is worth recording, because each step corrected a different
+    // wrong idea about what the problem was:
+    //
+    //   44.6%  Phase 2, at the end of the world-side families
+    //   36.9%  Phase 4, after forty-four class curses -- and the small size of
+    //          that step is what showed the shortage was never the table's
+    //          size. Phase 5 split GR_NoRewardShaped out of GR_NoCandidate and
+    //          found that ten of sixty-nine rows carried MF_RewardShaped and
+    //          only four were available to every class.
+    //   25.9%  Phase 6, from adding *one* classless reward-shaped row.
+    //    8.7%  Phase 6, from MAX_RANK 3 -> 4: a rank-up of something
+    //          reward-shaped already carried satisfies the guarantee too, and
+    //          a fourth rank is one more tier at which it can.
+    //
+    // 12% leaves room for the table to move without leaving room for the
+    // guarantee to quietly stop being kept.
+    EXPECT_LE(noRewardRate, 12.0)
         << noRewardRate << "% of all sets have no reward-shaped offer; the guarantee has stopped "
            "being kept rather than merely running out of table";
 

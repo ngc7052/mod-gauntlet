@@ -193,6 +193,11 @@ namespace Gauntlet
     // prefer an ordinary new mechanic in a clean family over a bargain it
     // could only place by relaxing a rule. The last of those alone changes
     // every offer set that contains a bargain slot.
+    // 8 was Phase 6's second half: MAX_RANK 3 -> 4. Every rank-up that was
+    // refused at III is now offered a IV, fifty-seven rows changed maxRank with
+    // it, and RankFloor's ceiling moved -- so the rank an offer carries, and
+    // therefore every offer set that contains a rank-up, is different.
+    //
     // 7 was Phase 6: Unspent (69) deleted from the table and Killing Floor (74)
     // added in its place. A row leaving and a row arriving each move every
     // offer set that could have drawn them, and this one moves the family
@@ -205,9 +210,9 @@ namespace Gauntlet
     // with one test froze an affix taken near the end of its window at whatever
     // rank it happened to get. Every offer set that could contain a rank-up of
     // an out-of-window mechanic moves.
-    constexpr uint16 GeneratorVersion = 8;
+    constexpr uint16 GeneratorVersion = 9;
 
-    constexpr uint8 MAX_RANK = 3;
+    constexpr uint8 MAX_RANK = 4;
 
     class IMechanic;   // GauntletMechanic.h
 
