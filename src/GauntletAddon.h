@@ -135,6 +135,18 @@ namespace Gauntlet
         // SUMMON key 0/1 - a stalker or ambusher is alive for you.
         void SendSummon(Player* player, std::string_view key, bool alive);
 
+        // PACE timed budgetPct minSpacingSecs - what the run's timed affixes
+        // are doing to every cadence in it.
+        //
+        // Every timed affix's blurb states the interval the *mechanic* asks
+        // for, because that is the only number it knows. The scheduler then
+        // multiplies it by the event budget, so a player carrying six timed
+        // affixes reads "every 20 seconds" and waits forty-five. That is not a
+        // number any one mechanic can correct -- the stretch is a property of
+        // the whole carried set -- so it is stated once, here, and the addon
+        // puts it where the affix list is read.
+        void SendPace(Player* player, uint32 timed, uint32 budgetPct, uint32 minSpacingSecs);
+
         // The three coalescing types. Each keeps only the latest value per
         // key and is flushed on the next 500 ms tick, under the rate limit.
         void QueueCounter(Player* player, std::string_view key, uint32 value, uint32 max);

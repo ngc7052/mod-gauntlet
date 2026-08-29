@@ -193,6 +193,12 @@ namespace Gauntlet
     // prefer an ordinary new mechanic in a clean family over a bargain it
     // could only place by relaxing a rule. The last of those alone changes
     // every offer set that contains a bargain slot.
+    // 9 is Phase 7's PACE frame and Pacing::Fixed. The frame alone would not
+    // need a bump -- the addon ignores a type it does not know -- but Fixed
+    // changes when a fuse and a telegraph land, and PROTOCOL_VERSION is this
+    // number, so an addon that predates the frame should be told to update
+    // rather than silently miss the one line that explains the cadences.
+    //
     // 8 was Phase 6's second half: MAX_RANK 3 -> 4. Every rank-up that was
     // refused at III is now offered a IV, fifty-seven rows changed maxRank with
     // it, and RankFloor's ceiling moved -- so the rank an offer carries, and
@@ -210,7 +216,7 @@ namespace Gauntlet
     // with one test froze an affix taken near the end of its window at whatever
     // rank it happened to get. Every offer set that could contain a rank-up of
     // an out-of-window mechanic moves.
-    constexpr uint16 GeneratorVersion = 9;
+    constexpr uint16 GeneratorVersion = 10;
 
     constexpr uint8 MAX_RANK = 4;
 

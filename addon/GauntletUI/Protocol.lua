@@ -14,7 +14,7 @@ GauntletProtocol = GauntletProtocol or {}
 local P = GauntletProtocol
 
 local ADDON_PREFIX = "GNT"
-P.PROTOCOL_VERSION = 9   -- must match Gauntlet::GeneratorVersion (src/Gauntlet.h) and Data.lua's version field
+P.PROTOCOL_VERSION = 10   -- must match Gauntlet::GeneratorVersion (src/Gauntlet.h) and Data.lua's version field
 
 -- mode: "pending" (waiting to find out), "protocol" (GNT confirmed live),
 -- "fallback" (chat-scraping; either no HELLO arrived in time, or the
@@ -51,6 +51,7 @@ callbacks["CTR"]    = function(key, value, max) end    -- counter readout: Champ
 callbacks["STAT"]   = function(key, value) end         -- wound %, Frenzy stacks, Unspent bank (Hud.lua)
 callbacks["COND"]   = function(slot, active) end       -- carried-row condition light (Panel.lua)
 callbacks["SUMMON"] = function(key, alive) end         -- stalker/ambusher-alive indicator (Hud.lua)
+callbacks["PACE"]   = function(timed, budgetPct, minSpacingSecs) end   -- cadence stretch (Panel.lua)
 callbacks["KILLBY"] = function(id, name) end           -- which affix acted last on death (surface TBD)
 
 local function Send(msgType, ...)

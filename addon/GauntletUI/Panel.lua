@@ -215,6 +215,17 @@ gear:SetScript("OnEnter", function(self)
 end)
 gear:SetScript("OnLeave", function(self) self.glow:Hide(); GameTooltip:Hide() end)
 
+-- What the run's timed affixes do to every cadence in it. The server sends this
+-- whenever the carried set changes; see Addon::SendPace for why it cannot live
+-- in the individual blurbs -- the stretch belongs to the whole set, not to any
+-- one affix, so no affix can state it.
+--
+-- Declared here, above the row loop, and not beside RefreshMain where it is
+-- also read: the row tooltips are closures built inside that loop, and a local
+-- declared after them would not be their upvalue -- they would capture a global
+-- of the same name and read nil for the life of the session.
+local pace = nil
+
 local ROW_H = 26
 local rows = {}
 for i = 1, 16 do
@@ -258,6 +269,12 @@ for i = 1, 16 do
         GameTooltip:AddLine(Body(self.data.desc), 1, 1, 1, true)
         local s = RowColor(self.data)
         GameTooltip:AddLine(s[4], s[1], s[2], s[3])
+        -- The blurb above states the interval the mechanic asks for. Say what
+        -- the run is doing to it, on the row where the number was read.
+        if pace and pace.timed > 1 and pace.mult > 1.0 then
+            GameTooltip:AddLine(("Cadences in this run run x%.2f longer (%d timed affixes)."):
+                                format(pace.mult, pace.timed), 0.6, 0.6, 0.6, true)
+        end
         GameTooltip:Show()
     end)
     r:SetScript("OnLeave", function(self) self.glow:Hide(); GameTooltip:Hide() end)
@@ -315,8 +332,16 @@ local function RefreshMain()
     end
 
     if n == 0 then main.empty:Show() else main.empty:Hide() end
-    main.foot:SetText(pendingOffer and "|cffffd100A choice is waiting - leave combat.|r"
-                                    or "/gauntlet top for the furthest runs")
+    if pendingOffer then
+        main.foot:SetText("|cffffd100A choice is waiting - leave combat.|r")
+    elseif pace and pace.timed > 1 and pace.mult > 1.0 then
+        -- Only when it is actually stretching something. A run with one timed
+        -- affix reads its blurbs literally and does not need telling.
+        main.foot:SetText(("|cff808080%d timed affixes: stated cadences run |r|cffffd100x%.2f|r|cff808080 longer|r")
+                          :format(pace.timed, pace.mult))
+    else
+        main.foot:SetText("/gauntlet top for the furthest runs")
+    end
     main:SetHeight(math.max(120, 76 + math.max(n, 1) * ROW_H))
 end
 
@@ -810,6 +835,15 @@ local function AskForTop()
     topPanel:Show()
     SendChatMessage(".gauntlet top", "SAY")
 end
+
+GauntletProtocol.On("PACE", function(timed, budgetPct, minSpacingSecs)
+    pace = {
+        timed = tonumber(timed) or 0,
+        mult  = (tonumber(budgetPct) or 100) / 100,
+        space = tonumber(minSpacingSecs) or 0,
+    }
+    if main:IsShown() then RefreshMain() end
+end)
 
 GauntletProtocol.OnModeChange(function(newMode)
     if newMode == "protocol" then

@@ -304,6 +304,35 @@ namespace Gauntlet
         // from six affix descriptions. Deliberately not numbered: the addon's
         // chat fallback scrapes any line beginning "<n>. " as an affix
         // (addon/GauntletUI/Panel.lua:430).
+        // What the run's timed affixes are doing to every cadence in it.
+        //
+        // Each timed affix's blurb states the interval its own mechanic asks
+        // for, because that is the only number a mechanic knows. The scheduler
+        // multiplies it by the event budget, so a player carrying six of them
+        // reads "every 20 seconds" and waits forty-five, and no blurb can
+        // correct that -- the stretch belongs to the whole carried set. Said
+        // once, here, rather than qualified thirty times.
+        void PrintPacing(ChatHandler* handler, Player* player)
+        {
+            Gauntlet::Scheduler const* clock = sGauntlet->ClockFor(player);
+            if (!clock)
+                return;
+
+            uint32 const timed = clock->TimedAffixes();
+            float  const mult  = clock->Budget();
+
+            if (timed <= 1)
+            {
+                handler->PSendSysMessage("  Pacing: {} timed affix; cadences are as written.", timed);
+                return;
+            }
+
+            handler->PSendSysMessage(
+                "  Pacing: {} timed affixes stretch every stated cadence by x{:.2f} "
+                "(a 20s affix acts every {}s), and no two events land closer than {}s.",
+                timed, mult, uint32(20.0f * mult + 0.5f), clock->MinSpacingMs() / 1000u);
+        }
+
         void PrintProducts(ChatHandler* handler, Player* player)
         {
             std::string line;
@@ -581,6 +610,7 @@ public:
         // add up to after the caps clamp them, which is not something six
         // separate descriptions can be read off.
         PrintProducts(handler, p);
+        PrintPacing(handler, p);
         return true;
     }
 

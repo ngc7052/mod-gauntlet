@@ -573,6 +573,21 @@ namespace Gauntlet
         Emit(player, f.Str());
     }
 
+    void Addon::SendPace(Player* player, uint32 timed, uint32 budgetPct, uint32 minSpacingSecs)
+    {
+        if (!CanSend(player))
+            return;
+
+        // Sent immediately rather than queued: it moves only when the carried
+        // set does, which is once a level at most, and it is read alongside the
+        // affix list it explains.
+        Frame f("PACE");
+        f.Num(timed);
+        f.Num(budgetPct);
+        f.Num(minSpacingSecs);
+        Emit(player, f.Str());
+    }
+
     void Addon::QueueCounter(Player* player, std::string_view key, uint32 value, uint32 max)
     {
         Frame f("CTR");

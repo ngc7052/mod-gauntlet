@@ -56,6 +56,7 @@ is specific.
 | S4 | A death caused by it names it (`KILLBY`, and the leaderboard's `cause`) |
 | S5 | Anything it summoned despawns on logout, on your death, on a zone change, and on leash |
 | S6 | Nothing fires while mounted, in flight, in a sanctuary, or inside `Gauntlet.Grace.Seconds` of login |
+| S6b | **A stated cadence is a base, not a promise.** The scheduler multiplies every *paced* interval by the event budget — `1 + 0.25 × (timed affixes − 1)` — so a blurb saying "every 20 seconds" acts every 45 on a run carrying six. `.gauntlet status` prints the multiplier and the addon's footer shows it. A *fixed* interval — Death Rattle's two-second fuse, Ambush's and Carrion's telegraph — is exempt and must be exactly what it says at any carried-set size |
 | S7 | Every rank differs from the one below it in the way the entry says, and `.gauntlet status` says so too. **There are four ranks**, except where an entry says "three ranks only" — those eight stop at III because rank III already ends their ladder, and `.gauntlet debug offers` must never offer them a IV |
 | S8 | The boon applies, and the number in the offer matches the number delivered |
 | S9 | The addon shows the state — HUD counter, panel row, or countdown |
@@ -159,6 +160,11 @@ A kill alerts kin within 20 / 30 / 40 / 50 yd; 1 / 1 / 2 / 3 answer.
 **E4 · Death Rattle** (`death_rattle`, 9) · tiers 20–60
 Corpses burst 2 s after death for 8% / 12% / 18% / 25%, within 5 yd.
 - Two seconds is the counterplay: step back and take nothing.
+- **It must be two seconds with a full carried set too.** The fuse is
+  `Pacing::Fixed`; before Phase 7 the budget stretched it and the spacing could
+  walk it out to twelve. Kill three of a pack at once with five other timed
+  affixes carried: all three must burst about two seconds after their own kill,
+  not twelve seconds apart.
 - Exclusive with Grudge (`onkill-positional`).
 
 **E5 · Grudge** (`grudge`, 10) · tiers 8–50

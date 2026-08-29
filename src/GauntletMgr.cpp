@@ -2124,5 +2124,17 @@ namespace Gauntlet
         }
 
         sched->SetTimedAffixCount(timed);
+
+        // And say what that does, because nothing else can.
+        //
+        // Every timed affix's blurb states the interval the mechanic asks for
+        // -- "every 20 seconds", "every 15 minutes" -- and the scheduler then
+        // multiplies it by the budget. A run carrying six timed affixes reads
+        // 20 and waits 45. No single blurb can correct that: the stretch is a
+        // property of the whole carried set, so it is stated once, here, and
+        // the addon puts it beside the list it explains.
+        sGauntletAddon->SendPace(player, timed,
+                                 uint32(sched->Budget() * 100.0f + 0.5f),
+                                 sched->MinSpacingMs() / 1000u);
     }
 }
