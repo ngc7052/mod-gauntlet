@@ -108,6 +108,20 @@ Deployment: `sync-to-server.sh`, `docker compose build ac-worldserver`,
 every piece of state these six hold is a key/value pair in `gauntlet_state`,
 which already exists. No migration, no schema change.
 
+**One deployment gap found, and it is not specific to this phase.** A rebuild
+does not update the realm's config. `docker-compose.yml:47` bind-mounts
+`./env/dist/etc` over the image's own, so `conf/mod_gauntlet.conf.dist` is baked
+into the image and then covered by whatever is on the host — the container's copy
+was four hours stale and had none of this phase's key in it. The module still
+behaved correctly, because `GetOption` falls back to the compiled default, but
+the key the user is meant to turn was not there to turn.
+
+Fixed by hand for this deploy: the live `.conf` differed from the old `.dist` by
+exactly one line (`Gauntlet.Debug.Enable = 1`), so both were regenerated from the
+new `.dist` and that line re-applied. **Any phase that adds a config key must copy
+`conf/mod_gauntlet.conf.dist` to `<core>/env/dist/etc/modules/` as a separate
+step** and diff the live `.conf` first to see what has been hand-edited.
+
 ---
 
 ## 3. Deviations, with reasons
@@ -404,3 +418,6 @@ while `IsGameMaster()` is true. This cost most of an evening in Phase 2.
 7. **Run `tests/compile-check.sh` on every file.** 0.5–7 s, and the anchor audit
    caught both new families before the first Docker build. Still the highest
    leverage thing in the repo.
+8. **A rebuild does not deploy a config key.** See §2. Copy the `.dist` to
+   `<core>/env/dist/etc/modules/` yourself, and diff the live `.conf` before you
+   overwrite it — `Gauntlet.Debug.Enable = 1` is a hand edit on this realm.
