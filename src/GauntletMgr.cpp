@@ -139,37 +139,6 @@ namespace Gauntlet
 
     namespace
     {
-        // The generator, the registry and the aggregate maths never see a
-        // Player (CONTRACT section 7): this is the one adapter that does, and
-        // it lives beside the only code that owns a Player and needs an offer.
-        class LivePlayerView : public IPlayerView
-        {
-        public:
-            explicit LivePlayerView(Player* player) : _player(player) { }
-
-            uint8 GetClass() const override { return _player->getClass(); }
-            uint8 GetLevel() const override { return _player->GetLevel(); }
-            bool  HasSpell(uint32 spellId) const override { return _player->HasSpell(spellId); }
-
-            // tabpage + 1, with 0 reserved for "no spec yet"; see the comment
-            // on IPlayerView::GetTalentTree. Player::GetMostPointsTalentTree
-            // cannot express that distinction on its own -- it returns 0 both
-            // for the first tab of every class and for a character that has
-            // spent nothing -- so the spent-point count decides which it is.
-            uint8 GetTalentTree() const override
-            {
-                uint32 const total = _player->CalculateTalentsPoints();
-                uint32 const free  = _player->GetFreeTalentPoints();
-                if (total <= free)
-                    return 0;
-
-                return static_cast<uint8>(_player->GetMostPointsTalentTree() + 1);
-            }
-
-        private:
-            Player* _player;
-        };
-
         // The action column of gauntlet_affix_log, one string per OfferKind
         // plus the swap's two halves. The ENUM in the schema is the authority:
         // 'pick', 'rankup', 'swap_out', 'swap_in', 'bargain'.

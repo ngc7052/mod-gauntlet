@@ -19,6 +19,47 @@
 
 namespace Gauntlet
 {
+    // The generator, the registry and the aggregate maths never see a Player
+    // (CONTRACT section 7). This is the one adapter that does.
+    //
+    // It was a file-local class in GauntletMgr.cpp, and GauntletCommands.cpp
+    // kept a second copy so that `.gauntlet debug offers` could ask the same
+    // question -- with a comment saying the two "must answer identically", the
+    // talent encoding pasted between them, and a TODO to hoist one of them out.
+    // That TODO stood from Phase 1 to Phase 8, and what it was really saying is
+    // that a divergence would show up as the debug command reporting offers a
+    // player would never see: the two would not crash, they would just quietly
+    // disagree about which class curses are relevant.
+    //
+    // One class, exported, so there is nothing left to drift.
+    class LivePlayerView : public IPlayerView
+    {
+    public:
+        explicit LivePlayerView(Player* player) : _player(player) { }
+
+        uint8 GetClass() const override { return _player->getClass(); }
+        uint8 GetLevel() const override { return _player->GetLevel(); }
+        bool  HasSpell(uint32 spellId) const override { return _player->HasSpell(spellId); }
+
+        // tabpage + 1, with 0 reserved for "no spec yet"; see the comment on
+        // IPlayerView::GetTalentTree. Player::GetMostPointsTalentTree cannot
+        // express that distinction on its own -- it returns 0 both for the
+        // first tab of every class and for a character that has spent nothing
+        // -- so the spent-point count decides which it is.
+        uint8 GetTalentTree() const override
+        {
+            uint32 const total = _player->CalculateTalentsPoints();
+            uint32 const free  = _player->GetFreeTalentPoints();
+            if (total <= free)
+                return 0;
+
+            return static_cast<uint8>(_player->GetMostPointsTalentTree() + 1);
+        }
+
+    private:
+        Player* _player;
+    };
+
     // RunState moved to Gauntlet.h with the switchover: plan section 2.6 puts
     // it there, and GauntletMechanic.h's Ctx needs it without dragging
     // Player.h into every mechanic. Its member functions are defined in

@@ -348,38 +348,6 @@ namespace Gauntlet
             handler->PSendSysMessage("  Now: {}", line);
         }
 
-        // The generator, the registry and the aggregate maths never see a
-        // Player (worker contract section 7). Mgr has an adapter for exactly
-        // this, but it is a file-local class in GauntletMgr.cpp's anonymous
-        // namespace and GauntletMgr.h -- which this step does not own -- does
-        // not export it, so `.gauntlet debug offers` needs its own. The two
-        // must answer identically; the talent encoding below is copied from
-        // GauntletMgr.cpp:146-154 for that reason and not because it is worth
-        // saying twice.
-        // TODO: Phase 1 should hoist one of these into GauntletMgr.h.
-        class CommandPlayerView : public IPlayerView
-        {
-        public:
-            explicit CommandPlayerView(Player* player) : _player(player) { }
-
-            uint8 GetClass() const override { return _player->getClass(); }
-            uint8 GetLevel() const override { return _player->GetLevel(); }
-            bool  HasSpell(uint32 spellId) const override { return _player->HasSpell(spellId); }
-
-            uint8 GetTalentTree() const override
-            {
-                uint32 const total = _player->CalculateTalentsPoints();
-                uint32 const free  = _player->GetFreeTalentPoints();
-                if (total <= free)
-                    return 0;
-
-                return static_cast<uint8>(_player->GetMostPointsTalentTree() + 1);
-            }
-
-        private:
-            Player* _player;
-        };
-
         // Every line the debug subtree prints says "[Gauntlet debug]" and not
         // "[Gauntlet]". The addon treats a "[Gauntlet]" system line as its own:
         // it scrapes it in fallback mode and, with suppressChat on, swallows it
@@ -1139,7 +1107,7 @@ public:
 
         // Nothing here touches st->pending, so an offer already on the table
         // is left exactly as it was and this cannot be picked from.
-        CommandPlayerView const view(p);
+        LivePlayerView view(p);
         // The realm's own view and carry cap, not the defaults: a family
         // switched off by Gauntlet.Family.<X>.Enable must be as absent here as
         // it is in the chooser, or this command answers a question nobody
