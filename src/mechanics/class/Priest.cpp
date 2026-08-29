@@ -62,7 +62,7 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_FRAIL_SOUL = 44;
 
         // The card's ladder: 20 -> 30 -> 45 seconds.
-        constexpr int32 WEAKENED_MS[] = { 20000, 30000, 45000 };
+        constexpr int32 WEAKENED_MS[] = { 20000, 30000, 45000, 60000 };
         static_assert(std::size(WEAKENED_MS) >= MAX_RANK, "WEAKENED_MS is short a rank");
 
         class FrailSoul final : public IMechanic
@@ -138,7 +138,7 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_WHISPERS = 47;
 
         // The card's ladder for the line: 15 -> 20 -> 30% health.
-        constexpr uint32 WHISPER_LINE_PCT[] = { 15, 20, 30 };
+        constexpr uint32 WHISPER_LINE_PCT[] = { 15, 20, 30, 40 };
         static_assert(std::size(WHISPER_LINE_PCT) >= MAX_RANK, "WHISPER_LINE_PCT is short a rank");
 
         constexpr uint32 WHISPER_MS = 3000;
@@ -266,7 +266,9 @@ namespace Gauntlet
 
         constexpr uint32 SPELL_SHADOWFORM = 15473;
 
-        constexpr uint32 SHADOWFORM_LOCK_MS[] = { 15000, 30000, 60000 };
+        // Ninety seconds at rank IV: dropping Shadowform to heal is a decision
+        // about the next minute and a half, not about the next global.
+        constexpr uint32 SHADOWFORM_LOCK_MS[] = { 15000, 30000, 60000, 90000 };
 
         static_assert(std::size(SHADOWFORM_LOCK_MS) >= MAX_RANK, "SHADOWFORM_LOCK_MS is short a rank");
 
@@ -362,7 +364,7 @@ namespace Gauntlet
         // ==================================================================
         constexpr uint16 MECHANIC_PENANCE = 46;
 
-        constexpr uint32 SILENCE_MS[] = { 2000, 3000, 4000 };
+        constexpr uint32 SILENCE_MS[] = { 2000, 3000, 4000, 5000 };
 
         static_assert(std::size(SILENCE_MS) >= MAX_RANK, "SILENCE_MS is short a rank");
 

@@ -66,7 +66,10 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_COLD_FEET = 56;
 
         // 15%, 25%, then gone -- price, higher price, removal, in one row.
-        constexpr uint32 BLINK_COST_PCT[] = { 15, 25, 0 };
+        // 15%, 25%, then gone -- price, higher price, removal, in one row. There
+        // is nothing past removal, so Cold Feet keeps maxRank = 3 and the fourth
+        // entry is unreachable.
+        constexpr uint32 BLINK_COST_PCT[] = { 15, 25, 0, 0 };
         static_assert(std::size(BLINK_COST_PCT) >= MAX_RANK, "BLINK_COST_PCT is short a rank");
 
         class ColdFeet final : public IMechanic
@@ -182,7 +185,10 @@ namespace Gauntlet
         // ==================================================================
         constexpr uint16 MECHANIC_MANA_BURN = 58;
 
-        constexpr uint32 BURN_PCT[] = { 30, 50, 100 };
+        // Rank III already burns a point of mana for every point of damage, and
+        // there is nothing past all of it, so Mana Burn keeps maxRank = 3. The
+        // fourth entry is unreachable.
+        constexpr uint32 BURN_PCT[] = { 30, 50, 100, 100 };
 
         static_assert(std::size(BURN_PCT) >= MAX_RANK, "BURN_PCT is short a rank");
 
@@ -316,7 +322,7 @@ namespace Gauntlet
         constexpr uint32 SPELL_ENRAGE    = 8599;
 
         // The card's ladder, and it shortens as the affix worsens.
-        constexpr int32 SHEEP_MS[] = { 5000, 4000, 3000 };
+        constexpr int32 SHEEP_MS[] = { 5000, 4000, 3000, 2000 };
         static_assert(std::size(SHEEP_MS) >= MAX_RANK, "SHEEP_MS is short a rank");
 
         constexpr int32 ENRAGE_MS = 10000;
@@ -409,9 +415,13 @@ namespace Gauntlet
         // no condition on either half. Both numbers are on the same card and
         // both are real.
         // ==================================================================
-        constexpr float FRAILTY_HEALTH[] = { 0.80f, 0.70f, 0.60f };
+        // Half at rank IV, and it can go there because this mechanic relaxes the
+        // MaxHealth floor to its own number -- see RelaxCaps below. Without
+        // that, Gauntlet.Caps.MaxHealth at 0.6 would clamp the last rank back
+        // to the third and the offer would promise a drop it never delivers.
+        constexpr float FRAILTY_HEALTH[] = { 0.80f, 0.70f, 0.60f, 0.50f };
         static_assert(std::size(FRAILTY_HEALTH) >= MAX_RANK, "FRAILTY_HEALTH is short a rank");
-        constexpr uint32 FRAILTY_DAMAGE_PCT[] = { 20, 30, 40 };
+        constexpr uint32 FRAILTY_DAMAGE_PCT[] = { 20, 30, 40, 50 };
         static_assert(std::size(FRAILTY_DAMAGE_PCT) >= MAX_RANK, "FRAILTY_DAMAGE_PCT is short a rank");
 
         class ArcaneFrailty final : public IMechanic

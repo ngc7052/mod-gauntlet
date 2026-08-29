@@ -80,9 +80,12 @@ namespace Gauntlet
 
         // Rank II makes the standing totem die to one hit; rank III doubles
         // what totems cost. Rank I is the rule alone.
-        constexpr bool FRAGILE[]     = { false, true,  true  };
+        constexpr bool FRAGILE[]     = { false, true,  true,  true };
         static_assert(std::size(FRAGILE) >= MAX_RANK, "FRAGILE is short a rank");
-        constexpr uint32 COST_MULT[]  = { 1,     1,     2     };
+        // Rank IV triples the cost. Fragility is already on from rank II and a
+        // totem cannot die to less than one hit, so the price is the only axis
+        // the last rank has left.
+        constexpr uint32 COST_MULT[]  = { 1,     1,     2,     3 };
         static_assert(std::size(COST_MULT) >= MAX_RANK, "COST_MULT is short a rank");
 
         class OneTotem final : public IMechanic
@@ -231,7 +234,7 @@ namespace Gauntlet
         // ==================================================================
         constexpr uint16 MECHANIC_TOTEMIC_ANCHOR = 53;
 
-        constexpr float ADRIFT_MULT[] = { 1.20f, 1.30f, 1.40f };
+        constexpr float ADRIFT_MULT[] = { 1.20f, 1.30f, 1.40f, 1.55f };
 
         static_assert(std::size(ADRIFT_MULT) >= MAX_RANK, "ADRIFT_MULT is short a rank");
         constexpr float ANCHOR_YARDS = 15.0f;
@@ -308,7 +311,7 @@ namespace Gauntlet
         // Lava Burst and totem drops is the reward -- the rotation the class
         // should have, enforced.
         // ==================================================================
-        constexpr float REPEAT_COST_MULT[] = { 1.5f, 2.0f, 3.0f };
+        constexpr float REPEAT_COST_MULT[] = { 1.5f, 2.0f, 3.0f, 4.0f };
         static_assert(std::size(REPEAT_COST_MULT) >= MAX_RANK, "REPEAT_COST_MULT is short a rank");
 
         class ElementalOverload final : public IMechanic
@@ -396,7 +399,7 @@ namespace Gauntlet
         // reapply them when you need the heal or the proc, and get out of DoTs.
         // Enemies that hit fast are the ones to control first.
         // ==================================================================
-        constexpr uint32 DEBT_PCT[] = { 2, 3, 4 };
+        constexpr uint32 DEBT_PCT[] = { 2, 3, 4, 5 };
         static_assert(std::size(DEBT_PCT) >= MAX_RANK, "DEBT_PCT is short a rank");
 
         constexpr uint32 SPELL_LIGHTNING_SHIELD = 324;

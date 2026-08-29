@@ -37,7 +37,7 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_BOUND_SKIN = 64;
 
         // The card's ladder, in seconds of lockout after any form change.
-        constexpr uint32 SHIFT_LOCK_MS[] = { 4000, 6000, 10000 };
+        constexpr uint32 SHIFT_LOCK_MS[] = { 4000, 6000, 10000, 15000 };
         static_assert(std::size(SHIFT_LOCK_MS) >= MAX_RANK, "SHIFT_LOCK_MS is short a rank");
 
         // Every form-granting spell, so the cooldown lands on the buttons and
@@ -150,7 +150,7 @@ namespace Gauntlet
         // what it should. The registry makes it exclusive with Bound Skin,
         // because together they would be a tax rather than a rhythm.
         // ==================================================================
-        constexpr uint32 TOLL_PCT[] = { 2, 3, 4 };
+        constexpr uint32 TOLL_PCT[] = { 2, 3, 4, 5 };
         static_assert(std::size(TOLL_PCT) >= MAX_RANK, "TOLL_PCT is short a rank");
 
         class NaturesToll final : public IMechanic
@@ -278,7 +278,7 @@ namespace Gauntlet
         // The root's own duration is long; this is what the affix holds the
         // druid for, which the card ties to the enemy's. Twelve seconds is
         // Entangling Roots' base at most ranks.
-        constexpr uint32 ROOT_MS[] = { 8000, 10000, 12000 };   // TODO(design)
+        constexpr uint32 ROOT_MS[] = { 8000, 10000, 12000, 15000 };   // TODO(design)
         static_assert(std::size(ROOT_MS) >= MAX_RANK, "ROOT_MS is short a rank");
 
         class CommitmentOfRoots final : public IMechanic
@@ -351,7 +351,7 @@ namespace Gauntlet
         // module whose state the player cannot change at all -- only work
         // around -- which is why both halves are always paid.
         // ==================================================================
-        constexpr uint32 FACE_PENALTY_PCT[] = { 20, 30, 40 };
+        constexpr uint32 FACE_PENALTY_PCT[] = { 20, 30, 40, 50 };
         static_assert(std::size(FACE_PENALTY_PCT) >= MAX_RANK, "FACE_PENALTY_PCT is short a rank");
         constexpr uint32 FACE_BONUS_PCT = 10;
 

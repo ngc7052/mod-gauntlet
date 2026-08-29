@@ -54,7 +54,7 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_FAINT = 68;
 
         // The card's ladder: 2 -> 3 -> 4 seconds.
-        constexpr uint32 FAINT_MS[] = { 2000, 3000, 4000 };
+        constexpr uint32 FAINT_MS[] = { 2000, 3000, 4000, 5000 };
         static_assert(std::size(FAINT_MS) >= MAX_RANK, "FAINT_MS is short a rank");
 
         // The card's own once-per-ten-seconds, so a caster who is genuinely out
