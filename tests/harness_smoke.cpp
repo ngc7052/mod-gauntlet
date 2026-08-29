@@ -36,7 +36,7 @@ namespace
 
 TEST(HarnessSmoke, CommittedConstants)
 {
-    EXPECT_EQ(Gauntlet::GeneratorVersion, 10);
+    EXPECT_EQ(Gauntlet::GeneratorVersion, 11);
 
     // 72 and 73 were Withering and Forgetful. Both were deleted from the
     // registry in Phase 2 and the constants stay behind as reservations: the
