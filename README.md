@@ -49,10 +49,10 @@ lever:
 | **Spawn** | Something appears and comes after you: a shade that hunts you down, an ambush waiting around the next corner. | 5 / 5 |
 | **Enemy** | Ordinary enemies behave differently: they hit harder in packs, they notice you from farther away, they don't die the way you expect. | 8 / 8 |
 | **Tempo** | Pressure on position and pacing rather than raw numbers: a telegraphed strike you have to move out of, a clock you have to beat. | 5 / 5 |
-| **Attrition** | A cost with a counterplay button, not a flat tax: a wound only rest heals, health spent where mana should have been. | 2 / 2 |
+| **Attrition** | A cost with a counterplay button, not a flat tax: a wound only rest heals, health spent where mana should have been, healing that comes from killing rather than resting. | 3 / 3 |
 | **Rules** | A restriction on what you're allowed to do rather than a number: no auction house, no partying up. | 3 / 3 |
 | **Bargain** | A curse you choose on purpose, because of what it pays out. | 2 / 2 |
-| **Class** | A curse written for one class specifically, leaning on the thing that class actually struggles with. | 44 / 44 |
+| **Class** | A curse written for one class specifically, leaning on the thing that class actually struggles with. | 43 / 43 |
 
 Every mechanic has up to three **ranks**. If an affix you already carry comes
 up again in a later offer, you are never offered a duplicate — you are offered
@@ -98,13 +98,12 @@ commit, so the table has never promised a curse the module could not deliver.
 **Spawn** — The Shade, Echo, Carrion, Reinforcements, Ambush
 **Enemy** — Champions, Craven, Call to Arms, Death Rattle, Grudge, Nimble, Cunning, Keen-nosed
 **Tempo** — Falling Sky, Frenzy, Overextended, Falter, Hubris
-**Attrition** — Deep Wounds, Blood Magic
+**Attrition** — Deep Wounds, Blood Magic, Killing Floor
 **Rules** — Self-found, Lone Wolf, Iron Purse
 **Bargain** — Last Rites, Cursed Hoard
 **Class** — four each for warrior, paladin, hunter, rogue, priest, death
-knight, shaman, mage, warlock and druid; two for everyone (Faint for mana
-users, Unspent for anyone); and two class bargains, Ankh Pact for shamans and
-Stone of the Damned for warlocks.
+knight, shaman, mage, warlock and druid; Faint for every mana user; and two
+class bargains, Ankh Pact for shamans and Stone of the Damned for warlocks.
 
 A handful are honestly narrower than the card that describes them, always
 because the core has no seam for the missing half, and in every case the
