@@ -3,7 +3,9 @@
 Requested after a live report: *"Unspent should be redesigned, this is wrong
 idea and shouldn't be implemented, instead do something else."*
 
-This is the plan, not the change. Nothing below is implemented.
+**Status: done.** Killing Floor (§5B) was chosen and shipped in `8de9d87`.
+Everything below is the reasoning as it stood before the build; §8 records what
+the finished row actually measured.
 
 ---
 
@@ -168,3 +170,33 @@ it except Deep Wounds' ceiling and Last Rites' mark.
 4. `GeneratorVersion` bump, `Data.lua` regenerated, `Protocol.lua` version.
 5. Re-run the sweep and confirm the numbers in §4 against the real row.
 6. A checklist entry in `docs/checklists.md` §6 or §5.
+
+
+---
+
+## 8. What it measured, built
+
+`build/sweep --seeds 300`, 240,000 sets, with the real row in the table:
+
+| | before | projected (§4) | **built** |
+|---|---|---|---|
+| sets that relaxed any rule | 48.26% | 40.97% | **37.57%** |
+| empty offer slots | 122,100 | — | **97,381** |
+| sets with no reward-shaped offer | 36.90% | 28.72% | **25.91%** |
+| tier 21 relaxed | 46.67% | 12.70% | **11.87%** |
+| tier 71 relaxed | 98.63% | — | **94.67%** |
+| tier 71 with no reward-shaped offer | 73.93% | — | **55.87%** |
+
+Better than projected, because §4 modelled the row where Unspent sat — family
+Class, which changes the family weights differently — and the built row is
+Attrition with a 10–80 window.
+
+Two things the plan got wrong and the build corrected:
+
+- **The row goes at the end of the registry, not beside Deep Wounds and Blood
+  Magic.** The table is in ascending id order and `FindMechanic` depends on it,
+  so a row at 74 goes last whatever its family. `Registry.HoldsSixtyNineEntries
+  InAscendingIdOrder` is what caught it.
+- **`OnTalentPoints` is now dispatched from nowhere again**, as §7 predicted.
+  It was left in place deliberately: it is a generic dispatch point and the next
+  curse to want it should find it there rather than re-add it.
