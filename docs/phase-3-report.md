@@ -435,3 +435,145 @@ while `IsGameMaster()` is true. This cost most of an evening in Phase 2.
 8. **A rebuild does not deploy a config key.** See §2. Copy the `.dist` to
    `<core>/env/dist/etc/modules/` yourself, and diff the live `.conf` before you
    overwrite it — `Gauntlet.Debug.Enable = 1` is a hand edit on this realm.
+
+---
+
+## 8. Addendum — what changed after this report was written
+
+Everything above was written before the module was played. It then was, for
+about an hour, and this section records what that found. Nine bugs, one of them
+mine from four commits earlier and one of them in the scheduler since Phase 1.
+
+### 8.1 A rank-up raised the curse and left the boon behind (`b16c7ec`)
+
+`Mgr::Pick`'s rank-up branch copied only `rank` into the held instance and wrote
+only `rank` to the database. `BoonTable` scales every generic boon linearly by
+rank, so **every rank-up in the game charged the new curse and paid the old
+boon**. Overextended II took 20% more damage per extra attacker and paid the
+rank I +10% healing, where the offer just accepted had promised 20%.
+
+It is the exact failure the comment above `BoonTable` warns about: "the number
+the offer promises has to be the number the mechanic pays". Found by the user
+asking why Overextended II looked like I.
+
+### 8.2 The panel could only ever show one sentence per row (`564469a` / `d824cf2`)
+
+`OFFER` and `AFFIX` carry ids and numbers, so the addon drew
+`MechanicDef::blurb` — one static line per registry row, identical at every
+rank. A RANK UP offer read exactly like the NEW offer beside it, and
+Reinforcements III's tooltip said "longer than 30 seconds … every 15 seconds",
+which is the rank I wording.
+
+The server now sends the mechanic's own `Describe()` at the offered rank, as
+`ODESC` frames after an offer and `ADESC` after a carried affix.
+`Mgr::DescribeOffer` builds a throwaway implementation to ask, because an offer
+is a row in `st->pending` and has none.
+
+A trailing space does not survive the trip to `CHAT_MSG_ADDON`, which produced
+"in dungeons.In exchange"; neither side sends one at a boundary now.
+
+### 8.3 Cursed Hoard's exit opened before the curse had done anything (`fab07d0`)
+
+Reported as "I just looted a chest with Cursed Hoard and got no curse at all".
+The curse fired; it lifted before it could touch anything. A player clears a
+camp and *then* loots, so they are safely out of combat when the debt is set,
+and §3.7's ten-second escape timer started immediately.
+
+§3.7 called that exit "close to free". That was too generous: it was free, and
+worse than free, because the affix did not visibly exist. The out-of-combat exit
+now opens only once the curse has been in a fight — breaking away requires
+something to break away from.
+
+### 8.4 A level 80 run had three Champions (`564469a` / `d824cf2`)
+
+`Mgr::Pick` branched on the offer's *kind*, so a New offer for a mechanic
+already carried — which the builder produces when it has relaxed
+`GR_RepeatedMechanic` to fill a slot, and at tier 16 it relaxed 86% of sets —
+fell through to the attach path and created a second instance in a fresh slot.
+Three counters, three sets of tick state, three contributions to one aggregate.
+It now branches on whether the mechanic is held, and raises it in place.
+
+### 8.5 Reinforcements fired once per session (`564469a` / `d824cf2`)
+
+`Arm()` bumped `_eventId` and then armed the scheduler with the constant
+`EVENT_ARRIVE`, while `OnWarn` and `OnEvent` both compared the callback's id
+against `_eventId`. The first fight worked by luck — one bump from 0 lands on 1
+— and from the second fight on the tag had moved and every callback was dropped
+on the guard. The only mechanic in the tree that armed with a constant while
+keeping a mutable tag.
+
+### 8.6 Falling Sky warned twenty-three times and never fell (`5ba64e1`)
+
+**The oldest fault found in this phase, and it had been in the scheduler since
+Phase 1.**
+
+`Scheduler::Earlier` broke a tie between two events due at the same instant by
+*mechanic id* — a stable ranking of the registry rather than of anything about
+the events. Under a spacing tight enough to make ties routine, the same mechanic
+won every time and the same one lost every time, and the loser was not merely
+late: a fire that slips past its telegraph is re-announced with its due time
+pushed to the next spacing boundary, where it ties again and loses again.
+
+Falling Sky is id 14. Echo is 2, Reinforcements 4, Ambush 5.
+
+Reproduced on the fake clock before anything was changed — four timed affixes,
+the shipped 12 s spacing, five minutes of unbroken combat: **23 warnings, 0
+fires**. Afterwards: 9 warnings, 7 fires.
+
+The fix is `ScheduledEvent::seq`, assigned at `Arm()` and surviving a
+re-telegraph, so an event that has been waiting is ahead of everything armed
+after it. Two wrong answers were tried and backed out first, both recorded in
+the header: exempting a re-telegraphed fire from the spacing lets three affixes
+land in the same tick, and capping re-telegraphs at one makes the held fire land
+on a telegraph 29 seconds stale.
+
+### 8.7 Grudge said "saps", and so did I
+
+The registry blurb was the design card's own wording. It names no effect, and
+Sap is a rogue ability, so it read as crowd control. The longer description was
+no better: "and heal for half" was meant to say healing received is halved and
+reads just as easily as the drain healing you.
+
+### 8.8 The tier axis: one tier per level (`cdc72ac`)
+
+At the user's direction, and the largest change since the report was written.
+Every registry window multiplied by five so each affix unlocks at the level it
+always did; `RankFloor` and the swap tiers rewritten to match; `MAX_CARRIED`
+introduced at 16 because eighty offers with nothing refusing them ends at
+thirty-odd simultaneous curses and a pegged aggregate.
+
+Measured over 152,000 live sets on the new axis:
+
+```
+tiers  5-8    exact zero
+tiers  9-15   1-10%
+tiers 16-29   rising to 81%
+tiers 30-33   2-4%   -- the bargain family opens at 30
+tiers 34-43   rising again; first empty slot at 44
+tiers 44-68   heavy, increasingly empty
+tiers 69-80   nothing at all
+```
+
+**The empty top is the finding Phase 4 inherits, and §4's diagnosis of it was
+wrong.** It is not that the table is small. Forty of the forty-four class rows
+and five of the twenty-five implemented rows expire at exactly tier 70, because
+a `maxTier` of 14 was the old axis's `TODO(design)` default and 14 × 5 = 70.
+Revisiting those bounds is in Phase 4's scope.
+
+### 8.9 Two deployment faults worth not repeating
+
+`ac-db-import` runs the SQL baked into its image, not the mounted source, so a
+migration edited and re-applied without rebuilding applies the old file and
+reports the old hash. And the tier-axis migration's first version multiplied
+`gauntlet_affix.slot` in one statement, which MySQL refuses: slot is half the
+primary key and updates go row by row, so slot 1 becoming 5 collides with the
+row still sitting at 5.
+
+### 8.10 What was added to make this findable next time
+
+- `.gauntlet debug hurt <percent>` — damage through the real pipeline, so a
+  cheat-death path can be tested without staking a run on the answer.
+- Cursed Hoard's `Diagnose()` reports loot windows seen and how many were game
+  objects, because "I looted a chest and got no curse" has two very different
+  causes and reading the code distinguishes neither.
+- `Scheduler` starvation and tie-break tests, both failing on the control.
