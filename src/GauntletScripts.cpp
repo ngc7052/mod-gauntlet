@@ -427,6 +427,7 @@ public:
             damage = uint32(damage * sGauntlet->AggregateAt(dealer, AggregateKind::DamageDone, target, nullptr));
 
         PetDamage(attacker, target, damage);
+        PetDamaged(target, attacker, damage);
     }
 
     void ModifySpellDamageTaken(Unit* target, Unit* attacker, int32& damage, SpellInfo const* spellInfo) override
@@ -440,6 +441,7 @@ public:
         {
             uint32 asUnsigned = uint32(damage);
             PetDamage(attacker, target, asUnsigned);
+            PetDamaged(target, attacker, asUnsigned);
             damage = int32(asUnsigned);
         }
     }
@@ -465,6 +467,20 @@ private:
         sGauntlet->OnPetDamage(owner, victim, damage);
     }
 
+    // The mirror: damage a player's pet is about to take. Same ownership test,
+    // read from the victim's side.
+    static void PetDamaged(Unit* victim, Unit* attacker, uint32& damage)
+    {
+        if (!victim || victim->IsPlayer())
+            return;
+
+        Player* owner = victim->GetCharmerOrOwnerPlayerOrPlayerItself();
+        if (!owner)
+            return;
+
+        sGauntlet->OnPetDamaged(owner, attacker, damage);
+    }
+
 public:
 
     void ModifyHealReceived(Unit* target, Unit* healer, uint32& heal, SpellInfo const* spellInfo) override
@@ -479,6 +495,15 @@ public:
         // Last Rites' Mark says "you cannot be healed above half", and half is
         // a place rather than a fraction of the incoming heal.
         sGauntlet->OnHeal(p, heal);
+    }
+
+    // One tick of a periodic damage aura, for the curses that read the
+    // player's own damage-over-time back onto them.
+    void ModifyPeriodicDamageAurasTick(Unit* target, Unit* attacker, uint32& damage,
+                                       SpellInfo const* spellInfo) override
+    {
+        if (Player* caster = attacker ? attacker->ToPlayer() : nullptr)
+            sGauntlet->OnPeriodicTick(caster, target, damage, spellInfo);
     }
 
     // The only place IMechanic::OnDamageTaken is dispatched from, and
@@ -742,8 +767,11 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_HalfTamed();          // 36  C9  hunter
     void AddSC_gauntlet_mechanic_DeadWeight();         // 37  C10 hunter
     void AddSC_gauntlet_mechanic_WideDeadZone();       // 38  C11 hunter
+    void AddSC_gauntlet_mechanic_BloodBond();          // 39  C12 hunter
     void AddSC_gauntlet_mechanic_ColdTrail();          // 40  C13 rogue
+    void AddSC_gauntlet_mechanic_PoisonedBlades();     // 41  C14 rogue
     void AddSC_gauntlet_mechanic_ExposedBack();        // 42  C15 rogue
+    void AddSC_gauntlet_mechanic_SlowHands();          // 43  C16 rogue
     void AddSC_gauntlet_mechanic_FrailSoul();          // 44  C17 priest
     void AddSC_gauntlet_mechanic_WhispersOfTheDeep();  // 47  C20 priest
     void AddSC_gauntlet_mechanic_RuneStarved();        // 48  C21 death knight
@@ -800,8 +828,11 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_HalfTamed();
     AddSC_gauntlet_mechanic_DeadWeight();
     AddSC_gauntlet_mechanic_WideDeadZone();
+    AddSC_gauntlet_mechanic_BloodBond();
     AddSC_gauntlet_mechanic_ColdTrail();
+    AddSC_gauntlet_mechanic_PoisonedBlades();
     AddSC_gauntlet_mechanic_ExposedBack();
+    AddSC_gauntlet_mechanic_SlowHands();
     AddSC_gauntlet_mechanic_FrailSoul();
     AddSC_gauntlet_mechanic_WhispersOfTheDeep();
     AddSC_gauntlet_mechanic_RuneStarved();

@@ -102,6 +102,8 @@ namespace Gauntlet
 
         // Damage a player's pet is dealing, for the boons that pay it.
         void OnPetDamage(Player* player, Unit* victim, uint32& damage);
+        void OnPetDamaged(Player* player, Unit* attacker, uint32& damage);
+        void OnPeriodicTick(Player* player, Unit* victim, uint32& damage, SpellInfo const* info);
 
         // Group membership changed. Re-runs the stat chain, because nothing
         // else will.

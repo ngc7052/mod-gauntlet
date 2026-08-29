@@ -127,6 +127,20 @@ namespace Gauntlet
         // aggregate's clamp: the caps bound what the world does to the player
         // and what the player does to the world, and a hunter's pet is neither.
         virtual void  OnPetDamage(Ctx&, Unit* /*victim*/, uint32& /*damage*/) {}
+
+        // The mirror: damage the player's pet is about to *take*, by reference.
+        //
+        // Blood Bond is the card that needs it -- a share of what the pet takes
+        // is dealt to the hunter as well -- and it is a separate callback from
+        // OnPetDamage rather than a flag on it, because a mechanic almost never
+        // wants both and conflating them would make every implementation start
+        // with the same branch.
+        virtual void  OnPetDamaged(Ctx&, Unit* /*attacker*/, uint32& /*damage*/) {}
+
+        // One tick of a periodic damage aura this player applied, by reference.
+        // Poisoned Blades reads the rogue's own poisons off it.
+        virtual void  OnPeriodicTick(Ctx&, Unit* /*victim*/, uint32& /*damage*/,
+                                     SpellInfo const*) {}
         virtual uint32 OnLethal(Ctx&, uint32 damage) { return damage; }              // UnitScript::DealDamage
 
         // The two halves of a bargain that buys back a death, and the seam

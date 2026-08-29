@@ -1630,6 +1630,36 @@ namespace Gauntlet
         });
     }
 
+    void Mgr::OnPetDamaged(Player* player, Unit* attacker, uint32& damage)
+    {
+        if (!_enabled || damage == 0 || !IsEligible(player))
+            return;
+
+        RunState* st = Get(player);
+        if (!st || st->dead)
+            return;
+
+        ForEachMechanic(player, st, [attacker, &damage](Ctx& ctx, AffixInstance& a)
+        {
+            a.impl->OnPetDamaged(ctx, attacker, damage);
+        });
+    }
+
+    void Mgr::OnPeriodicTick(Player* player, Unit* victim, uint32& damage, SpellInfo const* info)
+    {
+        if (!_enabled || damage == 0 || !IsEligible(player))
+            return;
+
+        RunState* st = Get(player);
+        if (!st || st->dead)
+            return;
+
+        ForEachMechanic(player, st, [victim, &damage, info](Ctx& ctx, AffixInstance& a)
+        {
+            a.impl->OnPeriodicTick(ctx, victim, damage, info);
+        });
+    }
+
     void Mgr::OnShapeshift(Player* player, uint8 form)
     {
         if (!_enabled || !IsEligible(player))

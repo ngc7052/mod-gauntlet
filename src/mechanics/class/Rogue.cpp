@@ -11,10 +11,13 @@
 #include "Chat.h"
 #include "Player.h"
 #include "Random.h"
+#include "SharedDefines.h"
+#include "Unit.h"
 #include "Spell.h"
 #include "SpellInfo.h"
 #include "SpellMgr.h"
 
+#include <algorithm>
 #include <cmath>
 #include <string>
 
@@ -206,8 +209,204 @@ namespace Gauntlet
 
             return out;
         }
+
+        // ==================================================================
+        // C14 - Poisoned Blades (41)
+        //
+        // "A quarter of the poison damage you deal ticks on you as well."
+        //
+        // Poison choice becomes a decision: Crippling and Mind-numbing cost
+        // nothing because they deal no damage, Instant and Deadly cost blood.
+        // Multi-DoTting a camp is the greedy play and bleeds accordingly, and
+        // unpoisoned blades are always an option.
+        // ==================================================================
+        constexpr uint32 POISON_SHARE_PCT[MAX_RANK] = { 25, 35, 50 };
+
+        class PoisonedBlades final : public IMechanic
+        {
+        public:
+            void OnPeriodicTick(Ctx& ctx, Unit* victim, uint32& damage,
+                                SpellInfo const* info) override
+            {
+                Player* player = ctx.player;
+                if (!player || !info || damage == 0)
+                    return;
+                if (!victim || victim == player)
+                    return;
+                if (ctx.run && ctx.run->dead)
+                    return;
+
+                // The rogue's own poisons, and nothing else. SpellFamilyName
+                // is what separates a poison tick from a bleed, a trap or a
+                // mage's DoT applied by something else in the fight.
+                if (info->SpellFamilyName != SPELLFAMILY_ROGUE)
+                    return;
+
+                uint32 const share = uint32(uint64(damage)
+                                          * POISON_SHARE_PCT[RankIndexOf(ctx.self)] / 100u);
+                if (share == 0)
+                    return;
+
+                uint32 const health = uint32(player->GetHealth());
+                uint32 const cost   = health > 1 ? std::min(share, health - 1) : 0;
+                if (cost == 0)
+                    return;
+
+                // Unmitigated and unable to kill, as the card says. The flag is
+                // the module's own, so this makes no Deep Wound and spends no
+                // Last Rites charge.
+                bool* flag = ctx.run ? &ctx.run->selfDamage : nullptr;
+                if (flag)
+                    *flag = true;
+
+                Unit::DealDamage(player, player, cost, nullptr, SELF_DAMAGE,
+                                 SPELL_SCHOOL_MASK_NORMAL, nullptr, /*durabilityLoss*/ false);
+
+                if (flag)
+                    *flag = false;
+
+                _bled += cost;
+            }
+
+            // Boon::BonusDamage, on the poisons themselves: the card's "+30%
+            // poison damage", which is what makes the trade worth taking.
+            float DamageDoneMult(Ctx& ctx, Unit*, SpellInfo const* info) override
+            {
+                if (!info || !ctx.self || ctx.self->boonMag == 0)
+                    return 1.0f;
+                if (info->SpellFamilyName != SPELLFAMILY_ROGUE)
+                    return 1.0f;
+
+                return 1.0f + float(ctx.self->boonMag) / 100.0f;
+            }
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                uint32 const pct  = POISON_SHARE_PCT[RankIndexOf(&self)];
+                uint32 const boon = self.boonMag;
+
+                std::string out = std::to_string(pct) + "% of the damage your poisons deal is"
+                                  " dealt to you as well. It cannot kill you. Crippling and"
+                                  " Mind-numbing cost nothing.";
+
+                if (boon != 0)
+                    out += " In exchange your poisons deal " + std::to_string(boon) + "% more.";
+
+                return out;
+            }
+
+            std::string Diagnose(Ctx&) const override
+            {
+                return "poisoned blades: " + std::to_string(_bled) + " health bled";
+            }
+
+        private:
+            uint32 _bled = 0;
+        };
+
+        // ==================================================================
+        // C16 - Slow Hands (43)
+        //
+        // "Energy does not regenerate while you move in combat."
+        //
+        // The kite-and-poke middle ground is gone: stand and fight, or leave.
+        // Kidney Shot and Gouge buy stationary seconds, and Sprint goes back to
+        // being for escaping rather than for repositioning every three seconds.
+        // ==================================================================
+        // The card's ladder: half, then none, then none plus no combo points.
+        constexpr float MOVING_REGEN[MAX_RANK] = { 0.5f, 0.0f, 0.0f };
+
+        // The boon's flat addition to the energy bar.
+        constexpr uint32 EXTRA_ENERGY = 20;
+
+        class SlowHands final : public IMechanic
+        {
+        public:
+            void OnAttach(Ctx& ctx) override
+            {
+                if (Player* player = ctx.player)
+                {
+                    _baseMax  = player->GetMaxPower(POWER_ENERGY);
+                    _lastEnergy = player->GetPower(POWER_ENERGY);
+                }
+            }
+
+            void OnDetach(Ctx& ctx) override
+            {
+                if (ctx.player && _baseMax != 0)
+                    ctx.player->SetMaxPower(POWER_ENERGY, _baseMax);
+            }
+
+            void OnTick(Ctx& ctx, uint32 /*diffMs*/) override;
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                uint8 const i = RankIndexOf(&self);
+
+                std::string out = MOVING_REGEN[i] > 0.0f
+                    ? std::string("Your energy regenerates at half rate while you are moving in"
+                                  " combat.")
+                    : std::string("Your energy does not regenerate at all while you are moving in"
+                                  " combat.");
+
+                if (i >= 2)
+                    out += " You gain no combo points while moving either.";
+
+                out += " In exchange your energy bar holds " + std::to_string(EXTRA_ENERGY)
+                     + " more. Stand and fight, or leave.";
+                return out;
+            }
+
+            std::string Diagnose(Ctx& ctx) const override
+            {
+                bool const moving = ctx.player && ctx.player->isMoving() && ctx.player->IsInCombat();
+                return std::string("slow hands: ") + (moving ? "MOVING, regen taxed" : "still");
+            }
+
+        private:
+            uint32 _baseMax     = 0;
+            int32  _lastEnergy  = 0;
+            uint32 _taxedTicks  = 0;
+        };
+
+        void SlowHands::OnTick(Ctx& ctx, uint32 /*diffMs*/)
+        {
+            Player* player = ctx.player;
+            if (!player || player->getPowerType() != POWER_ENERGY)
+                return;
+
+            // The boon, held rather than set once: the stat chain recomputes
+            // maximum power on level-up and on some aura changes, so an affix
+            // that set it at attach would quietly lose it.
+            if (ctx.self && ctx.self->boonMag != 0)
+            {
+                uint32 const want = (_baseMax != 0 ? _baseMax : 100u) + EXTRA_ENERGY;
+                if (player->GetMaxPower(POWER_ENERGY) < want)
+                    player->SetMaxPower(POWER_ENERGY, want);
+            }
+
+            int32 const now = player->GetPower(POWER_ENERGY);
+
+            // The curse. There is no hook on energy regeneration, so what is
+            // taxed is the *gain* since the last tick: the core has already
+            // added it, and this gives back only the share the rank allows.
+            // Spending energy shows up as a fall and is never touched.
+            if (now > _lastEnergy && player->isMoving() && player->IsInCombat())
+            {
+                float const keep   = MOVING_REGEN[RankIndexOf(ctx.self)];
+                int32 const gained = now - _lastEnergy;
+                int32 const allowed = int32(float(gained) * keep);
+
+                player->SetPower(POWER_ENERGY, _lastEnergy + allowed);
+                ++_taxedTicks;
+            }
+
+            _lastEnergy = player->GetPower(POWER_ENERGY);
+        }
     }
 
+    GAUNTLET_MECHANIC(41, PoisonedBlades);
+    GAUNTLET_MECHANIC(43, SlowHands);
     GAUNTLET_MECHANIC(40, ColdTrail);
     GAUNTLET_MECHANIC(42, ExposedBack);
 }

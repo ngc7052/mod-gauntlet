@@ -343,7 +343,7 @@ namespace
           "Ranged attacks cannot be used within ten yards." },
 
         { 39, "c12_blood_bond", "Blood Bond", Family::Class, CM_HUNTER, 25, 80, 3,
-          MF_NotImplemented, "", Boon::BonusHealing, 883, 0,
+          MF_None, "", Boon::BonusHealing, 883, 0,
           "A fifth of the damage your pet takes is dealt to you." },
 
         // Rogue
@@ -354,7 +354,7 @@ namespace
 
         // TODO(design): rogue poisons have no spell id in the plan's Appendix A, so no gate.
         { 41, "c14_poisoned_blades", "Poisoned Blades", Family::Class, CM_ROGUE, 20, 80, 3,
-          MF_NotImplemented, "", Boon::BonusDamage, 0, 0,
+          MF_None, "", Boon::BonusDamage, 0, 0,
           "A quarter of the poison damage you deal ticks on you as well." },
 
         // The boon is +5% dodge.
@@ -363,7 +363,7 @@ namespace
           "Attacks from behind you deal 50% more damage." },
 
         { 43, "c16_slow_hands", "Slow Hands", Family::Class, CM_ROGUE, 20, 80, 3,
-          MF_NotImplemented, "", Boon::BonusRegen, 0, 0,
+          MF_None, "", Boon::BonusRegen, 0, 0,
           "Energy does not regenerate while you move in combat." },
 
         // Priest

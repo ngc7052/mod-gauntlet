@@ -50,8 +50,8 @@ phase.
 | # | Step | Ids | State |
 |---|---|---|---|
 | B1 | Warrior C3, Paladin C7, C8 | 30, 34, 35 | **done** |
-| B2 | Hunter C12, Rogue C14, C16 | 39, 41, 43 | in progress |
-| B3 | Priest C18, C19, DK C23, C24 | 45, 46, 50, 51 | |
+| B2 | Hunter C12, Rogue C14, C16 | 39, 41, 43 | **done** |
+| B3 | Priest C18, C19, DK C23, C24 | 45, 46, 50, 51 | in progress |
 | B4 | Shaman C27, C28, Mage C30, C32 | 54, 55, 57, 59 | |
 | B5 | Warlock C34, C35, C36 | 61, 62, 63 | |
 | B6 | Druid C38, C39, C40 | 65, 66, 67 | |

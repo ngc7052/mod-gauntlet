@@ -410,8 +410,122 @@ namespace Gauntlet
 
             return out;
         }
+
+        // ==================================================================
+        // C12 - Blood Bond (39)
+        //
+        // "A fifth of the damage your pet takes is dealt to you."
+        //
+        // Wave B's hunter, and the counterpart to Half-Tamed: that one prices
+        // neglecting the pet, this one prices hiding behind it. The card's
+        // reading is that a voidwalker-style "let it tank everything" loop
+        // becomes a shared health pool the hunter has to watch.
+        // ==================================================================
+        constexpr uint16 MECHANIC_BLOOD_BOND = 39;
+
+        constexpr uint32 BOND_PCT[MAX_RANK] = { 20, 30, 40 };
+
+        constexpr uint32 SPELL_MEND_PET = 136;
+
+        class BloodBond final : public IMechanic
+        {
+        public:
+            void OnAttach(Ctx& ctx) override
+            {
+                if (ctx.player)
+                    AddonFor(ctx)->QueueStat(ctx.player, KeyOf(MECHANIC_BLOOD_BOND, "c12_blood_bond"),
+                                             int32(BOND_PCT[RankIndexOf(ctx.self)]));
+            }
+
+            void OnDetach(Ctx& ctx) override
+            {
+                if (ctx.addon && ctx.player)
+                    ctx.addon->QueueStat(ctx.player, KeyOf(MECHANIC_BLOOD_BOND, "c12_blood_bond"), 0);
+            }
+
+            void OnPetDamaged(Ctx& ctx, Unit* /*attacker*/, uint32& damage) override
+            {
+                Player* player = ctx.player;
+                if (!player || damage == 0)
+                    return;
+                if (ctx.run && ctx.run->dead)
+                    return;
+                if (!player->IsAlive())
+                    return;
+
+                uint32 const share = uint32(uint64(damage) * BOND_PCT[RankIndexOf(ctx.self)] / 100u);
+                if (share == 0)
+                    return;
+
+                // Floored at one health, like every other self-damage in this
+                // module: an affix about watching a health bar must not be the
+                // thing that empties it, and a pet dying to a pull the hunter
+                // is running from should not take them with it.
+                uint32 const health = uint32(player->GetHealth());
+                uint32 const cost   = health > 1 ? std::min(share, health - 1) : 0;
+                if (cost == 0)
+                    return;
+
+                bool* flag = ctx.run ? &ctx.run->selfDamage : nullptr;
+                if (flag)
+                    *flag = true;
+
+                Unit::DealDamage(player, player, cost, nullptr, SELF_DAMAGE,
+                                 SPELL_SCHOOL_MASK_NORMAL, nullptr, /*durabilityLoss*/ false);
+
+                if (flag)
+                    *flag = false;
+            }
+
+            // The boon: Mend Pet heals the hunter too. It is the button the
+            // curse is trying to teach, which is the pattern wave A used for
+            // Fear Ward and Raise Dead.
+            //
+            // It arrives through OnPeriodicTick rather than any heal hook,
+            // because Mend Pet is a periodic heal *on the pet* -- nothing about
+            // it ever touches the hunter, so there is no ModifyHealReceived on
+            // them to intercept.
+            void OnPeriodicTick(Ctx& ctx, Unit* victim, uint32& healing, SpellInfo const* info) override
+            {
+                // Mend Pet is a periodic heal on the pet, so its ticks arrive
+                // here rather than through any heal hook on the hunter.
+                Player* player = ctx.player;
+                if (!player || !info || !ctx.self || ctx.self->boonMag == 0)
+                    return;
+                if (sSpellMgr->GetFirstSpellInChain(info->Id) != SPELL_MEND_PET)
+                    return;
+                if (!victim || victim == player)
+                    return;
+
+                uint32 const share = uint32(uint64(healing) * ctx.self->boonMag / 100u);
+                if (share != 0)
+                    player->ModifyHealth(int32(share));
+            }
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                uint32 const pct  = BOND_PCT[RankIndexOf(&self)];
+                uint32 const boon = self.boonMag;
+
+                std::string out = std::to_string(pct) + "% of the damage your pet takes is dealt"
+                                  " to you as well. It cannot kill you.";
+
+                if (boon != 0)
+                    out += " In exchange, Mend Pet heals you for " + std::to_string(boon)
+                         + "% of what it heals your pet.";
+
+                return out;
+            }
+
+            std::string Diagnose(Ctx& ctx) const override
+            {
+                return "blood bond: " + std::to_string(BOND_PCT[RankIndexOf(ctx.self)])
+                     + "% of pet damage shared";
+            }
+        };
     }
 
+    GAUNTLET_MECHANIC(39, BloodBond);
     GAUNTLET_MECHANIC(36, HalfTamed);
     GAUNTLET_MECHANIC(37, DeadWeight);
     GAUNTLET_MECHANIC(38, WideDeadZone);
