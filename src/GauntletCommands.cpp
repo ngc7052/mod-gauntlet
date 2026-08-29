@@ -535,6 +535,7 @@ public:
             { "give",         HandleDebugGive,        SEC_GAMEMASTER, Console::No },
             { "remove",       HandleDebugRemove,      SEC_GAMEMASTER, Console::No },
             { "rank",         HandleDebugRank,        SEC_GAMEMASTER, Console::No },
+            { "cards",        HandleDebugCards,       SEC_GAMEMASTER, Console::No },
             { "dump",         HandleDebugDump,        SEC_GAMEMASTER, Console::No },
             { "offers",       HandleDebugOffers,      SEC_GAMEMASTER, Console::No },
             { "seed",         HandleDebugSeed,        SEC_GAMEMASTER, Console::No },
@@ -963,6 +964,79 @@ public:
             else
                 handler->PSendSysMessage("    {} = {} (saved {})", key, live, saved);
         } while (r->NextRow());
+    }
+
+    // Every card at every rank, and a shout when two of them are the same.
+    //
+    // This exists because Half-Tamed shipped with rank I and rank II identical
+    // -- same happiness threshold, same hostile duration, and Describe() reads
+    // only those two arrays, so the offer card for rank II was the same *string*
+    // as rank I. A player taking that rank-up spent a tier on nothing and the
+    // card told them nothing had changed.
+    //
+    // Nothing could have caught it off-line: Describe() is a method on the
+    // mechanic, the mechanics need a Player, and the unit-test harness compiles
+    // neither. So the check lives where the mechanics do. It reads the registry
+    // and builds one throwaway instance per rank; it commits nothing and needs
+    // no run.
+    static bool HandleDebugCards(ChatHandler* handler, Optional<std::string_view> keyArg)
+    {
+        if (!DebugAllowed(handler))
+            return false;
+
+        uint32 dead = 0;
+        uint32 shown = 0;
+
+        for (MechanicDef const& def : AllMechanics())
+        {
+            if (keyArg && *keyArg != def.key)
+                continue;
+
+            uint8 const top = std::min<uint8>(def.maxRank, MAX_RANK);
+            handler->PSendSysMessage("|cffff2020[{}]|r {} - ranks 1..{}", def.key, def.name, top);
+
+            std::string previous;
+            for (uint8 rank = 1; rank <= top; ++rank)
+            {
+                AffixInstance preview;
+                preview.mechanic = def.id;
+                preview.rank     = rank;
+                preview.boon     = def.boon;
+
+                // Magnitude deliberately left at zero, which suppresses the
+                // boon clause. The boon ladders by rank on its own, so leaving
+                // it in would make two otherwise identical cards read
+                // differently and hide exactly the fault this is looking for.
+                // What is compared here is the curse.
+                preview.boonMag  = 0;
+
+                std::unique_ptr<IMechanic> const impl(MakeMechanic(def.id));
+                preview.impl = impl.get();
+
+                std::string const text = sGauntlet->DescribeOf(preview);
+                handler->PSendSysMessage("  rank {}: {}", rank, text);
+
+                if (rank > 1 && text == previous)
+                {
+                    ++dead;
+                    handler->PSendSysMessage(
+                        "  |cffff2020^ rank {} reads exactly as rank {}: this rank-up costs a tier "
+                        "and changes nothing|r", rank, rank - 1);
+                }
+                previous = text;
+            }
+            ++shown;
+        }
+
+        if (shown == 0)
+        {
+            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r No mechanic with that key.");
+            return false;
+        }
+
+        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r {} mechanic(s), {} dead rank(s).",
+                                 shown, dead);
+        return true;
     }
 
     static bool HandleDebugDump(ChatHandler* handler)

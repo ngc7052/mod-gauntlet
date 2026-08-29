@@ -28,12 +28,19 @@ account. Nothing below stakes a real run.
 .gauntlet debug offers <tier>          # what the generator would offer, committing nothing
 .gauntlet debug set <state-key> <n>    # push a counter to the edge of its trigger
 .gauntlet debug hurt <percent>         # test a death path without staking a run
+.gauntlet debug cards [key]            # every card at every rank, flagging any two that read the same
 .gauntlet status                       # what the player sees
 .gauntlet top                          # the leaderboard, and now the conducts
 ```
 
 Keys are the registry's own (`shade`, `c13_cold_trail`, …) and are listed in
 `src/GauntletRegistry.cpp` next to each id.
+
+**Run `.gauntlet debug cards` first, once, and read the tail.** It prints every
+mechanic's offer text at every rank and shouts when two consecutive ranks read
+identically — a rank-up that costs a tier and changes nothing. It found one on
+its first run (Half-Tamed I and II) and it is the cheapest check in this file:
+one command, no character, no run staked.
 
 **Every mechanic's `Diagnose()` is in `.gauntlet debug dump`.** It reports what
 that mechanic has actually done this run — fires, kills counted, spells refused
@@ -429,8 +436,11 @@ Hammer of Justice roots you for its duration.
 ### Hunter
 
 **C9 · Half-Tamed** (`c09_half_tamed`, 36) · turns at unhappy / unhappy / content / content
-Hostile for 15 / 15 / 25 / 40 s — the happiness threshold stops at content and
-rank IV escalates the duration instead.
+Hostile for 15 / 20 / 25 / 40 s — the happiness threshold stops at content and
+the duration carries the ladder.
+- **Rank I and rank II were identical before Phase 7** — same threshold, same
+  duration, and the offer card for II was the same string as I. Check that
+  `.gauntlet debug cards c09_half_tamed` prints four different lines.
 - **Priority item.** `RemovePet` then a summon of the same entry: the copy must
   attack you, and the real pet must be callable afterwards.
 - Feed it back to happy and confirm it stops.

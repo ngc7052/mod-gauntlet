@@ -74,8 +74,16 @@ namespace Gauntlet
         constexpr uint32 TURNS_AT[] = { UNHAPPY, UNHAPPY, CONTENT, CONTENT };
         static_assert(std::size(TURNS_AT) >= MAX_RANK, "TURNS_AT is short a rank");
 
-        // The card's two numbers: fifteen seconds, twenty-five at rank III.
-        constexpr uint32 HOSTILE_MS[] = { 15000, 15000, 25000, 40000 };
+        // The card gives two numbers -- fifteen seconds, twenty-five at rank III
+        // -- for three rungs, and the middle one used to be filled by repeating
+        // the first. With TURNS_AT also flat across I and II, the two ranks were
+        // byte-for-byte identical: Describe() reads only these two arrays, so
+        // the offer card for rank II was the same *string* as rank I, and taking
+        // the rank-up cost a tier and changed nothing.
+        //
+        // So the ladder walks between the card's own two numbers instead of
+        // repeating one of them.
+        constexpr uint32 HOSTILE_MS[] = { 15000, 20000, 25000, 40000 };
         static_assert(std::size(HOSTILE_MS) >= MAX_RANK, "HOSTILE_MS is short a rank");
 
         // Not on the card. A short grace after a break so a hunter who calls the
