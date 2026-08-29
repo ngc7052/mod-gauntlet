@@ -768,6 +768,7 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_Hubris();             // 18
 
     void AddSC_gauntlet_mechanic_BloodMagic();         // 20
+    void AddSC_gauntlet_mechanic_KillingFloor();       // 74  A5, replaces Unspent (69)
     void AddSC_gauntlet_mechanic_LastRites();          // 26
     void AddSC_gauntlet_mechanic_CursedHoard();        // 27
 
@@ -813,7 +814,6 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_CommitmentOfRoots();  // 66  C39 druid
     void AddSC_gauntlet_mechanic_TwoFaces();           // 67  C40 druid
     void AddSC_gauntlet_mechanic_Faint();              // 68  C41 all mana users
-    void AddSC_gauntlet_mechanic_Unspent();            // 69  C42 all classes
     void AddSC_gauntlet_mechanic_AnkhPact();           // 70  C43 shaman
     void AddSC_gauntlet_mechanic_StoneOfTheDamned();   // 71  C44 warlock
     void AddSC_gauntlet_mechanic_SelfFound();          // 23
@@ -845,6 +845,7 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_Hubris();
 
     AddSC_gauntlet_mechanic_BloodMagic();
+    AddSC_gauntlet_mechanic_KillingFloor();
     AddSC_gauntlet_mechanic_LastRites();
     AddSC_gauntlet_mechanic_CursedHoard();
 
@@ -889,7 +890,6 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_CommitmentOfRoots();
     AddSC_gauntlet_mechanic_TwoFaces();
     AddSC_gauntlet_mechanic_Faint();
-    AddSC_gauntlet_mechanic_Unspent();
     AddSC_gauntlet_mechanic_AnkhPact();
     AddSC_gauntlet_mechanic_StoneOfTheDamned();
     AddSC_gauntlet_mechanic_IronPurse();

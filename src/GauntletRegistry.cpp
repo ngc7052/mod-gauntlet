@@ -54,8 +54,14 @@ namespace
     // nothing may ever fill one. The ranges are the design's: S1-S5 = 1-5,
     // E1-E8 = 6-13, T1-T5 = 14-18, A1-A4 = 19-22, R1-R3 = 23-25, B1-B2 = 26-27,
     // C1-C44 = 28-71. Ids 21, 22, 72 and 73 -- Exposed, Feeble, Withering and
-    // Forgetful -- were the four flat scalars and were deleted in Phase 2, so
-    // 69 rows carry 71 ids and the table is not contiguous.
+    // Forgetful -- were the four flat scalars and were deleted in Phase 2, and
+    // 69 -- Unspent -- was deleted in Phase 6.
+    //
+    // The design's ranges therefore stop describing the table from 74 onward.
+    // A new mechanic takes the next free id and not the next id in its family's
+    // band, because the band is a description of how the table was first laid
+    // out and the no-reuse rule is a promise to every stored row ever written.
+    // Killing Floor is an Attrition mechanic at 74, outside A1-A4's 19-22.
     //
     // No row carries MF_NotImplemented any more. Phase 1 brought four, Phase 2
     // fifteen, Phase 3 six across two new families, and Phase 4 finished family
@@ -220,6 +226,7 @@ namespace
         { 20, "blood_magic", "Blood Magic", Family::Attrition, CM_MANA_USERS, 25, 60, 3,
           MF_None, "", Boon::BonusDamage, 0, 0,
           "Spells cost 3% of your maximum health in addition to mana." },
+
 
         // Ids 21 and 22 were Exposed and Feeble, the last two flat scalars, and
         // 72 and 73 were Withering and Forgetful. All four were deleted in
@@ -502,10 +509,6 @@ namespace
           MF_None, "", Boon::BonusRegen, 0, 0,
           "When your mana hits zero in combat you black out for two seconds." },
 
-        { 69, "c42_unspent", "Unspent", Family::Class, 0, 10, 40, 3,
-          MF_None, "", Boon::BonusDamage, 0, 0,
-          "You receive a talent point every second level, and each unspent point makes you 2% stronger." },
-
         // Class bargains. The design files these under family C but says they
         // follow family B's rules -- from tier 8, once per run -- so they are
         // Class here and reward-shaped for the offer builder's guarantee.
@@ -521,6 +524,35 @@ namespace
         { 71, "c44_stone_of_the_damned", "Stone of the Damned", Family::Class, CM_WARLOCK, 40, 80, 3,
           MF_RewardShaped, "", Boon::SecondLife, 693, 0,
           "A Soulstone will bring you back once, and whoever kills you will be waiting." },
+
+        // ---------------------------------------------------------------
+        // A5 Killing Floor, at the end of the table because the table is in
+        // ascending id order and 74 is the next free id -- not next to its own
+        // family's rows, where a reader would look for it.
+        //
+        // 21 and 22 are Exposed's and Feeble's and are spent forever, so the
+        // design's A1-A4 band has no room left. The band describes how the
+        // table was first laid out; the no-reuse rule outranks it, because a
+        // stored gauntlet_affix row from any past run must still resolve to the
+        // mechanic it named.
+        //
+        // It replaces Unspent (69) in the table and not its number. The case is
+        // in docs/unspent-replacement-plan.md -- the short version is that the
+        // module had four generally-available MF_RewardShaped rows for eighty
+        // tiers, two of which expire at 50, and one more classless row with the
+        // flag measured as worth more than twenty-one more curses.
+        //
+        // Boon::None on purpose. The kill burst is the upside and it is the
+        // other half of the curse's own sentence, so a BoonClause would promise
+        // a second one. Frenzy and Berserker's Bargain are written the same way.
+        //
+        // Not MF_OnKill: that flag is "fires on a kill, and counts against
+        // CAP_ON_KILL", and the curse here is the continuous healing block. The
+        // kill is the release.
+        // ---------------------------------------------------------------
+        { 74, "a05_killing_floor", "Killing Floor", Family::Attrition, 0, 10, 80, 3,
+          MF_RewardShaped, "", Boon::None, 0, 0,
+          "Nothing heals you while something you have wounded still lives. Every kill gives health back instead." },
 
         };
     }

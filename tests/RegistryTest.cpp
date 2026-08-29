@@ -25,20 +25,26 @@ namespace
 {
     using namespace Gauntlet;
 
-    // Sixty-nine rows carrying ids 1..71 with four holes in them. Phase 2
+    // Sixty-nine rows carrying ids 1..74 with five holes in them. Phase 2
     // deleted Exposed (21), Feeble (22), Withering (72) and Forgetful (73) --
-    // the four flat scalars -- and an id is never reused, so the holes stay.
+    // the four flat scalars -- and Phase 6 deleted Unspent (69). An id is never
+    // reused, so the holes stay. The count is unchanged because Killing Floor
+    // (74) took Unspent's place in the table and not its number.
     constexpr size_t TABLE_SIZE = 69;
     // A tier is a level now, not five of them. Every registry window was
     // multiplied by five with the axis, so the *level* each affix unlocks at
     // is exactly what it was; only the number naming it changed.
     constexpr uint8  MAX_TIER   = 80;
 
-    // The four ids that were removed and may never come back. Asserting their
+    // The ids that were removed and may never come back. Asserting their
     // absence is what stops a later phase quietly filling a hole: a stored
     // gauntlet_affix row from any past run must never resolve to a different
     // mechanic than the one it was written for.
-    constexpr std::array<uint16, 4> DELETED = { 21, 22, 72, 73 };
+    //
+    // 69 is Unspent, and it is the first retirement that was not a scalar: the
+    // affix worked exactly as written and the design was wrong. See
+    // docs/unspent-replacement-plan.md.
+    constexpr std::array<uint16, 5> DELETED = { 21, 22, 69, 72, 73 };
 
     // The mechanics the generator may offer: Phase 1's vertical slice -- The
     // Shade (1), Champions (6), Falling Sky (14) and Deep Wounds (19) --
@@ -54,7 +60,7 @@ namespace
         1, 2, 3, 4, 5,           // S1 Shade, S2 Echo, S3 Carrion, S4 Reinforcements, S5 Ambush
         6, 7, 8, 9, 10, 11, 12, 13,  // E1 Champions .. E8 Keen-nosed
         14, 15, 16, 17, 18,      // T1 Falling Sky .. T5 Hubris
-        19, 20,                  // A1 Deep Wounds, A2 Blood Magic
+        19, 20, 74,              // A1 Deep Wounds, A2 Blood Magic, A5 Killing Floor
         23, 24, 25,              // R1 Self-found, R2 Lone Wolf, R3 Iron Purse
         26, 27,                  // B1 Last Rites, B2 Cursed Hoard
         28, 29, 31,              // C1 Red Mist, C2 Berserker's Bargain, C4 Deafening Roar
@@ -78,8 +84,7 @@ namespace
         54, 55,                  // C27 Elemental Overload, C28 Spirit Debt
         57, 59,                  // C30 Fickle Sheep, C32 Arcane Frailty
         61, 62, 63,              // C34 Affliction, C35 Shard Economy, C36 Shared Blood
-        65, 66, 67,              // C38 Nature's Toll, C39 Commitment of Roots, C40 Two Faces
-        69                       // C42 Unspent (all classes)
+        65, 66, 67               // C38 Nature's Toll, C39 Commitment of Roots, C40 Two Faces
     };
 
     // CONTRACT.md section 8's id ranges, which are fixed forever. The Attrition
@@ -92,14 +97,18 @@ namespace
         size_t count;
     };
 
-    constexpr std::array<Range, 7> RANGES = { {
+    constexpr std::array<Range, 8> RANGES = { {
         {  1,  5, Family::Spawn,      5 },
         {  6, 13, Family::Enemy,      8 },
         { 14, 18, Family::Tempo,      5 },
-        { 19, 22, Family::Attrition,  2 },   // 21 and 22 deleted; 19 and 20 remain
+        { 19, 22, Family::Attrition,  3 },   // 21 and 22 deleted; 19, 20 and 74 remain
         { 23, 25, Family::Rules,      3 },
         { 26, 27, Family::Bargain,    2 },
-        { 28, 71, Family::Class,     44 }
+        { 28, 71, Family::Class,     43 },   // 69 deleted with Unspent
+        // A5 Killing Floor, outside its family's original band because 21 and
+        // 22 are spent and the next free id was 74. The band describes how the
+        // table was first laid out; the no-reuse rule outranks it.
+        { 74, 74, Family::Attrition,  3 }
     } };
 }
 
@@ -117,18 +126,18 @@ TEST(Registry, HoldsSixtyNineEntriesInAscendingIdOrder)
             << " (id " << all[i - 1].id << ") in ascending order";
 
     EXPECT_EQ(all.front().id, 1u);
-    EXPECT_EQ(all.back().id, 71u) << "the table must still end at C44, id 71";
+    EXPECT_EQ(all.back().id, 74u) << "the table must end at A5 Killing Floor, id 74";
 }
 
 TEST(Registry, TheDeletedScalarIdsAreGoneAndStayGone)
 {
     for (uint16 id : DELETED)
         EXPECT_EQ(FindMechanic(id), nullptr)
-            << "id " << id << " was one of the four flat scalars Phase 2 deleted. An id is never "
-               "reused: a stored gauntlet_affix row written for it must never resolve to something "
-               "else. If a mechanic needs this number, it needs a different number.";
+            << "id " << id << " was retired -- one of Phase 2's four flat scalars, or Unspent. An "
+               "id is never reused: a stored gauntlet_affix row written for it must never resolve "
+               "to something else. If a mechanic needs this number, it needs a different number.";
 
-    for (std::string_view key : { "exposed", "feeble", "withering", "forgetful" })
+    for (std::string_view key : { "exposed", "feeble", "withering", "forgetful", "c42_unspent" })
         EXPECT_EQ(FindMechanic(key), nullptr) << "key '" << key << "' is still in the table";
 }
 
@@ -207,10 +216,11 @@ TEST(Registry, FamiliesAreInRangeAndMatchTheIdRanges)
         EXPECT_EQ(counted[static_cast<size_t>(range.family)], range.count)
             << "family " << unsigned(static_cast<uint8>(range.family)) << " has the wrong entry count";
 
-    // Design section 4.7's forty-four class curses, spelled out because the
-    // addon's family filter and the offer builder's family weights both
-    // assume the class family is the large one.
-    EXPECT_EQ(counted[static_cast<size_t>(Family::Class)], 44u);
+    // Design section 4.7's forty-four class curses less Unspent, which was
+    // never a class curse in anything but its filing -- it had no class mask.
+    // Spelled out because the addon's family filter and the offer builder's
+    // family weights both assume the class family is the large one.
+    EXPECT_EQ(counted[static_cast<size_t>(Family::Class)], 43u);
 }
 
 TEST(Registry, OnlyTheImplementedMechanicsMayBeOffered)
@@ -265,9 +275,10 @@ TEST(Registry, LookupsAgreeWithTheTable)
     // one of these is the normal answer for a run migrated from a registry
     // this build has never seen, so nullptr is the contract, not a crash.
     EXPECT_EQ(FindMechanic(static_cast<uint16>(MECHANIC_NONE)), nullptr);
-    // 72, one past the highest id the table carries. Not TABLE_SIZE + 1: the
+    // 75, one past the highest id the table carries. Not TABLE_SIZE + 1: the
     // ids are no longer contiguous, so the count and the highest id are
     // different numbers and only the second one bounds a lookup.
+    EXPECT_EQ(FindMechanic(static_cast<uint16>(75)), nullptr);
     EXPECT_EQ(FindMechanic(static_cast<uint16>(72)), nullptr);
     EXPECT_EQ(FindMechanic(static_cast<uint16>(0xFFFF)), nullptr);
     EXPECT_EQ(FindMechanic(std::string_view("")), nullptr);

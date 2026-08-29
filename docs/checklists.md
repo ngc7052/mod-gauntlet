@@ -225,6 +225,25 @@ Enemies below your level give 50% / 25% / 0% experience; above give
 - The addon shows the wound percentage. Confirm it matches `dump`.
 - **Pair test with the Shade — see §9.**
 
+**A5 · Killing Floor** (`a05_killing_floor`, 74) · tiers 10–80
+No healing reaches you while something you have wounded is still alive; every
+kill gives back 10% / 8% / 6% of maximum health. Rank III holds the block for
+ten seconds after the fight.
+- **It replaces Unspent (69), which was retired.** A character carrying Unspent
+  had the row deleted by `2026_08_29_03_gauntlet_retire_unspent.sql`; confirm
+  `.gauntlet status` shows no blank row and one free slot.
+- Wound something, then try a potion, a bandage and a self-heal: all three must
+  do nothing, and the first one must print the chat line.
+- **Food and drink still work** — they restore through a regeneration aura, not
+  a heal, so this never sees them. That is stated in the blurb; it is not a bug.
+- Kill it: the burst must land even though healing is blocked (it goes through
+  `ModifyHealth`, not through the heal path it would otherwise be eaten by).
+- Damage from a Shade or any other module summon must **not** arm the block —
+  a stalker you cannot outrun would hold it open for as long as it lives.
+- Rank III: leave combat and confirm the block holds ten more seconds, and that
+  `.gauntlet debug dump` counts the linger down.
+- **Pair test with Deep Wounds** — see §9.
+
 **D2 · Blood Magic** (`blood_magic`, 20) · tiers 25–60
 Spells cost 2% / 3% / 5% of maximum health on top of mana.
 - The self-damage goes through `RunState::selfDamage`, so it must **not** make a
@@ -293,6 +312,13 @@ kills within 8 seconds. They pull against each other, which is the design's
 intent. Check that the champion fight does not simply reset every Frenzy stack
 and make the pair strictly worse than either alone — and that the damage-taken
 product stays under `Gauntlet.Caps.DamageTaken`.
+
+**Killing Floor + Deep Wounds.** The pair this phase added and the one most
+likely to be too much: Deep Wounds caps the health you can reach and only rest
+lifts it, Killing Floor stops anything reaching it while a fight is open. Check
+that a run carrying both can still recover between pulls, and that the kill
+burst is not simply eaten by the wound ceiling — a burst that can never land is
+a reward-shaped affix with no reward.
 
 **Shade + Deep Wounds.** The Shade is unavoidable damage; Deep Wounds turns a
 share of damage taken into a health ceiling that only rest lifts. Together they

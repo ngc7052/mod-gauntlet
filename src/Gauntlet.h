@@ -153,10 +153,18 @@ namespace Gauntlet
     // legacy scalars and Phase 2 deleted their registry rows along with
     // Exposed (21) and Feeble (22). An id is never reused -- a stored
     // gauntlet_affix row written for one must never resolve to something else
-    // -- so these two are kept spelled out here, and 21 and 22 with them in
+    // -- so these are kept spelled out here, and 21 and 22 with them in
     // the registry's own comment, to say that the numbers are spent.
     constexpr uint16 MECHANIC_WITHERING = 72;
     constexpr uint16 MECHANIC_FORGETFUL = 73;
+
+    // And Unspent, C42, deleted in Phase 6 for the reasons in
+    // docs/unspent-replacement-plan.md: it was a character-sheet tax of exactly
+    // the kind this redesign exists to delete, half its card described a state
+    // the game never reached because nobody banks talent points, and what was
+    // left was close to a free damage boon. Killing Floor (74) takes its place
+    // in the table but not its number.
+    constexpr uint16 MECHANIC_UNSPENT   = 69;
 
     // The generator version folded into the offer stream. Bump whenever the
     // registry table, the family weights or the offer algorithm change; runs
@@ -185,13 +193,19 @@ namespace Gauntlet
     // prefer an ordinary new mechanic in a clean family over a bargain it
     // could only place by relaxing a rule. The last of those alone changes
     // every offer set that contains a bargain slot.
+    // 7 was Phase 6: Unspent (69) deleted from the table and Killing Floor (74)
+    // added in its place. A row leaving and a row arriving each move every
+    // offer set that could have drawn them, and this one moves the family
+    // weights too -- Attrition goes from two rows to three and Class from
+    // forty-four to forty-three.
+    //
     // 6 was Phase 5: a rank-up stopped being refused by its mechanic's maxTier.
     // The window says when a mechanic may be *introduced*; whether something
     // already carried may deepen is a different question, and answering both
     // with one test froze an affix taken near the end of its window at whatever
     // rank it happened to get. Every offer set that could contain a rank-up of
     // an out-of-window mechanic moves.
-    constexpr uint16 GeneratorVersion = 7;
+    constexpr uint16 GeneratorVersion = 8;
 
     constexpr uint8 MAX_RANK = 3;
 
