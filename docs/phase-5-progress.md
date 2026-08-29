@@ -26,7 +26,7 @@ nothing in this module has been playtested; and the three-way choice
 | 3 | The pair tests | **folded into step 4** — see below |
 | 4 | `docs/checklists.md` | **done** |
 | 5 | `.gauntlet top` conducts, and the addon's leaderboard | **done** |
-| 6 | README for the family model, and the determinism note | |
+| 6 | README for the family model, and the determinism note | **done** |
 | 7 | `docs/phase-5-report.md` | |
 
 ## Standing rules for this run

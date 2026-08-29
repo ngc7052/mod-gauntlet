@@ -11,12 +11,15 @@ it, rather than a multiplier bolted onto your character sheet. A shade that
 hunts you between fights. A strike that lands where you were standing. A
 paladin whose Consecration burns twice as hot for half as long.
 
-> **Status.** The module is mid-redesign. **35 of the 69 mechanics are live**
-> and offerable; the rest are registry rows waiting on their implementation and
-> are never offered. Phases 1–3 are complete and reported in `docs/`; Phase 4
-> (the class curses) is in progress and lands one class at a time, so the count
-> below moves. `docs/phase-4-progress.md` tracks it, and the `OFFERABLE` list
-> in `tests/RegistryTest.cpp` is what actually enforces it.
+> **Status.** **All 69 mechanics are live and offerable.** No registry row is
+> flagged `MF_NotImplemented`, and the `OFFERABLE` list in
+> `tests/RegistryTest.cpp` is what enforces that. Phases 0–4 are complete and
+> reported in `docs/`; Phase 5 is the pacing pass — config, tuning and
+> measurement — and `docs/phase-5-progress.md` tracks it.
+>
+> What is *not* done is the playtesting. Every mechanic compiles, links and
+> passes its unit tests, and almost none has been seen working on a screen.
+> `docs/checklists.md` is the list, in priority order.
 
 ## How it works
 
@@ -49,19 +52,20 @@ lever:
 | **Attrition** | A cost with a counterplay button, not a flat tax: a wound only rest heals, health spent where mana should have been. | 2 / 2 |
 | **Rules** | A restriction on what you're allowed to do rather than a number: no auction house, no partying up. | 3 / 3 |
 | **Bargain** | A curse you choose on purpose, because of what it pays out. | 2 / 2 |
-| **Class** | A curse written for one class specifically, leaning on the thing that class actually struggles with. | 10 / 44 |
+| **Class** | A curse written for one class specifically, leaning on the thing that class actually struggles with. | 44 / 44 |
 
 Every mechanic has up to three **ranks**. If an affix you already carry comes
 up again in a later offer, you are never offered a duplicate — you are offered
 its next rank instead, and taking it replaces what you hold in that slot with
-the stronger version. A finished run typically carries somewhere around seven
-to nine distinct mechanics, most of them ranked up, rather than sixteen
-unrelated ones.
+the stronger version. Simulated over 240,000 offer sets, a run reaches the
+sixteen-affix cap around level 49 and spends the rest of the climb deepening
+and trading rather than collecting.
 
 The generator also limits how much of one *kind* of pressure a run can carry,
 so it stays varied instead of turning into a pile of the same idea: at most one
 creature stalking you at a time, at most two on-kill effects, at most two tempo
-mechanics, one role-specific tax, one rule, one class curse, and two bargains.
+mechanics, one role-specific tax, one rule, three class curses, and two
+bargains.
 
 Where affixes instead move a scalar you already have — damage taken, damage
 dealt, healing received, maximum health, enemy speed — the cap is on the
@@ -88,7 +92,8 @@ without a reroll button.
 
 ## What is implemented
 
-Thirty-five mechanics are live as of the last commit to touch the registry.
+All sixty-nine rows. A row and its implementation are switched on in the same
+commit, so the table has never promised a curse the module could not deliver.
 
 **Spawn** — The Shade, Echo, Carrion, Reinforcements, Ambush
 **Enemy** — Champions, Craven, Call to Arms, Death Rattle, Grudge, Nimble, Cunning, Keen-nosed
@@ -96,15 +101,16 @@ Thirty-five mechanics are live as of the last commit to touch the registry.
 **Attrition** — Deep Wounds, Blood Magic
 **Rules** — Self-found, Lone Wolf, Iron Purse
 **Bargain** — Last Rites, Cursed Hoard
-**Class** — Red Mist, Berserker's Bargain, Deafening Roar *(warrior)*; Long
-Forbearance, Consecrated Ground *(paladin)*; Half-Tamed, Dead Weight, Wide Dead
-Zone *(hunter)*; Cold Trail, Exposed Back *(rogue)*
+**Class** — four each for warrior, paladin, hunter, rogue, priest, death
+knight, shaman, mage, warlock and druid; two for everyone (Faint for mana
+users, Unspent for anyone); and two class bargains, Ankh Pact for shamans and
+Stone of the Damned for warlocks.
 
-The remaining thirty-four rows are class curses for the other seven classes,
-plus two class bargains. They are already written into the registry with their
-tier windows, class masks and boons — a row and its implementation are switched
-on in the same commit, so the table never promises a curse the module cannot
-deliver.
+A handful are honestly narrower than the card that describes them, always
+because the core has no seam for the missing half, and in every case the
+mechanic's own blurb describes what it does rather than what the card wished
+for. They are listed in `docs/checklists.md` §10 so a tester does not file one
+as a bug.
 
 ## Boons
 
@@ -124,9 +130,11 @@ the registry blurb describes the curse and has nowhere to put the gift.
 
 Every character rolls a seed at creation. The three affixes offered at a given
 tier are reproducible from `(seed, tier, the affixes you already carry, your
-class, and the generator's version)` — the same inputs always produce the same
-offer, so a run can be reproduced or handed to someone else as a challenge.
-`.gauntlet status` shows yours.
+class, the realm's family switches and carry cap, and the generator's version)`
+— the same inputs always produce the same offer, so a run can be reproduced or
+handed to someone else as a challenge. `.gauntlet status` shows yours. Two
+realms configured differently will produce different runs from the same seed,
+and each of them reproducibly.
 
 What you actually pick, though, is stored, not regenerated. The mechanic, rank,
 condition and boon you end up with are written to your character the moment you
@@ -171,9 +179,14 @@ scheduler owns them all, which is what keeps a late run playable:
 
 ## Leaderboard
 
-When a run ends, the character, level, tier and cause of death are recorded.
-`.gauntlet top` shows the furthest runs on the server. Death is a score, not
-just a loss.
+When a run ends, the character, level, tier, cause of death and **conducts** are
+recorded. Conducts are the class curses the run was carrying when it ended —
+the run's epitaph, and the reason a place on the list means more than a number.
+
+`.gauntlet top` shows the ten furthest runs, with each run's conducts under it.
+With the addon installed, `/gauntlet top` opens a panel instead and puts the
+conducts in a tooltip, where a list that long can actually be read. Death is a
+score, not just a loss.
 
 ## The addon
 
@@ -310,9 +323,18 @@ check that catches *the mechanic is offered and does nothing*, which is the
 failure mode this codebase produces most easily.
 
 `docs/` carries the design and the record: `affix-design.md` is the full card
-set, `implementation-plan.md` the phasing, and `phase-0-report.md` through
-`phase-3-report.md` what each phase actually found — including the bugs, the
-wrong answers tried first, and the numbers measured on a live realm.
+set, `implementation-plan.md` the phasing, `checklists.md` what still has to be
+tried in-game, and `phase-0-report.md` onward what each phase actually found —
+including the bugs, the wrong answers tried first, and the numbers measured on
+a live realm.
+
+`tests/tools/sweep_standalone.cpp` is the tuning tool. It simulates runs and
+reports, per tier, how often the offer builder had to relax a rule, how many
+slots came back empty and how often a tier had no reward-shaped offer — 240,000
+offer sets in about a second, with every bound on the command line. Every
+argument about the shape of the run has been settled with it;
+`tests/tools/README-sweep.md` has the recipes, including how to measure the
+compile-time knobs.
 
 ## Notes and limitations
 
