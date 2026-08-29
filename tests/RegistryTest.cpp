@@ -29,7 +29,10 @@ namespace
     // deleted Exposed (21), Feeble (22), Withering (72) and Forgetful (73) --
     // the four flat scalars -- and an id is never reused, so the holes stay.
     constexpr size_t TABLE_SIZE = 69;
-    constexpr uint8  MAX_TIER   = 16;
+    // A tier is a level now, not five of them. Every registry window was
+    // multiplied by five with the axis, so the *level* each affix unlocks at
+    // is exactly what it was; only the number naming it changed.
+    constexpr uint8  MAX_TIER   = 80;
 
     // The four ids that were removed and may never come back. Asserting their
     // absence is what stops a later phase quietly filling a hole: a stored

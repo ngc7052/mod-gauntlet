@@ -16,7 +16,37 @@ namespace Gauntlet
     // offers), only from tier 6, and each may be taken once per run". The
     // offer builder enforces the tier half here; the registry's own windows
     // must not contradict it, and RegistryTest asserts that they do not.
-    constexpr uint8 BARGAIN_MIN_TIER = 6;
+    // The first tier at which anything in the table can be offered.
+    //
+    // Every window was multiplied by five when a tier became a level, so the
+    // earliest -- Champions, Carrion, Hubris, Overextended and the three Rules
+    // rows, all of them 1 before -- now opens at 5. That is the level the old
+    // tier 1 was reached at, so nothing has actually moved; it just has a
+    // number now, and the sweeps need to know it so they do not measure four
+    // tiers of guaranteed emptiness and call it a collision.
+    constexpr uint8 FIRST_TIER = 5;
+
+    constexpr uint8 BARGAIN_MIN_TIER = 30;
+
+    // The most affixes a run may carry at once.
+    //
+    // It exists because the tier axis became one tier per level: eighty offers
+    // instead of sixteen, and nothing anywhere refused a New pick, so a run
+    // would have ended somewhere past thirty simultaneous curses. That is not
+    // a harder run, it is a run where no individual affix matters -- the
+    // damage-taken ceiling and the maximum-health floor both sit pegged from
+    // the midgame on, and the event budget, 1 + 0.25 x (timed - 1), stretches
+    // every cadence past x4 so the timed affixes barely act at all.
+    //
+    // Sixteen is the design's own bound: plan section 2.2 puts the dispatch
+    // loop at "<= 16, so no indexing needed", and it is what the aggregate
+    // caps were sized against.
+    //
+    // Reaching it does not end the choosing. It changes what is on offer: a
+    // full set can still rank up and can still swap, so the late run is about
+    // deepening what you have and deciding what to give up, which is a better
+    // question than "which of three more".
+    constexpr uint8 MAX_CARRIED = 16;
 
     // ---------------------------------------------------------------------
     // The roll stream.
@@ -94,7 +124,8 @@ namespace Gauntlet
     // stream. A pick, once taken, is stored in columns and never regenerated.
     OfferSet BuildOffers(uint32 seed, uint8 tier, IPlayerView const& view,
                          std::vector<AffixInstance> const& carried,
-                         uint32 count = 3, RegistryView reg = {});
+                         uint32 count = 3, RegistryView reg = {},
+                         uint8 maxCarried = MAX_CARRIED);
 }
 
 #endif // MOD_GAUNTLET_GENERATOR_H

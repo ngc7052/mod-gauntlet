@@ -22,11 +22,18 @@ Gauntlet.Hardcore = 1
 
 #
 #    Gauntlet.TierInterval
-#        Description: Levels between affix tiers. With 5, tiers land at level
-#                     5, 10, 15 ... 80, for 16 affixes over a full run.
-#        Default:     5
+#        Description: Levels between affix tiers. With 1, a tier lands at every
+#                     level, for eighty offers over a full run; the registry's
+#                     tier windows are written on that axis, so a tier and a
+#                     level are the same number.
+#
+#                     Raising it does not break anything -- an affix simply
+#                     unlocks at the same tier, reached later -- but it thins
+#                     the run out: at 5 a character sees sixteen offers and
+#                     most of the table never comes up.
+#        Default:     1
 
-Gauntlet.TierInterval = 5
+Gauntlet.TierInterval = 1
 
 #
 #    Gauntlet.ChoicesPerTier
@@ -127,6 +134,27 @@ Gauntlet.Family.Bargain.Enable = 1
 #        Default:     1 - (enabled)
 
 Gauntlet.Family.Class.Enable = 1
+
+#
+#    Gauntlet.MaxAffixes
+#        Description: The most affixes a run may carry at once. Reaching it
+#                     does not stop the choosing: a full set is still offered
+#                     rank-ups and swaps, so the late run becomes "deepen what
+#                     you have, or trade something away".
+#
+#                     It exists because a tier is now a level. Eighty offers
+#                     with nothing refusing them ends at thirty-odd
+#                     simultaneous curses, which is not a harder run but one
+#                     where no single affix matters: both damage caps sit
+#                     pegged from the midgame, and the event budget stretches
+#                     every cadence past x4 so the timed affixes barely act.
+#
+#                     16 is the design's own bound (plan 2.2 puts the dispatch
+#                     loop at "<= 16") and what the aggregate caps were sized
+#                     against.
+#        Default:     16
+
+Gauntlet.MaxAffixes = 16
 
 #
 #    Gauntlet.Events.Enable

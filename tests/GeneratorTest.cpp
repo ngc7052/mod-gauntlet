@@ -133,7 +133,7 @@ TEST(GeneratorDeterminism, SameQueryTwiceInOneProcess)
         for (size_t ci = 0; ci < CLASSES.size(); ++ci)
         {
             StubView const view(CLASSES[ci], static_cast<uint8>(1 + (ci % 3)));
-            for (uint8 tier = 1; tier <= 16; ++tier)
+            for (uint8 tier = FIRST_TIER; tier <= 80; ++tier)
             {
                 std::vector<AffixInstance> const carried = CarriedFor(seed, tier);
 
@@ -159,7 +159,7 @@ TEST(GeneratorDeterminism, DoesNotDependOnWhereTheInputsLive)
     full.includeUnimplemented = true;
 
     for (uint32 seed = 1; seed <= 100; ++seed)
-        for (uint8 tier = 1; tier <= 16; ++tier)
+        for (uint8 tier = FIRST_TIER; tier <= 80; ++tier)
         {
             StubView const view(CLASSES[seed % CLASSES.size()], static_cast<uint8>(1 + (tier % 3)));
 
@@ -203,13 +203,13 @@ TEST(GeneratorDeterminism, DifferentSeedsGiveDifferentOffers)
     std::vector<AffixInstance> const empty;
     size_t pairs = 0;
     size_t identical = 0;
-    std::array<size_t, 17> identicalPerTier = {};
+    std::array<size_t, 81> identicalPerTier = {};   // one slot per tier, and a tier is a level
 
     for (uint32 seed = 1; seed <= 500; ++seed)
         for (size_t ci = 0; ci < CLASSES.size(); ++ci)
         {
             StubView const view(CLASSES[ci], static_cast<uint8>(1 + (ci % 3)));
-            for (uint8 tier = 1; tier <= 16; ++tier)
+            for (uint8 tier = FIRST_TIER; tier <= 80; ++tier)
             {
                 OfferSet const a = BuildOffers(seed, tier, view, empty, 3, full);
                 OfferSet const b = BuildOffers(seed + 1, tier, view, empty, 3, full);
@@ -222,7 +222,8 @@ TEST(GeneratorDeterminism, DifferentSeedsGiveDifferentOffers)
             }
         }
 
-    ASSERT_EQ(pairs, 80000u);
+    // 500 seeds x 10 classes x (80 - FIRST_TIER + 1) tiers.
+    ASSERT_EQ(pairs, 500u * 10u * (80u - FIRST_TIER + 1u));
 
     // Measured after Phase 2: 428 of the 80,000 pairs collide, 0.535%, against
     // 78 (0.0975%) before it. The rise is arithmetic and has two named causes,
@@ -253,8 +254,8 @@ TEST(GeneratorDeterminism, DifferentSeedsGiveDifferentOffers)
     EXPECT_LE(identical, ceiling)
         << identical << " of " << pairs << " adjacent seed pairs produced identical offers";
 
-    size_t const perTier = pairs / 16;
-    for (uint8 tier = 1; tier <= 16; ++tier)
+    size_t const perTier = pairs / (80u - FIRST_TIER + 1u);
+    for (uint8 tier = FIRST_TIER; tier <= 80; ++tier)
     {
         double const rate = 100.0 * double(identicalPerTier[tier]) / double(perTier);
         EXPECT_LE(rate, CEILING_TIER_PCT)
@@ -263,7 +264,7 @@ TEST(GeneratorDeterminism, DifferentSeedsGiveDifferentOffers)
     }
 
     if (identical > ceiling)
-        for (uint8 tier = 1; tier <= 16; ++tier)
+        for (uint8 tier = FIRST_TIER; tier <= 80; ++tier)
             if (identicalPerTier[tier] != 0)
                 ADD_FAILURE() << "  tier " << unsigned(tier) << ": " << identicalPerTier[tier]
                               << " identical pairs of " << perTier;
@@ -292,7 +293,7 @@ TEST(GeneratorDeterminism, GeneratorVersionIsFoldedIntoTheStream)
     };
 
     for (uint32 seed : { 1u, 7u, 1337u, 987654321u })
-        for (uint8 tier = 1; tier <= 16; ++tier)
+        for (uint8 tier = FIRST_TIER; tier <= 80; ++tier)
         {
             uint64 const current = streamSeed(seed, tier, GeneratorVersion);
             for (uint16 version = 1; version <= 8; ++version)

@@ -292,6 +292,13 @@ namespace Gauntlet
         // A kill on a creature this module put into the world. Clamped to
         // [0, 1] because the key exists to stop summons being farmed, and a
         // value above 1 would turn it into the opposite.
+        // Clamped to something the dispatch loop and the aggregate caps were
+        // actually sized for: plan section 2.2 puts the carried set at "<= 16",
+        // and a realm that sets this to 200 would not get a harder run, only
+        // one where every cap sits pegged and no single affix matters.
+        _maxAffixes = uint8(std::clamp<uint32>(
+            sConfigMgr->GetOption<uint32>("Gauntlet.MaxAffixes", MAX_CARRIED), 3u, MAX_CARRIED));
+
         _summonXpRate = sConfigMgr->GetOption<float>("Gauntlet.Summons.XpRate", 0.5f);
         _summonXpRate = std::max(0.0f, std::min(1.0f, _summonXpRate));
 
@@ -737,7 +744,31 @@ namespace Gauntlet
         uint8 const genTier = static_cast<uint8>(std::min<uint32>(tier, 255u));
 
         LivePlayerView view(player);
-        OfferSet const set = BuildOffers(st->seed, genTier, view, st->affixes, _choices);
+        OfferSet const set = BuildOffers(st->seed, genTier, view, st->affixes, _choices,
+                                         RegistryView{}, _maxAffixes);
+
+        // Nothing at all fits this character at this tier, so there is nothing
+        // to choose and no window to raise. The tier still advances -- the run
+        // has reached it -- and the next one asks again.
+        //
+        // Before the tier axis became one tier per level this could not happen
+        // below tier 13: a tier was five levels and the table's earliest window
+        // opened at the first of them. Now tiers 1 to 4 are levels 1 to 4, and
+        // the earliest window in the table opens at 5, because that is the
+        // level the old tier 1 was reached at. A character levelling from 1
+        // would otherwise be shown four empty choosers before its first real
+        // offer.
+        bool anything = false;
+        for (Offer const& o : set.offers)
+            if (o.mechanic != MECHANIC_NONE)
+                anything = true;
+
+        if (!anything)
+        {
+            st->tier  = tier;
+            st->dirty = true;
+            return;
+        }
 
         st->pending     = set.offers;
         st->pendingTier = tier;

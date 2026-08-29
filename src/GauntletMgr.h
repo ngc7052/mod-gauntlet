@@ -8,6 +8,7 @@
 
 #include "Gauntlet.h"
 #include "GauntletAggregate.h"
+#include "GauntletGenerator.h"
 #include "GauntletMechanic.h"
 #include "GauntletScheduler.h"
 #include "DatabaseEnv.h"
@@ -292,6 +293,7 @@ namespace Gauntlet
         // grace window, and a later tuning pass that shortens the grace must not
         // silently shorten the window a hardcore character has to be saved in.
         uint32 _deathWindowMs = 60000;   // TODO(design)
+        uint8  _maxAffixes    = MAX_CARRIED;   // Gauntlet.MaxAffixes
 
         // Gauntlet.Events.*. MinSpacing is configured in seconds and the
         // scheduler takes milliseconds; the conversion is in LoadConfig and

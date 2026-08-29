@@ -166,13 +166,20 @@ namespace Gauntlet
     // match it, because Data.lua is generated from the registry: the change
     // that moves a mechanic id is exactly the change that must invalidate the
     // addon's table.
-    // 5 is Phase 3: six registry rows made offerable across two families that
+    // 6 is the tier-axis change: one tier per level instead of one per five,
+    // every registry window rescaled x5 so the *level* each affix unlocks at is
+    // unchanged, RankFloor and the swap tiers rewritten on the new axis, and a
+    // carried-set cap of MAX_CARRIED introduced because eighty offers with
+    // nothing refusing them is thirty-odd simultaneous curses and a pegged
+    // aggregate.
+    //
+    // 5 was Phase 3: six registry rows made offerable across two families that
     // had never produced an offer, Cursed Hoard's window moved from tier 4 to
     // 6 so the row and BARGAIN_MIN_TIER agree, and the slot loop taught to
     // prefer an ordinary new mechanic in a clean family over a bargain it
     // could only place by relaxing a rule. The last of those alone changes
     // every offer set that contains a bargain slot.
-    constexpr uint16 GeneratorVersion = 5;
+    constexpr uint16 GeneratorVersion = 6;
 
     constexpr uint8 MAX_RANK = 3;
 

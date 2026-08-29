@@ -76,7 +76,12 @@ namespace
     // is III, while I and II stay reachable for two thirds of the run.
     uint8 RankFloor(uint8 tier)
     {
-        uint32 const floor = 1u + (tier > 0 ? (tier - 1u) / 6u : 0u);
+        // Rescaled with the tier axis in Phase 3: a tier is a level now, not
+        // five of them. The old form was 1 + (tier - 1) / 6 over sixteen
+        // tiers, which put rank II at tier 7 and rank III at tier 13 -- levels
+        // 35 and 65. This is the same two levels expressed on the new axis, so
+        // a run's rank curve is exactly what it was.
+        uint32 const floor = 1u + (tier > 5 ? (tier - 5u) / 30u : 0u);
         return static_cast<uint8>(std::min<uint32>(floor, MAX_RANK));
     }
 
@@ -288,6 +293,7 @@ namespace
         IPlayerView const*               view = nullptr;
         Carried const*                   carried = nullptr;
         RegistryView                     reg;
+        uint8                            maxCarried = MAX_CARRIED;
         std::array<bool, FAMILY_COUNT>   familyUsed = {};
         std::vector<uint16>              mechanicUsed;
 
@@ -330,6 +336,16 @@ namespace
         else if (held)
         {
             return false;   // never offer a carried mechanic as new
+        }
+        else if (ctx.carried->set && ctx.carried->set->size() >= ctx.maxCarried)
+        {
+            // The set is full, so nothing new may join it. A Swap is exempt
+            // and deliberately so: it is the offer that takes one out before
+            // it puts one in, which is the whole reason a cap is a design
+            // rather than a wall. Past the cap a tier asks "deepen, or trade",
+            // and both are real questions.
+            if (kind != OfferKind::Swap)
+                return false;
         }
 
         if (!CapsAllow(def, *ctx.carried, rankUp))
@@ -490,7 +506,7 @@ namespace Gauntlet
 {
     OfferSet BuildOffers(uint32 seed, uint8 tier, IPlayerView const& view,
                          std::vector<AffixInstance> const& carried,
-                         uint32 count, RegistryView reg)
+                         uint32 count, RegistryView reg, uint8 maxCarried)
     {
         OfferSet result;
         if (count == 0)
@@ -508,7 +524,8 @@ namespace Gauntlet
         ctx.tier    = tier;
         ctx.view    = &view;
         ctx.carried = &summary;
-        ctx.reg     = reg;
+        ctx.reg         = reg;
+        ctx.maxCarried  = maxCarried;
 
         // Slot kinds, decided before any family is drawn. The bargain roll is
         // consumed only on a tier that is not a swap tier, exactly as the
@@ -516,13 +533,32 @@ namespace Gauntlet
         // seed, so no two tiers share a stream and the skipped roll cannot
         // shift another tier's offers.
         std::vector<OfferKind> kinds(count, OfferKind::New);
-        bool const swapTier = tier == 4 || tier == 8 || tier == 12;
+        // Levels 20, 40 and 60, which is where tiers 4, 8 and 12 used to fall.
+        //
+        // They are no longer the only place a swap happens. With one tier per
+        // level and a carried set that fills up, every offer past the cap is a
+        // rank-up or a swap -- so the fixed swap tiers are now the three where
+        // a swap is *guaranteed* rather than the three where it is possible.
+        bool const swapTier = tier == 20 || tier == 40 || tier == 60;
+
+        // A full carried set changes what a tier asks. Nothing new may join it,
+        // so slot C becomes the trade -- "give one up for one" -- and the
+        // bargain roll is not consumed, because a bargain is a new mechanic and
+        // there is no room for one.
+        //
+        // Without this the cap was a wall rather than a design. Slot C stayed
+        // New, found nothing, degraded to a rank-up, and once everything
+        // carried sat at rank III the whole offer set came back empty: measured
+        // at 100% relaxed with every slot empty from tier 55 to 80, which is
+        // thirty levels of a run being asked nothing at all.
+        bool const full = carried.size() >= maxCarried;
 
         if (count >= 1 && (carried.size() >= 3 || tier >= 9))
             kinds[0] = OfferKind::RankUp;
         if (count >= 3)
-            kinds[2] = swapTier ? OfferKind::Swap
-                                : (RollIn(state, 0, 5) == 0 ? OfferKind::Bargain : OfferKind::New);
+            kinds[2] = (swapTier || full)
+                     ? OfferKind::Swap
+                     : (RollIn(state, 0, 5) == 0 ? OfferKind::Bargain : OfferKind::New);
 
         for (uint32 slot = 0; slot < count; ++slot)
         {
@@ -581,6 +617,22 @@ namespace Gauntlet
                 {
                     kind  = fallback;
                     pools = std::move(rankPools);
+                    step  = RELAX_STRICT;
+                }
+            }
+
+            // Last resort, and it only exists once the set is full: a slot with
+            // no new mechanic to offer and nothing left to rank up can still
+            // offer a trade. This is what keeps the late run from going quiet
+            // -- a character carrying sixteen affixes at rank III has nothing
+            // to gain and everything still to choose between.
+            if (step == RELAX_COUNT && kind != OfferKind::Swap && full)
+            {
+                Pools swapPools;
+                if (FirstUsableStep(ctx, OfferKind::Swap, false, swapPools) != RELAX_COUNT)
+                {
+                    kind  = OfferKind::Swap;
+                    pools = std::move(swapPools);
                     step  = RELAX_STRICT;
                 }
             }

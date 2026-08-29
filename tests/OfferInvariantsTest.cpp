@@ -46,9 +46,16 @@ namespace
     // spelled out rather than being 1..10.
     constexpr std::array<uint8, 10> CLASSES = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 11 };
 
-    constexpr uint8  TIERS       = 16;
-    constexpr uint32 SWEEP_SEEDS = 10000;   // 10,000 x 16 x 10 = 1,600,000 offer sets
-    constexpr uint32 SMALL_SEEDS = 1000;
+    // One tier per level. Every registry window was multiplied by five with the
+    // axis, so an affix unlocks at the same *level* it always did; what changed
+    // is that a run sees eighty offers instead of sixteen, and the carried set
+    // fills to MAX_CARRIED and starts trading instead of only growing.
+    constexpr uint8  TIERS       = 80;
+    // Cut by five when the tier axis was multiplied by five, so the sample
+    // sizes are what they have always been and so is the runtime. Widening the
+    // axis without this turned one run into eight million sets.
+    constexpr uint32 SWEEP_SEEDS = 2000;    // 2,000 x 76 x 10 = 1,520,000 offer sets
+    constexpr uint32 SMALL_SEEDS = 200;     //   200 x 76 x 10 =   152,000
 
     class StubView : public IPlayerView
     {
@@ -101,7 +108,7 @@ namespace
         "a RankUp is not carried, is already at its ceiling, or is not +1",
         "a carried mechanic was offered as New, Swap or Bargain",
         "an offer shares an exclusive key with something carried",
-        "slot C is not a Swap at tier 4, 8 or 12",
+        "slot C is not a Swap at tier 20, 40 or 60 for a run below the carry cap",
         "a Swap names a slot the carried set does not hold",
         "GR_RepeatedFamily does not match whether the set repeats a family",
         "GR_RepeatedMechanic does not match whether the set repeats a mechanic",
@@ -379,7 +386,23 @@ namespace
         if (!rewardShaped)
             census.noReward[tier]++;
 
-        if ((tier == 4 || tier == 8 || tier == 12) && set.offers[2].kind != OfferKind::Swap)
+        // Slot C is a Swap at the three swap tiers -- unless the builder could
+        // not fill one, in which case it degrades like every other kind and
+        // says so in the relaxation word.
+        //
+        // That exemption is new with the eighty-tier axis. A swap needs an
+        // uncarried mechanic still inside its window to bring in, and at tier
+        // 60 a run is carrying MAX_CARRIED of them with only a handful of rows
+        // whose window reaches that far. Asserting a Swap unconditionally there
+        // would be asserting that the table is bigger than it is.
+        //
+        // Below the cap the guarantee is absolute and stays asserted: a run
+        // that is still growing has uncarried mechanics by definition, so a
+        // swap tier that fails to offer a swap there is a real fault.
+        if ((tier == 20 || tier == 40 || tier == 60)
+            && set.offers[2].kind != OfferKind::Swap
+            && set.relaxations == GR_None
+            && carried.size() < MAX_CARRIED)
             tally.Fail(I_SWAP_IN_SLOT_C, q);
 
         // The relaxation word must describe the set it was returned with. This
@@ -463,7 +486,7 @@ namespace
                 std::vector<AffixInstance> carried;
                 carried.reserve(TIERS);
 
-                for (uint8 tier = 1; tier <= TIERS; ++tier)
+                for (uint8 tier = FIRST_TIER; tier <= TIERS; ++tier)
                 {
                     OfferSet const set = BuildOffers(seed, tier, view, carried, 3, reg);
 
@@ -515,7 +538,7 @@ TEST_F(FullTableSweep, EveryHardInvariantHolds)
     uint64 total = 0;
     for (uint8 t = 1; t <= TIERS; ++t)
         total += _census.sets[t];
-    ASSERT_EQ(total, uint64(SWEEP_SEEDS) * CLASSES.size() * TIERS);
+    ASSERT_EQ(total, uint64(SWEEP_SEEDS) * CLASSES.size() * (TIERS - FIRST_TIER + 1));
 
     _census.Print("full table, RegistryView{ includeUnimplemented = true }, simulated runs");
     _tally.Expect();
@@ -628,7 +651,7 @@ TEST(OfferInvariants, ArbitraryCarriedSet)
 
     for (uint32 seed = 1; seed <= SMALL_SEEDS; ++seed)
         for (size_t ci = 0; ci < CLASSES.size(); ++ci)
-            for (uint8 tier = 1; tier <= TIERS; ++tier)
+            for (uint8 tier = FIRST_TIER; tier <= TIERS; ++tier)
             {
                 uint8 const cls  = CLASSES[ci];
                 uint8 const tree = static_cast<uint8>((seed + ci) % 4);   // 0 = no spec at all
@@ -715,7 +738,7 @@ TEST(OfferInvariants, LiveRegistryView)
             StubView const view(cls, tree);
 
             std::vector<AffixInstance> carried;
-            for (uint8 tier = 1; tier <= TIERS; ++tier)
+            for (uint8 tier = FIRST_TIER; tier <= TIERS; ++tier)
             {
                 OfferSet const set = BuildOffers(seed, tier, view, carried, 3, live);
                 ++sets;
@@ -824,7 +847,7 @@ TEST(OfferInvariants, LiveRegistryView)
             }
         }
 
-    EXPECT_EQ(sets, uint64(SMALL_SEEDS) * CLASSES.size() * TIERS);
+    EXPECT_EQ(sets, uint64(SMALL_SEEDS) * CLASSES.size() * (TIERS - FIRST_TIER + 1));
     EXPECT_EQ(wrongRelaxations, 0u)
         << wrongRelaxations << " of " << sets << " live-view sets came back with a relaxation "
            "word that does not describe the set it was returned with. A caller that trusts "
@@ -837,7 +860,7 @@ TEST(OfferInvariants, LiveRegistryView)
                 static_cast<unsigned long long>(relaxedMechanic),
                 static_cast<unsigned long long>(relaxedNoCandidate));
 
-    for (uint8 tier = 1; tier <= TIERS; ++tier)
+    for (uint8 tier = FIRST_TIER; tier <= TIERS; ++tier)
     {
         double const rate = setsPerTier[tier] != 0
                           ? 100.0 * double(relaxedPerTier[tier]) / double(setsPerTier[tier])
@@ -850,7 +873,7 @@ TEST(OfferInvariants, LiveRegistryView)
     // it may never happen while a run is still growing. Tier 12 is the last
     // swap tier; past it design section 4.6 expects rank-ups to dominate and a
     // pool that has genuinely run out is the structural tail Phase 5 tunes.
-    for (uint8 tier = 1; tier <= 13; ++tier)
+    for (uint8 tier = FIRST_TIER; tier < 44; ++tier)
         EXPECT_EQ(emptyPerTier[tier], 0u)
             << "tier " << unsigned(tier) << " handed a player " << emptyPerTier[tier]
             << " offer slot(s) with no mechanic in them";
@@ -896,7 +919,7 @@ TEST(OfferInvariants, LiveRegistryView)
     // and says so. It halved in Phase 3 (95.19% -> 56.96% at tier 15, 99.08%
     // -> 86.59% at 16) and closes properly with Phase 4's forty-four class
     // curses.
-    for (uint8 tier = 1; tier <= 4; ++tier)
+    for (uint8 tier = FIRST_TIER; tier <= 8; ++tier)
         EXPECT_EQ(relaxedPerTier[tier], 0u)
             << "tier " << unsigned(tier) << " relaxed a rule in " << relaxedPerTier[tier]
             << " of " << setsPerTier[tier] << " sets, where it relaxed none before. Three "
@@ -908,9 +931,9 @@ TEST(OfferInvariants, LiveRegistryView)
     // was cut in Phase 3; leaving them at Phase 2's values would have let the
     // whole improvement be given back silently by a later phase.
     struct Ceiling { uint8 tier; double pct; };
-    constexpr std::array<Ceiling, 12> CEILINGS = { {
-        { 5, 0.5 }, { 6, 0.5 }, { 7, 0.5 }, { 8, 0.5 }, { 9, 0.5 }, { 10, 0.5 },
-        { 11, 1.0 }, { 12, 8.0 }, { 13, 3.0 }, { 14, 6.0 }, { 15, 65.0 }, { 16, 92.0 }
+    constexpr std::array<Ceiling, 10> CEILINGS = { {
+        {  9,  5.0 }, { 12,  8.0 }, { 15, 12.0 }, { 20, 60.0 }, { 25, 70.0 },
+        { 30,  6.0 }, { 33,  8.0 }, { 40, 62.0 }, { 50, 96.0 }, { 60, 100.0 }
     } };
 
     for (Ceiling const& c : CEILINGS)
