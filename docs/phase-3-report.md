@@ -241,6 +241,20 @@ Opening a second chest while cursed refreshes the debt rather than stacking it.
 Stacking would make the affix a death sentence for the one mistake it exists to
 make survivable.
 
+**The exit had to be narrowed the first time it was played, and the report's
+original wording understated the problem.** "Close to free" was too generous: a
+player clears a camp and *then* loots, which is the normal way anyone opens a
+chest, so the escape timer started while they were already safely out of combat
+and the curse lifted ten seconds later having never multiplied a single blow.
+The affix did not exist. The user's report was "I just looted a chest with
+Cursed Hoard and got no curse at all".
+
+The out-of-combat exit now opens only once the curse has actually been in a
+fight — breaking away requires something to break away from. That keeps what
+decision 2 was for, which is that a pull going wrong under a triple must not end
+a run with no answer, and removes what it was not for, which is never fighting
+at all.
+
 ### 3.8 Iron Purse is the weakest row in the table, and stays
 
 Tiers 1–3 is levels 5 to 15. A repair bill there is a few silver, doubling it is

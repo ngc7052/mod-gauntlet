@@ -87,7 +87,12 @@ namespace Gauntlet
             void OnDetach(Ctx& ctx) override;
             void OnTick(Ctx& ctx, uint32 diffMs) override;
 
-            void OnEnterCombat(Ctx&, Unit*, bool) override { _calmMs = 0; }
+            void OnEnterCombat(Ctx&, Unit*, bool) override
+            {
+                _calmMs = 0;
+                if (_debt != 0)
+                    _engaged = true;
+            }
 
             void OnLoot(Ctx& ctx, ObjectGuid const& lootGuid, Loot* loot) override;
             void OnLootGroupAmount(Ctx& ctx, uint32& groupAmount) override;
@@ -126,9 +131,10 @@ namespace Gauntlet
             void Save(Ctx& ctx) const;
             void Publish(Ctx& ctx);
 
-            uint32 _debt   = 0;   // kills still owed; 0 = no curse
-            uint32 _calmMs = 0;   // how long out of combat, while cursed
-            uint32 _opened = 0;
+            uint32 _debt    = 0;   // kills still owed; 0 = no curse
+            uint32 _calmMs  = 0;   // how long out of combat, while cursed
+            uint32 _opened  = 0;
+            bool   _engaged = false;   // has this curse been in a fight yet
         };
 
         void CursedHoard::OnAttach(Ctx& ctx)
@@ -136,7 +142,8 @@ namespace Gauntlet
             if (ctx.state)
                 _debt = uint32(std::max(0, ctx.state->Get(DebtKey())));
 
-            _calmMs = 0;
+            _calmMs  = 0;
+            _engaged = false;
             Publish(ctx);
         }
 
@@ -162,6 +169,27 @@ namespace Gauntlet
             if (escape == 0)
             {
                 // The strict card: three kills or nothing.
+                _calmMs = 0;
+                return;
+            }
+
+            // Breaking away requires something to break away from.
+            //
+            // Without this the affix did not exist. A player clears a camp,
+            // loots the chest standing safely out of combat -- which is the
+            // normal way anyone opens one -- and the escape timer starts
+            // immediately, so the curse lifted ten seconds later having never
+            // multiplied a single blow. The user's report was "I just looted a
+            // chest with Cursed Hoard and got no curse at all", and that is
+            // exactly what it looked like from the outside.
+            //
+            // So the out-of-combat exit only opens once the curse has actually
+            // been in a fight. That is what decision 2's escape was for: a
+            // pull that goes wrong under a triple is a run ended by one
+            // unlucky moment, and disengaging has to be an answer. Never
+            // fighting at all is not disengaging.
+            if (!_engaged)
+            {
                 _calmMs = 0;
                 return;
             }
@@ -209,8 +237,9 @@ namespace Gauntlet
             // Opening a second chest while already cursed does not stack it;
             // it refreshes the debt to full. Stacking would make the affix a
             // death sentence for the one mistake it is meant to make survivable.
-            _debt   = KILLS_TO_LIFT[RankIndex(ctx.self)];
-            _calmMs = 0;
+            _debt    = KILLS_TO_LIFT[RankIndex(ctx.self)];
+            _calmMs  = 0;
+            _engaged = false;
             Save(ctx);
             Publish(ctx);
 
@@ -268,8 +297,9 @@ namespace Gauntlet
 
         void CursedHoard::Lift(Ctx& ctx, char const* how)
         {
-            _debt   = 0;
-            _calmMs = 0;
+            _debt    = 0;
+            _calmMs  = 0;
+            _engaged = false;
             Save(ctx);
             Publish(ctx);
 
@@ -306,7 +336,7 @@ namespace Gauntlet
                             + std::to_string(kills) + ".";
 
             if (secs != 0)
-                out += " Breaking away for " + std::to_string(secs)
+                out += " Once it has been in a fight, breaking away for " + std::to_string(secs)
                      + " seconds out of combat lifts it too.";
 
             out += " Open at full health with easy kills in reach, or walk past.";
@@ -320,8 +350,10 @@ namespace Gauntlet
         std::string CursedHoard::Diagnose(Ctx& ctx) const
         {
             std::string out = "cursed hoard: ";
-            out += _debt != 0 ? ("CURSED, " + std::to_string(_debt) + " kill(s) owed, calm "
-                                 + std::to_string(_calmMs / 1000u) + "s")
+            out += _debt != 0 ? ("CURSED, " + std::to_string(_debt) + " kill(s) owed, "
+                                 + (_engaged ? "engaged, calm " + std::to_string(_calmMs / 1000u) + "s"
+                                             : std::string("not yet in combat, no escape open"))
+                                )
                               : std::string("clean");
             out += ", " + std::to_string(_opened) + " chest(s) opened this session";
             (void)ctx;
