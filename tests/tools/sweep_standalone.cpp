@@ -125,6 +125,20 @@ namespace
         uint64 empty = 0;
         uint64 noReward = 0;
         uint64 carried = 0;   // summed, for the mean
+
+        // The relaxation bits, counted apart, because "relaxed" alone says
+        // nothing about which of three different problems a run is hitting.
+        // This tool is what separated them, and what earned GR_NoRewardShaped
+        // its own bit: the first says the table has run out, the second says
+        // ten rows out of sixty-nine carry MF_RewardShaped.
+        uint64 bitFamily = 0;
+        uint64 bitMechanic = 0;
+        uint64 bitNoCandidate = 0;
+        uint64 bitNoReward = 0;
+
+        // Sets whose only relaxation was the reward-shaped guarantee: no empty
+        // slot, no repeated family, no repeated mechanic.
+        uint64 rewardOnly = 0;
     };
 }
 
@@ -202,6 +216,10 @@ int main(int argc, char** argv)
                     ++row.relaxed;
                     ++total.relaxed;
                 }
+                if (set.relaxations & GR_RepeatedFamily)   { ++row.bitFamily;      ++total.bitFamily; }
+                if (set.relaxations & GR_RepeatedMechanic) { ++row.bitMechanic;    ++total.bitMechanic; }
+                if (set.relaxations & GR_NoCandidate)      { ++row.bitNoCandidate; ++total.bitNoCandidate; }
+                if (set.relaxations & GR_NoRewardShaped)   { ++row.bitNoReward;    ++total.bitNoReward; }
 
                 bool rewardShaped = false;
                 for (Offer const& o : set.offers)
@@ -222,6 +240,17 @@ int main(int argc, char** argv)
                     ++total.noReward;
                 }
 
+                bool anyEmpty = false;
+                for (Offer const& o : set.offers)
+                    if (o.mechanic == MECHANIC_NONE)
+                        anyEmpty = true;
+                if (!rewardShaped && !anyEmpty
+                    && !(set.relaxations & (GR_RepeatedFamily | GR_RepeatedMechanic)))
+                {
+                    ++row.rewardOnly;
+                    ++total.rewardOnly;
+                }
+
                 if (!set.offers.empty())
                     ApplyPick(carried, set.offers[PickIndex(seed, tier, ci, set.offers.size())], tier);
             }
@@ -234,17 +263,23 @@ int main(int argc, char** argv)
                 opt.choices, unsigned(opt.maxCarried),
                 opt.fullTable ? "full" : "live", unsigned(opt.familyMask));
 
-    auto printRow = [](unsigned tier, Row const& r) {
-        std::printf("  %4u  %8llu  %7.2f%%  %8llu  %7.2f%%  %6.2f\n",
+    auto pct = [](uint64 n, uint64 d) { return d ? 100.0 * double(n) / double(d) : 0.0; };
+
+    auto printRow = [&pct](unsigned tier, Row const& r) {
+        std::printf("  %4u  %8llu  %7.2f%%  %8llu  %7.2f%%  %6.2f  %7.2f%%  %7.2f%%  %7.2f%%\n",
                     tier,
                     static_cast<unsigned long long>(r.sets),
-                    r.sets ? 100.0 * double(r.relaxed) / double(r.sets) : 0.0,
+                    pct(r.relaxed, r.sets),
                     static_cast<unsigned long long>(r.empty),
-                    r.sets ? 100.0 * double(r.noReward) / double(r.sets) : 0.0,
-                    r.sets ? double(r.carried) / double(r.sets) : 0.0);
+                    pct(r.noReward, r.sets),
+                    r.sets ? double(r.carried) / double(r.sets) : 0.0,
+                    pct(r.bitFamily, r.sets),
+                    pct(r.bitMechanic, r.sets),
+                    pct(r.rewardOnly, r.sets));
     };
 
-    std::printf("  tier      sets   relaxed     empty  noReward  carried\n");
+    std::printf("  tier      sets   relaxed     empty  noReward  carried"
+                "   family  mechanic  rwdOnly\n");
     if (opt.perTier)
     {
         for (uint8 t = FIRST_TIER; t <= opt.tiers; ++t)
@@ -257,10 +292,13 @@ int main(int argc, char** argv)
                 printRow(t, rows[t]);
     }
 
-    std::printf("  ----  --------  --------  --------  --------  -------\n");
+    std::printf("  ----  --------  --------  --------  --------  -------  --------  --------  --------\n");
     printRow(0, total);
-    std::printf("total: %llu empty slots, %.2f%% of sets with no reward-shaped offer\n",
+    std::printf("total: %llu empty slots, %.2f%% of sets with no reward-shaped offer,\n"
+                "       %.2f%% relaxed, of which %.2f points are the reward-shaped guarantee alone\n",
                 static_cast<unsigned long long>(total.empty),
-                total.sets ? 100.0 * double(total.noReward) / double(total.sets) : 0.0);
+                pct(total.noReward, total.sets),
+                pct(total.relaxed, total.sets),
+                pct(total.rewardOnly, total.sets));
     return 0;
 }

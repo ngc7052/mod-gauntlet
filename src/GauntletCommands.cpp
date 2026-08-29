@@ -1055,6 +1055,8 @@ public:
             relaxed += relaxed.empty() ? "repeated mechanic" : ", repeated mechanic";
         if (set.relaxations & GR_NoCandidate)
             relaxed += relaxed.empty() ? "no candidate" : ", no candidate";
+        if (set.relaxations & GR_NoRewardShaped)
+            relaxed += relaxed.empty() ? "no reward-shaped offer" : ", no reward-shaped offer";
 
         handler->PSendSysMessage("  relaxations: {}", relaxed.empty() ? "none" : relaxed);
         return true;

@@ -22,7 +22,7 @@ nothing in this module has been playtested; and the three-way choice
 | # | Step | State |
 |---|---|---|
 | 1 | The seven dead `Gauntlet.Family.*.Enable` keys | **done** |
-| 2 | The empty tail: measure the levers, make the choice a config key | |
+| 2 | The empty tail: measure the levers, make the choice a config key | **in progress** |
 | 3 | The pair tests, as unit tests where they can be one | |
 | 4 | `docs/checklists.md` | |
 | 5 | `.gauntlet top` conducts, and the addon's leaderboard | |
@@ -52,3 +52,66 @@ revertable one at a time:
    exists to fill a slot that would otherwise be empty, and the tempting shape
    is to drop rules at the last rung. A family the realm switched off is not a
    rule the generator may drop, so the check sits where every rung sees it.
+3. **The sweep gets a second home, as a tool.** `tests/OfferInvariantsTest.cpp`
+   runs the same simulation and must keep every knob at its shipped value; the
+   question Phase 4 left needs the opposite. `tests/tools/sweep_standalone.cpp`
+   takes them from the command line and runs 240,000 sets in a second.
+4. **`GR_NoCandidate` was two failures on one bit, and they are not the same
+   failure.** Split into `GR_NoCandidate` and `GR_NoRewardShaped`. See the
+   measurement below: the second is the largest single relaxation in the module
+   and it had been invisible for five phases.
+
+## The measurement, and what it says about the phase-4 report's three options
+
+All figures from `build/sweep --seeds 300` (240,000 sets), live table.
+
+| variant | relaxed | empty slots | no reward-shaped | tier 80 relaxed |
+|---|---|---|---|---|
+| **shipped** (carry 16, rank 3, `CAP_CLASS` 3) | 48.86% | 130,277 | 37.03% | 100% |
+| `MAX_CARRIED` 20 | 56.40% | 245,180 | 51.58% | 100% |
+| `MAX_CARRIED` 24 or 30 | 56.36% | 245,407 | 51.56% | 100% |
+| `MAX_RANK` 4 (and every row's `maxRank` with it) | **27.70%** | 46,231 | **18.10%** | 91.97% |
+| every window opened to tier 80 | 39.34% | **17,338** | 29.14% | **62.73%** |
+| `CAP_CLASS` 4 | 46.75% | 103,289 | 35.01% | 99.93% |
+| `CAP_CLASS` 5 | 46.20% | 90,059 | 34.59% | 99.73% |
+
+**Option 2 of `docs/phase-4-report.md` §7 -- raise `MAX_CARRIED` -- is refuted.**
+It makes every number worse, and 24 and 30 measure identically to 20 because a
+run never reaches twenty affixes: the eligible pool is exhausted at about 19.4.
+The reason is that the carry cap was *helping*. A full set is what turns slot C
+into a guaranteed Swap and puts the whole set on the Swap fallback; a set that
+never fills never gets either, so its slots stay New, find nothing, and come
+back empty.
+
+**The relaxation number was three different problems wearing one word.** With
+`GR_NoRewardShaped` split out, over the test's own 160,000 live sets:
+
+```
+repeated family 19,660   repeated mechanic 0   no candidate 35,576   no reward-shaped 59,022
+```
+
+and by region of the run:
+
+- **Tiers 13-50: the reward-shaped guarantee.** At tier 21 the set relaxes
+  46.67% of the time and 36.50 points of that is sets with three real offers, no
+  empty slot and no repeated family, marked only because none of the three was
+  reward-shaped.
+- **Tiers 51-70: repeated family.** 43.93% at tier 61. A genuinely thin pool.
+- **Tiers 66-80: empty slots.** The tail Phase 4 found.
+
+**The reward-shaped guarantee cannot be met and it is not a pool problem.** Ten
+of sixty-nine rows carry `MF_RewardShaped`, and six of those are gated behind a
+class or the Bargain family, so a character has exactly **four** generally
+available: Carrion (1-50), Hubris (1-50), Champions (1-80), Frenzy (8-80). Once
+all four are carried the guarantee is unsatisfiable, which happens in the
+twenties -- and past tier 50 only two of the four are still in window. This is
+the same shape as Phase 4's finding about the tier curve: the design's rule was
+written for sixteen tiers and does not stretch to eighty.
+
+The tag itself is not the thing to loosen. The design's test is "bargains in
+structure -- they pay out for engagement", and applying it honestly to the rows
+Phases 3 and 4 added does not produce many more: Deep Wounds and Falling Sky
+have counterplay but pay nothing, Blood Magic is a tax with a boon, the Rules
+rows are restrictions. Diluting `MF_RewardShaped` until the guarantee is
+trivially met would make the guarantee mean nothing, which is worse than it
+failing honestly.

@@ -137,14 +137,33 @@ namespace Gauntlet
         GR_RepeatedMechanic = 1u << 1,
 
         // Set when a slot could not be filled at all and came back as
-        // MECHANIC_NONE, and also when the "one reward-shaped offer per tier"
-        // guarantee found no reward-shaped candidate -- which is the same
-        // failure, nothing eligible, seen from the other end.
+        // MECHANIC_NONE.
         //
         // The bit is the one Phase 0 called GR_FellBackToScalar and its value
         // is unchanged; only the name is, because there is no scalar to fall
         // back to any more.
-        GR_NoCandidate      = 1u << 2
+        GR_NoCandidate      = 1u << 2,
+
+        // Set when the "one reward-shaped offer per tier" guarantee (§4.4.5)
+        // found nothing to pay it with.
+        //
+        // This shared GR_NoCandidate's bit for five phases, on the reasoning
+        // that it is the same failure -- nothing eligible -- seen from the
+        // reward-shaped end. Measured, that turned out to be wrong, and wrong
+        // in the direction that mattered: over 240,000 sets, 48.86% carried
+        // some relaxation and 15.52 points of that were sets with three real
+        // offers, no empty slot and no repeated family, marked only because
+        // none of the three was reward-shaped. In the twenties it is most of
+        // the number -- tier 21 relaxes 46.67% of the time and 36.50 points of
+        // that is this and nothing else.
+        //
+        // Sharing the bit is what let that read as a pool problem for four
+        // phases. It is not one. Ten of sixty-nine rows carry MF_RewardShaped
+        // and only four of those are available to every class, so the
+        // guarantee stops being satisfiable at the tier a character has
+        // carried all four -- which happens in the twenties and has nothing to
+        // do with how big the table is.
+        GR_NoRewardShaped   = 1u << 3
     };
 
     struct OfferSet

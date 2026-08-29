@@ -769,10 +769,20 @@ namespace Gauntlet
             // replacement is measured against its siblings, not against the
             // pick it is replacing.
             SlotContext replace;
-            replace.tier    = tier;
-            replace.view    = &view;
-            replace.carried = &summary;
-            replace.reg     = reg;
+            replace.tier       = tier;
+            replace.view       = &view;
+            replace.carried    = &summary;
+            replace.reg        = reg;
+            // Carried over from the caller, not left at MAX_CARRIED.
+            //
+            // It was left at the default for five phases, and the default is
+            // the shipped ceiling -- so on a realm with Gauntlet.MaxAffixes
+            // below 16 this path was the one place a New offer could be made
+            // to a run that the slot loop above had already decided was full.
+            // A player on such a realm would have been offered a seventeenth
+            // affix exactly when the tier had no reward-shaped offer to give,
+            // which is a hard bug to ever see and a trivial one to prevent.
+            replace.maxCarried = maxCarried;
             for (size_t i = 0; i < result.offers.size(); ++i)
                 if (i != 1)
                     Remember(replace, result.offers[i]);
@@ -814,10 +824,11 @@ namespace Gauntlet
             }
             else
             {
-                // No reward-shaped mechanic is eligible at all. Recorded on
-                // the same bit as "no candidate", which is what it is: the
-                // eligible pool ran out, seen from the reward-shaped end.
-                result.relaxations |= GR_NoCandidate;
+                // No reward-shaped mechanic is eligible at all. On its own bit
+                // since Phase 5: see the note on GR_NoRewardShaped for the
+                // measurement that separated it from GR_NoCandidate, and for
+                // why the two being one bit hid the diagnosis for four phases.
+                result.relaxations |= GR_NoRewardShaped;
             }
         }
 

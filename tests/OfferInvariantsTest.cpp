@@ -112,9 +112,9 @@ namespace
         "a Swap names a slot the carried set does not hold",
         "GR_RepeatedFamily does not match whether the set repeats a family",
         "GR_RepeatedMechanic does not match whether the set repeats a mechanic",
-        "a set with no MF_RewardShaped offer did not record GR_NoCandidate",
-        "GR_NoCandidate was recorded for a set that does have a reward-shaped offer",
-        "relaxations carries a bit outside the three the enum declares",
+        "a set with no MF_RewardShaped offer did not record GR_NoRewardShaped",
+        "GR_NoRewardShaped was recorded for a set that does have a reward-shaped offer",
+        "relaxations carries a bit outside the four the enum declares",
         "an MF_NotImplemented mechanic was offered on the live registry view"
     };
 
@@ -264,7 +264,8 @@ namespace
             census.repeatedFamily[tier]++;
         if (set.relaxations & GR_RepeatedMechanic)
             census.repeatedMechanic[tier]++;
-        if (set.relaxations & ~uint32(GR_RepeatedFamily | GR_RepeatedMechanic | GR_NoCandidate))
+        if (set.relaxations & ~uint32(GR_RepeatedFamily | GR_RepeatedMechanic | GR_NoCandidate
+                                    | GR_NoRewardShaped))
             tally.Fail(I_UNKNOWN_BIT, q);
 
         if (set.offers.size() != 3)
@@ -432,25 +433,25 @@ namespace
         if (repeatedMechanic != bool(set.relaxations & GR_RepeatedMechanic))
             tally.Fail(I_MECHANIC_BIT, q);
 
-        // GR_NoCandidate carries two meanings -- a slot that could not be
-        // filled at all and came back empty, and the reward-shaped guarantee
-        // finding no candidate.
+        // The reward-shaped guarantee, and both directions of it.
         //
-        // Only one direction is still asserted. Both meanings were once
-        // separable, because on the sixteen-tier axis with an uncapped carried
-        // set the first never happened and the bit was exactly "this set has no
-        // reward-shaped offer". Neither premise survived: eighty tiers against
-        // twenty-five rows, a carry cap, and a rule against offering the same
-        // mechanic twice in one set all make an empty slot an ordinary outcome
-        // late in a run, so a set can hold a reward-shaped offer *and* have run
-        // out elsewhere. Asserting that pair away would be asserting the table
-        // is bigger than it is.
+        // Only one direction could be asserted while this shared GR_NoCandidate
+        // with "a slot came back empty": eighty tiers against twenty-five rows
+        // and a carry cap make an empty slot an ordinary outcome late in a run,
+        // so a set could hold a reward-shaped offer and still carry the bit,
+        // and asserting the pair away would have been asserting the table is
+        // bigger than it is.
         //
-        // What is still a fault is a set with no reward-shaped offer that does
-        // not say so, and an empty slot that does not say so -- checked above,
-        // per offer. Between them nothing goes unreported.
-        if (!rewardShaped && !(set.relaxations & GR_NoCandidate))
+        // Phase 5 gave the guarantee its own bit -- GR_NoRewardShaped -- after
+        // measuring that the two are not the same failure at all, so the
+        // biconditional is back: for a three-offer set the bit is set exactly
+        // when the set has no reward-shaped offer, and a builder that stopped
+        // trying to satisfy the guarantee would be caught by the direction that
+        // was unassertable for five phases.
+        if (!rewardShaped && !(set.relaxations & GR_NoRewardShaped))
             tally.Fail(I_REWARD_BIT, q);
+        if (rewardShaped && (set.relaxations & GR_NoRewardShaped))
+            tally.Fail(I_SPURIOUS_BIT, q);
     }
 
     // The pick the simulated run takes at each tier, from the same seed
@@ -747,6 +748,7 @@ TEST(OfferInvariants, LiveRegistryView)
     uint64 relaxedFamily = 0;
     uint64 relaxedMechanic = 0;
     uint64 relaxedNoCandidate = 0;
+    uint64 relaxedNoReward = 0;
     uint64 emptySlots = 0;
     std::array<uint64, TIERS + 1> setsPerTier    = {};
     std::array<uint64, TIERS + 1> relaxedPerTier = {};
@@ -841,6 +843,8 @@ TEST(OfferInvariants, LiveRegistryView)
                     ++relaxedMechanic;
                 if (set.relaxations & GR_NoCandidate)
                     ++relaxedNoCandidate;
+                if (set.relaxations & GR_NoRewardShaped)
+                    ++relaxedNoReward;
 
                 ++setsPerTier[tier];
                 if (set.relaxations != GR_None)
@@ -850,16 +854,18 @@ TEST(OfferInvariants, LiveRegistryView)
                 // which is the same rule the full-table sweep applies and the
                 // only one that survives the pool changing size.
                 //
-                // GR_NoCandidate is asserted in one direction only. It carries
-                // two meanings -- a slot that came back empty, and the
-                // reward-shaped guarantee finding no candidate -- and both are
-                // reachable at the last tiers of a long run, so only "no
-                // reward-shaped offer implies the bit" is a rule.
+                // GR_NoCandidate is not asserted at all here: an empty slot
+                // is an ordinary outcome late in a long run and the count is
+                // printed below instead. The reward-shaped guarantee carries
+                // its own bit since Phase 5, so its clause is a biconditional
+                // again rather than the one-way implication it had to be while
+                // the two shared GR_NoCandidate.
                 bool const wordFits = repeatedFamily   == bool(set.relaxations & GR_RepeatedFamily)
                                    && repeatedMechanic == bool(set.relaxations & GR_RepeatedMechanic)
-                                   && (rewardShaped || (set.relaxations & GR_NoCandidate))
+                                   && rewardShaped     != bool(set.relaxations & GR_NoRewardShaped)
                                    && !(set.relaxations
-                                        & ~uint32(GR_RepeatedFamily | GR_RepeatedMechanic | GR_NoCandidate));
+                                        & ~uint32(GR_RepeatedFamily | GR_RepeatedMechanic
+                                                | GR_NoCandidate | GR_NoRewardShaped));
 
                 if (!wordFits)
                 {
@@ -880,11 +886,12 @@ TEST(OfferInvariants, LiveRegistryView)
            "GR_None would go on believing the three offers are distinct.\n  first: " << firstWrong;
 
     std::printf("[ live     ] %llu sets: repeated family %llu, repeated mechanic %llu, "
-                "no candidate %llu\n",
+                "no candidate %llu, no reward-shaped offer %llu\n",
                 static_cast<unsigned long long>(sets),
                 static_cast<unsigned long long>(relaxedFamily),
                 static_cast<unsigned long long>(relaxedMechanic),
-                static_cast<unsigned long long>(relaxedNoCandidate));
+                static_cast<unsigned long long>(relaxedNoCandidate),
+                static_cast<unsigned long long>(relaxedNoReward));
 
     for (uint8 tier = FIRST_TIER; tier <= TIERS; ++tier)
     {
