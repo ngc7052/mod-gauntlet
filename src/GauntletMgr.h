@@ -85,6 +85,11 @@ namespace Gauntlet
 
         void OnSpellCast(Player* player, Spell* spell);
 
+        // An aura landing on the player, for the class curses that edit how
+        // long one lasts. Declared on IMechanic since Phase 0 and dispatched
+        // from nowhere until Phase 4 needed it.
+        void OnAuraApplied(Player* player, Unit* target, Aura* aura);
+
         // Group membership changed. Re-runs the stat chain, because nothing
         // else will.
         void OnGroupChanged(Player* player);

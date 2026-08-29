@@ -472,6 +472,23 @@ public:
         return damage;
     }
 
+    // Auras landing on our own player, for the class curses that change how
+    // long one lasts.
+    //
+    // This is a UnitScript hook and fires for every unit on the map, so the
+    // very first thing it does is establish that the unit is a player with a
+    // run. AuraDurationEdit::Matches makes the same check again at the
+    // mechanic's own site, because a curse that watches one spell id and
+    // forgets to check the unit will happily extend a mob's copy of it.
+    void OnAuraApply(Unit* unit, Aura* aura) override
+    {
+        Player* p = unit ? unit->ToPlayer() : nullptr;
+        if (!p || !aura)
+            return;
+
+        sGauntlet->OnAuraApplied(p, unit, aura);
+    }
+
     // The other side of the same blow, and the only hook in the core that can
     // see a creature's health *about* to cross a threshold: OnDamage runs at
     // Unit.cpp:999, twenty-five lines before the health is applied, with the

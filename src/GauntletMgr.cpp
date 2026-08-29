@@ -1595,6 +1595,21 @@ namespace Gauntlet
         return allowed;
     }
 
+    void Mgr::OnAuraApplied(Player* player, Unit* target, Aura* aura)
+    {
+        if (!_enabled || !aura || !IsEligible(player))
+            return;
+
+        RunState* st = Get(player);
+        if (!st)
+            return;
+
+        ForEachMechanic(player, st, [target, aura](Ctx& ctx, AffixInstance& a)
+        {
+            a.impl->OnAuraApplied(ctx, target, aura);
+        });
+    }
+
     void Mgr::OnHeal(Player* player, uint32& heal)
     {
         if (!_enabled || heal == 0 || !IsEligible(player))
