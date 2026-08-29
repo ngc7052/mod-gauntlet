@@ -153,6 +153,14 @@ namespace Gauntlet
             }
         }
 
+        // The leaderboard's numerals, and the addon's RANK_PIP has to agree
+        // with them: a run that ends carrying a rank IV should not be recorded
+        // as "Falling Sky 4" in the one place its epitaph is read.
+        //
+        // IV was missing for the whole of Phase 6, which is how long there had
+        // been a fourth rank. The decimal fallback is deliberate and stays: it
+        // is what a rank the numerals do not cover should look like, and it is
+        // visibly wrong rather than silently plausible.
         std::string RankNumeral(uint8 rank)
         {
             switch (rank)
@@ -160,9 +168,11 @@ namespace Gauntlet
                 case 1:  return "I";
                 case 2:  return "II";
                 case 3:  return "III";
+                case 4:  return "IV";
                 default: return std::to_string(static_cast<uint32>(rank));
             }
         }
+        static_assert(MAX_RANK <= 4, "RankNumeral needs a case for the new top rank");
 
         // How often the key/value store is written while a character is
         // logged in. CONTRACT-P1 section 5.2 states the sixty seconds.
