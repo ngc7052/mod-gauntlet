@@ -235,6 +235,12 @@ namespace Gauntlet
         uint32 Choices() const   { return _choices; }
         bool   Hardcore() const  { return _hardcore; }
 
+        // What the offer builder is allowed to draw from on this realm, ready
+        // to hand to BuildOffers. Public so that .gauntlet debug offers shows
+        // the same set of families the player would actually be offered.
+        RegistryView OfferView() const { return RegistryView{ false, _familyMask }; }
+        uint8 MaxAffixes() const { return _maxAffixes; }
+
         AggregateCaps const& Caps() const { return _caps; }
 
         // The offer's player-facing name, built the way Affix::Name() built
@@ -318,6 +324,12 @@ namespace Gauntlet
         // silently shorten the window a hardcore character has to be saved in.
         uint32 _deathWindowMs = 60000;   // TODO(design)
         uint8  _maxAffixes    = MAX_CARRIED;   // Gauntlet.MaxAffixes
+
+        // Gauntlet.Family.<X>.Enable, one bit per Family. Read by the offer
+        // builder only: a family switched off stops being offered and every
+        // affix already carried keeps acting, which is what the conf file has
+        // documented since Phase 0.
+        uint8  _familyMask    = FAMILY_MASK_ALL;
 
         // Gauntlet.Events.*. MinSpacing is configured in seconds and the
         // scheduler takes milliseconds; the conversion is in LoadConfig and

@@ -996,8 +996,13 @@ public:
         // Nothing here touches st->pending, so an offer already on the table
         // is left exactly as it was and this cannot be picked from.
         CommandPlayerView const view(p);
+        // The realm's own view and carry cap, not the defaults: a family
+        // switched off by Gauntlet.Family.<X>.Enable must be as absent here as
+        // it is in the chooser, or this command answers a question nobody
+        // asked.
         OfferSet const set = BuildOffers(st->seed, static_cast<uint8>(tierArg), view, st->affixes,
-                                         sGauntlet->Choices());
+                                         sGauntlet->Choices(), sGauntlet->OfferView(),
+                                         sGauntlet->MaxAffixes());
 
         handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r would offer at tier {} - seed {}, class {}, level {}, "
                                  "{} carried (nothing is committed):",

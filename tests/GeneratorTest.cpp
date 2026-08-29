@@ -18,6 +18,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <sstream>
@@ -173,8 +174,12 @@ TEST(GeneratorDeterminism, DoesNotDependOnWhereTheInputsLive)
 
             std::vector<AffixInstance> const relocated(carried.begin(), carried.end());
             if (!carried.empty())
+            {
+                // Braced because ASSERT_NE expands to an if/else and an
+                // unbraced one under an if is the -Wdangling-else warning.
                 ASSERT_NE(relocated.data(), carried.data())
                     << "the copy landed on the same allocation, so this iteration proves nothing";
+            }
 
             OfferSet const second = BuildOffers(seed, tier, view, relocated, 3, full);
             ASSERT_TRUE(SameSet(first, second))
@@ -326,4 +331,99 @@ TEST(GeneratorDeterminism, CountIsHonoured)
     for (uint32 count = 1; count <= 5; ++count)
         EXPECT_EQ(BuildOffers(1, 5, view, empty, count, full).offers.size(), count)
             << "count=" << count;
+}
+
+// ---------------------------------------------------------------------------
+// Gauntlet.Family.<X>.Enable, which reached Phase 5 as seven conf keys that
+// nothing read. These are the tests that make them real: a family switched off
+// is absent from every offer, at every tier, for every class -- including from
+// the relaxed passes, which is the part that is easy to get wrong. A relaxation
+// exists to fill a slot that would otherwise be empty, and the tempting shape
+// is to drop every rule at the last rung; a family the realm has turned off is
+// not a rule the generator may drop.
+// ---------------------------------------------------------------------------
+
+TEST(GeneratorFamilyMask, DisabledFamilyIsNeverOffered)
+{
+    for (uint8 f = 0; f < static_cast<uint8>(Family::MAX); ++f)
+    {
+        Family const off = static_cast<Family>(f);
+
+        RegistryView view;
+        view.includeUnimplemented = true;
+        view.familyMask = static_cast<uint8>(FAMILY_MASK_ALL & ~FamilyBit(off));
+
+        for (uint8 cls : CLASSES)
+        {
+            StubView const player(cls, 1);
+
+            // The carried set is grown as the run would grow it, so the later
+            // tiers are asked with a full set and reach the relaxed passes --
+            // which is where a mask that is only checked once would leak.
+            std::vector<AffixInstance> carried;
+            for (uint8 tier = FIRST_TIER; tier <= 80; ++tier)
+            {
+                OfferSet const set = BuildOffers(7u + cls, tier, player, carried, 3, view);
+                for (Offer const& o : set.offers)
+                {
+                    if (o.mechanic == MECHANIC_NONE)
+                        continue;
+                    MechanicDef const* def = FindMechanic(o.mechanic);
+                    ASSERT_NE(def, nullptr);
+                    EXPECT_NE(def->family, off)
+                        << FamilyName(off) << " was offered at tier " << unsigned(tier)
+                        << " for class " << unsigned(cls) << " with its bit clear";
+                }
+
+                if (!set.offers.empty() && set.offers[0].mechanic != MECHANIC_NONE
+                    && carried.size() < MAX_CARRIED)
+                {
+                    AffixInstance inst;
+                    inst.slot     = tier;
+                    inst.mechanic = set.offers[0].mechanic;
+                    inst.rank     = set.offers[0].rank;
+                    inst.boon     = set.offers[0].boon;
+                    inst.boonMag  = set.offers[0].boonMag;
+                    if (!std::any_of(carried.begin(), carried.end(),
+                                     [&](AffixInstance const& a) { return a.mechanic == inst.mechanic; }))
+                        carried.push_back(inst);
+                }
+            }
+        }
+    }
+}
+
+TEST(GeneratorFamilyMask, EveryFamilyOffIsEmptyRatherThanUnfiltered)
+{
+    // The degenerate realm: every family off. The honest answer is nothing at
+    // all, and the failure this guards against is a generator that treats an
+    // empty candidate pool as "no filter" and offers the whole table.
+    RegistryView view;
+    view.includeUnimplemented = true;
+    view.familyMask = 0;
+
+    StubView const player(1, 1);
+    std::vector<AffixInstance> const empty;
+
+    for (uint8 tier = FIRST_TIER; tier <= 80; ++tier)
+    {
+        OfferSet const set = BuildOffers(99, tier, player, empty, 3, view);
+        for (Offer const& o : set.offers)
+            EXPECT_EQ(o.mechanic, MECHANIC_NONE)
+                << "an offer survived a mask of zero at tier " << unsigned(tier);
+        EXPECT_TRUE(set.relaxations & GR_NoCandidate)
+            << "tier " << unsigned(tier) << " came back empty without saying so";
+    }
+}
+
+TEST(GeneratorFamilyMask, TheDefaultViewAllowsEveryFamily)
+{
+    // FAMILY_MASK_ALL is derived from Family::MAX, so adding a family to the
+    // enum widens it automatically -- and this is what catches a family added
+    // to the enum but not to LoadConfig's key table, since that table has a
+    // static_assert against the same enum.
+    RegistryView const def;
+    EXPECT_EQ(def.familyMask, FAMILY_MASK_ALL);
+    for (uint8 f = 0; f < static_cast<uint8>(Family::MAX); ++f)
+        EXPECT_TRUE(def.FamilyAllowed(static_cast<Family>(f)));
 }

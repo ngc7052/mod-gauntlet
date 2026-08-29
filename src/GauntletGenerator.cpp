@@ -343,6 +343,12 @@ namespace
     {
         if (!ctx.reg.includeUnimplemented && !IsImplemented(def))
             return false;
+        // Gauntlet.Family.<X>.Enable. Checked here rather than in BuildPools so
+        // that it holds at every relaxation: a switched-off family must not
+        // come back as the last resort when nothing else fits. An empty slot is
+        // the right answer for a realm that has turned six families off.
+        if (!ctx.reg.FamilyAllowed(def.family))
+            return false;
         if (rewardShapedOnly && !(def.flags & MF_RewardShaped))
             return false;
 

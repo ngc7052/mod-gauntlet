@@ -23,6 +23,7 @@
 #include "GameTime.h"
 #include "WorldSession.h"
 #include <algorithm>
+#include <iterator>
 #include <limits>
 #include <memory>
 #include <utility>
@@ -298,6 +299,50 @@ namespace Gauntlet
         // one where every cap sits pegged and no single affix matters.
         _maxAffixes = uint8(std::clamp<uint32>(
             sConfigMgr->GetOption<uint32>("Gauntlet.MaxAffixes", MAX_CARRIED), 3u, MAX_CARRIED));
+
+        // Gauntlet.Family.<X>.Enable. Seven keys that the conf file has
+        // documented since Phase 0 and that nothing read until now: a realm
+        // could set every one of them to 0 and be offered the whole table
+        // anyway. They are the same fault Gauntlet.MaxAffixes had -- a key
+        // written into the conf ahead of its consumer -- and the fix is the
+        // same one.
+        //
+        // The order is Family's own, so the array and the enum cannot drift
+        // apart without the static_assert below failing.
+        static constexpr struct { Family family; char const* key; } FAMILY_KEYS[] = {
+            { Family::Spawn,     "Gauntlet.Family.Spawn.Enable"     },
+            { Family::Enemy,     "Gauntlet.Family.Enemy.Enable"     },
+            { Family::Tempo,     "Gauntlet.Family.Tempo.Enable"     },
+            { Family::Attrition, "Gauntlet.Family.Attrition.Enable" },
+            { Family::Rules,     "Gauntlet.Family.Rules.Enable"     },
+            { Family::Bargain,   "Gauntlet.Family.Bargain.Enable"   },
+            { Family::Class,     "Gauntlet.Family.Class.Enable"     },
+        };
+        static_assert(std::size(FAMILY_KEYS) == static_cast<size_t>(Family::MAX),
+                      "a family was added to the enum without a conf key");
+
+        _familyMask = 0;
+        std::string disabled;
+        for (auto const& fk : FAMILY_KEYS)
+        {
+            if (sConfigMgr->GetOption<bool>(fk.key, true))
+                _familyMask |= FamilyBit(fk.family);
+            else
+            {
+                if (!disabled.empty())
+                    disabled += ", ";
+                disabled += FamilyName(fk.family);
+            }
+        }
+
+        // Said out loud, because a family switched off is invisible from
+        // inside the game: the offers simply stop containing it, which looks
+        // exactly like bad luck. A realm operator who did this on purpose sees
+        // it confirmed, and one who did it by accident has a line to find.
+        if (!disabled.empty())
+            LOG_INFO("module.gauntlet", "Gauntlet: families disabled by config: {}. "
+                     "They will not be offered; affixes already carried keep acting.",
+                     disabled);
 
         _summonXpRate = sConfigMgr->GetOption<float>("Gauntlet.Summons.XpRate", 0.5f);
         _summonXpRate = std::max(0.0f, std::min(1.0f, _summonXpRate));
@@ -745,7 +790,7 @@ namespace Gauntlet
 
         LivePlayerView view(player);
         OfferSet const set = BuildOffers(st->seed, genTier, view, st->affixes, _choices,
-                                         RegistryView{}, _maxAffixes);
+                                         OfferView(), _maxAffixes);
 
         // Nothing at all fits this character at this tier, so there is nothing
         // to choose and no window to raise. The tier still advances -- the run

@@ -819,7 +819,11 @@ TEST(OfferInvariants, LiveRegistryView)
                         << "boon its registry row does not name; nothing rolls one any more\n  "
                         << Describe(q);
                     if (def->classMask != 0)
+                    {
+                        // Braced for the same reason as GeneratorTest.cpp's
+                        // relocation assert: ASSERT_NE is an if/else.
                         ASSERT_NE(def->classMask & view.GetClassMask(), 0u) << Describe(q);
+                    }
 
                     if (def->flags & MF_RewardShaped)
                         rewardShaped = true;

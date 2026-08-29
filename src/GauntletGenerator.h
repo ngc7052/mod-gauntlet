@@ -80,6 +80,20 @@ namespace Gauntlet
         }
     }
 
+    // Every family's bit set: Family::MAX is 7, so 0x7F.
+    //
+    // A bit per family rather than seven bools because this travels through
+    // BuildOffers as an input the offers are deterministic in, and one byte
+    // that a test can write as a literal is easier to reason about than a
+    // seven-field struct that has to be compared field by field.
+    constexpr uint8 FAMILY_MASK_ALL =
+        static_cast<uint8>((1u << static_cast<uint8>(Family::MAX)) - 1u);
+
+    constexpr uint8 FamilyBit(Family f)
+    {
+        return static_cast<uint8>(1u << static_cast<uint8>(f));
+    }
+
     // A view of the registry the offer builder may draw from. The live one
     // hides MF_NotImplemented entries; the tests use one that does not, so the
     // invariants exercise the whole 73-entry table rather than the four
@@ -87,6 +101,25 @@ namespace Gauntlet
     struct RegistryView
     {
         bool includeUnimplemented = false;
+
+        // Gauntlet.Family.<Spawn|Enemy|Tempo|Attrition|Rules|Bargain|Class>
+        // .Enable, one bit each in Family order. A family whose bit is clear is
+        // never offered.
+        //
+        // It is in RegistryView rather than a parameter of its own because it
+        // is the same kind of thing includeUnimplemented is: a statement about
+        // which rows of the table exist as far as this call is concerned. The
+        // generator stays deterministic in its inputs and this is one of them,
+        // so a realm that turns a family off gets a different run from a realm
+        // that does not, reproducibly.
+        //
+        // Carried affixes are untouched. The conf file has promised since
+        // Phase 0 that disabling a family "removes it from future offers;
+        // anything a character already carries keeps working", and that is
+        // what this does -- the offer builder is the only thing that reads it.
+        uint8 familyMask = FAMILY_MASK_ALL;
+
+        bool FamilyAllowed(Family f) const { return (familyMask & FamilyBit(f)) != 0; }
     };
 
     // Why the builder had to relax a rule; empty when it did not.
