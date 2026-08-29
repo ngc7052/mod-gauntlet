@@ -85,8 +85,14 @@ local function Reading(key)
     return key, "", true
 end
 
+-- Keys the server sends that are not a mechanic's registry key. Last Rites
+-- draws two rows -- the Mark, and the charge -- and only one of them can be
+-- named after the mechanic, so the second borrows the first's icon rather than
+-- falling back to the question mark.
+local ICON_ALIAS = { last_rites_charge = "last_rites" }
+
 local function IconFor(key)
-    local id = idByKey[key]
+    local id = idByKey[ICON_ALIAS[key] or key]
     local m  = id and GauntletData and GauntletData.mechanics and GauntletData.mechanics[id]
     return m and m.icon or "Interface\\Icons\\INV_Misc_QuestionMark"
 end
@@ -271,7 +277,18 @@ hud:SetScript("OnUpdate", function(self, elapsed)
     end
 
     bar:SetValue(soon.total > 0 and (left / soon.total) or 0)
-    bar.text:SetText(("%s  %.0f"):format(soon.label or "", left + 0.5))
+
+    -- Seconds up to a minute, m:ss beyond it. Every Phase 1 and 2 countdown
+    -- was between two and thirty seconds, so a bare number was fine; Last
+    -- Rites' Mark runs for ten minutes and "Marked  537" is a number nobody
+    -- reads as nine minutes.
+    local text
+    if left >= 60 then
+        text = ("%s  %d:%02d"):format(soon.label or "", math.floor(left / 60), math.floor(left % 60))
+    else
+        text = ("%s  %.0f"):format(soon.label or "", left + 0.5)
+    end
+    bar.text:SetText(text)
 end)
 
 -- =============================================================== wiring ====
