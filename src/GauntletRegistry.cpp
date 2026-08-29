@@ -376,11 +376,11 @@ namespace
         // names this exact case -- "Faithless Form for a priest without Shadowform" is
         // the example it gives of a curse that must not be offered.
         { 45, "c18_faithless_form", "Faithless Form", Family::Class, CM_PRIEST, 30, 80, 3,
-          MF_NotImplemented, "", Boon::BonusDamage, 15473, 3,
+          MF_None, "", Boon::BonusDamage, 15473, 3,
           "Leaving Shadowform has a thirty-second cooldown." },
 
         { 46, "c19_penance_of_silence", "Penance of Silence", Family::Class, CM_PRIEST, 20, 80, 3,
-          MF_NotImplemented, "", Boon::BonusHealing, 0, 0,
+          MF_None, "", Boon::BonusHealing, 0, 0,
           "Healing yourself silences you for two seconds." },
 
         // The boon halves Fear Ward's cooldown.
@@ -401,14 +401,14 @@ namespace
         // The boon is bespoke: every presence is 25% stronger. requiresSpell is
         // Frost Presence, the second presence a death knight trains.
         { 50, "c23_cold_presence", "Cold Presence", Family::Class, CM_DEATH_KNIGHT, 60, 80, 3,
-          MF_NotImplemented, "", Boon::BonusAbility, 48263, 0,
+          MF_None, "", Boon::BonusAbility, 48263, 0,
           "Changing presence costs all your runic power and has a ten-second cooldown." },
 
         // The boon is bespoke: both wards last half again as long. requiresSpell
         // is Icebound Fortitude, the later of the two the card shares a
         // cooldown between.
         { 51, "c24_one_ward", "One Ward", Family::Class, CM_DEATH_KNIGHT, 60, 80, 3,
-          MF_NotImplemented, "", Boon::BonusAbility, 48792, 0,
+          MF_None, "", Boon::BonusAbility, 48792, 0,
           "Anti-Magic Shell and Icebound Fortitude share a cooldown." },
 
         // Shaman

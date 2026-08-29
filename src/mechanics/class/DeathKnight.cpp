@@ -9,6 +9,7 @@
 #include "GauntletRegistry.h"
 #include "GauntletSummons.h"
 #include "../Nearby.h"
+#include "AuraDurationEdit.h"
 
 #include "Chat.h"
 #include "Creature.h"
@@ -17,8 +18,10 @@
 #include "Position.h"
 #include "Spell.h"
 #include "SpellInfo.h"
+#include "SpellAuras.h"
 #include "SpellMgr.h"
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -343,8 +346,195 @@ namespace Gauntlet
 
             return out;
         }
+
+        // ==================================================================
+        // C23 - Cold Presence (50)
+        //
+        // "Changing presence costs all your runic power and has a ten-second
+        // cooldown."
+        //
+        // The identity verb. Blood for the elite, Frost to hold, Unholy to
+        // travel -- chosen before the fight rather than during it, and the
+        // Rune Strike and Death Coil dumps happen *before* the switch.
+        // ==================================================================
+        constexpr uint16 MECHANIC_COLD_PRESENCE = 50;
+
+        constexpr uint32 SPELL_BLOOD_PRESENCE  = 48266;
+        constexpr uint32 SPELL_FROST_PRESENCE  = 48263;
+        constexpr uint32 SPELL_UNHOLY_PRESENCE = 48265;
+
+        constexpr std::array<uint32, 3> PRESENCES = { {
+            SPELL_BLOOD_PRESENCE, SPELL_FROST_PRESENCE, SPELL_UNHOLY_PRESENCE
+        } };
+
+        constexpr uint32 PRESENCE_LOCK_MS[MAX_RANK] = { 6000, 10000, 20000 };
+
+        bool IsPresence(uint32 spellId)
+        {
+            for (uint32 id : PRESENCES)
+                if (id == spellId)
+                    return true;
+            return false;
+        }
+
+        class ColdPresence final : public IMechanic
+        {
+        public:
+            void OnDetach(Ctx& ctx) override
+            {
+                if (Player* player = ctx.player)
+                    for (uint32 id : PRESENCES)
+                        player->RemoveSpellCooldown(id, /*update*/ true);
+            }
+
+            void OnSpellCast(Ctx& ctx, Spell* spell) override
+            {
+                Player* player = ctx.player;
+                if (!player || !spell)
+                    return;
+
+                SpellInfo const* info = spell->GetSpellInfo();
+                if (!info || !IsPresence(info->Id))
+                    return;
+                if (ctx.run && ctx.run->dead)
+                    return;
+
+                player->SetPower(POWER_RUNIC_POWER, 0);
+
+                uint32 const ms = PRESENCE_LOCK_MS[RankIndexOf(ctx.self)];
+                for (uint32 id : PRESENCES)
+                    if (id != info->Id)
+                        player->AddSpellCooldown(id, 0, ms, /*needSendToClient*/ true);
+
+                AddonFor(ctx)->SendEvent(player, KeyOf(MECHANIC_COLD_PRESENCE, "c23_cold_presence"),
+                                         ms / 1000u, "Presence locked");
+
+                if (player->GetSession())
+                    ChatHandler(player->GetSession()).PSendSysMessage(
+                        "|cffff2020[Gauntlet]|r The change costs everything you had stored.");
+            }
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                uint32 const secs = PRESENCE_LOCK_MS[RankIndexOf(&self)] / 1000u;
+
+                // The card's boon is "+25% presence effects", which lives
+                // inside each presence's own aura and has no seam this module
+                // can reach; it is not promised here. See the report.
+                return "Changing presence empties your runic power and locks the other two for "
+                     + std::to_string(secs) + " seconds. Dump before you switch.";
+            }
+
+            std::string Diagnose(Ctx& ctx) const override
+            {
+                return "cold presence: " + std::to_string(PRESENCE_LOCK_MS[RankIndexOf(ctx.self)] / 1000u)
+                     + "s lock";
+            }
+        };
+
+        // ==================================================================
+        // C24 - One Ward (51)
+        //
+        // "Anti-Magic Shell and Icebound Fortitude share a cooldown."
+        //
+        // Read the fight: a caster pack is a Shell fight, a melee elite is a
+        // Fortitude fight, and you no longer get to be wrong about which.
+        // ==================================================================
+        constexpr uint16 MECHANIC_ONE_WARD = 51;
+
+        constexpr uint32 SPELL_ANTI_MAGIC_SHELL    = 48707;
+        constexpr uint32 SPELL_ICEBOUND_FORTITUDE  = 48792;
+        constexpr uint32 SPELL_LICHBORNE           = 49039;
+
+        // The card's shared cooldown: the longer of the two.
+        constexpr uint32 WARD_SHARED_MS = 120000;
+
+        class OneWard final : public IMechanic
+        {
+        public:
+            void OnDetach(Ctx& ctx) override
+            {
+                if (Player* player = ctx.player)
+                    for (uint32 id : { SPELL_ANTI_MAGIC_SHELL, SPELL_ICEBOUND_FORTITUDE, SPELL_LICHBORNE })
+                        player->RemoveSpellCooldown(id, /*update*/ true);
+            }
+
+            void OnSpellCast(Ctx& ctx, Spell* spell) override
+            {
+                Player* player = ctx.player;
+                if (!player || !spell)
+                    return;
+
+                SpellInfo const* info = spell->GetSpellInfo();
+                if (!info)
+                    return;
+
+                bool const rankThree = RankIndexOf(ctx.self) >= 2;
+                bool const isWard = info->Id == SPELL_ANTI_MAGIC_SHELL
+                                 || info->Id == SPELL_ICEBOUND_FORTITUDE
+                                 || (rankThree && info->Id == SPELL_LICHBORNE);
+                if (!isWard)
+                    return;
+                if (ctx.run && ctx.run->dead)
+                    return;
+
+                for (uint32 id : { SPELL_ANTI_MAGIC_SHELL, SPELL_ICEBOUND_FORTITUDE, SPELL_LICHBORNE })
+                {
+                    if (id == info->Id)
+                        continue;
+                    if (id == SPELL_LICHBORNE && !rankThree)
+                        continue;
+
+                    player->AddSpellCooldown(id, 0, WARD_SHARED_MS, /*needSendToClient*/ true);
+                }
+
+                AddonFor(ctx)->SendEvent(player, KeyOf(MECHANIC_ONE_WARD, "c24_one_ward"),
+                                         WARD_SHARED_MS / 1000u, "One Ward");
+            }
+
+            // The boon: whichever ward was used lasts longer.
+            void OnAuraApplied(Ctx& ctx, Unit* target, Aura* aura) override
+            {
+                Player* player = ctx.player;
+                if (!player || !aura || target != player || !ctx.self || ctx.self->boonMag == 0)
+                    return;
+
+                SpellInfo const* info = aura->GetSpellInfo();
+                if (!info)
+                    return;
+                if (info->Id != SPELL_ANTI_MAGIC_SHELL && info->Id != SPELL_ICEBOUND_FORTITUDE
+                    && info->Id != SPELL_LICHBORNE)
+                    return;
+
+                AuraDurationEdit::Scale(aura, 1.0f + float(ctx.self->boonMag) / 100.0f);
+            }
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                bool const three = RankIndexOf(&self) >= 2;
+                uint32 const pct = self.boonMag;
+
+                std::string out = "Anti-Magic Shell and Icebound Fortitude share a two-minute"
+                                  " cooldown";
+                out += three ? ", and so does Lichborne." : ".";
+                out += " Read the fight before you spend one.";
+
+                if (pct != 0)
+                    out += " In exchange whichever you use lasts " + std::to_string(pct)
+                         + "% longer, whatever its tooltip says.";
+
+                return out;
+            }
+
+            std::string Diagnose(Ctx&) const override
+            {
+                return "one ward: two-minute shared cooldown";
+            }
+        };
     }
 
+    GAUNTLET_MECHANIC(50, ColdPresence);
+    GAUNTLET_MECHANIC(51, OneWard);
     GAUNTLET_MECHANIC(48, RuneStarved);
     GAUNTLET_MECHANIC(49, GraveCall);
 }

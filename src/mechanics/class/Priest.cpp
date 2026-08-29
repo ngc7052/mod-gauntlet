@@ -10,6 +10,8 @@
 #include "AuraDurationEdit.h"
 #include "SelfControl.h"
 
+#include "SharedDefines.h"
+
 #include "Chat.h"
 #include "Player.h"
 #include "Spell.h"
@@ -247,8 +249,206 @@ namespace Gauntlet
 
             return out;
         }
+
+        // ==================================================================
+        // C18 - Faithless Form (45)
+        //
+        // "Leaving Shadowform has a thirty-second cooldown."
+        //
+        // The identity verb, and the card names the target: powershifting
+        // priests. Healing means committing out of form for half a minute --
+        // heal at 50% and plan, or ride the form and trust Vampiric Embrace.
+        // ==================================================================
+        constexpr uint16 MECHANIC_FAITHLESS = 45;
+
+        constexpr uint32 SPELL_SHADOWFORM = 15473;
+
+        constexpr uint32 SHADOWFORM_LOCK_MS[MAX_RANK] = { 15000, 30000, 60000 };
+
+        class FaithlessForm final : public IMechanic
+        {
+        public:
+            void OnDetach(Ctx& ctx) override
+            {
+                if (ctx.player)
+                    ctx.player->RemoveSpellCooldown(SPELL_SHADOWFORM, /*update*/ true);
+            }
+
+            // OnAuraRemoved rather than OnSpellCast: a priest leaves Shadowform
+            // by cancelling the aura, which is not a cast and produces no
+            // Spell* to see.
+            void OnAuraRemoved(Ctx& ctx, Unit* target, AuraApplication* app) override;
+
+            // Boon: shadow damage while in form.
+            float DamageDoneMult(Ctx& ctx, Unit*, SpellInfo const* info) override
+            {
+                Player* player = ctx.player;
+                if (!player || !info || !ctx.self || ctx.self->boonMag == 0)
+                    return 1.0f;
+                if (!player->HasAura(SPELL_SHADOWFORM))
+                    return 1.0f;
+                if ((info->GetSchoolMask() & SPELL_SCHOOL_MASK_SHADOW) == 0)
+                    return 1.0f;
+
+                return 1.0f + float(ctx.self->boonMag) / 100.0f;
+            }
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                uint32 const secs = SHADOWFORM_LOCK_MS[RankIndexOf(&self)] / 1000u;
+                uint32 const pct  = self.boonMag;
+
+                std::string out = "Leaving Shadowform locks it for " + std::to_string(secs)
+                                + " seconds. Healing is a commitment, not a flicker.";
+
+                if (pct != 0)
+                    out += " In exchange your shadow damage is " + std::to_string(pct)
+                         + "% higher while in form.";
+
+                return out;
+            }
+
+            std::string Diagnose(Ctx&) const override
+            {
+                return "faithless form: " + std::to_string(_left) + " departure(s)";
+            }
+
+        private:
+            uint32 _left = 0;
+        };
+
+        void FaithlessForm::OnAuraRemoved(Ctx& ctx, Unit* target, AuraApplication* app)
+        {
+            Player* player = ctx.player;
+            if (!player || target != player || !app)
+                return;
+
+            Aura* aura = app->GetBase();
+            if (!aura)
+                return;
+
+            SpellInfo const* info = aura->GetSpellInfo();
+            if (!info || info->Id != SPELL_SHADOWFORM)
+                return;
+            if (ctx.run && ctx.run->dead)
+                return;
+
+            uint32 const ms = SHADOWFORM_LOCK_MS[RankIndexOf(ctx.self)];
+            player->AddSpellCooldown(SPELL_SHADOWFORM, 0, ms, /*needSendToClient*/ true);
+            ++_left;
+
+            AddonFor(ctx)->SendEvent(player, KeyOf(MECHANIC_FAITHLESS, "c18_faithless_form"),
+                                     ms / 1000u, "Faithless");
+
+            if (player->GetSession())
+                ChatHandler(player->GetSession()).PSendSysMessage(
+                    "|cffff2020[Gauntlet]|r The shadow will not have you back for {} seconds.",
+                    ms / 1000u);
+        }
+
+        // ==================================================================
+        // C19 - Penance of Silence (46)
+        //
+        // "Healing yourself silences you for two seconds."
+        //
+        // The tempo verb. Heal-then-attack becomes heal-then-wand, and the
+        // decision "heal now or push" is made explicit every time. Renew before
+        // the pull stays free at rank I, which is the card's own exemption.
+        // ==================================================================
+        constexpr uint16 MECHANIC_PENANCE = 46;
+
+        constexpr uint32 SILENCE_MS[MAX_RANK] = { 2000, 3000, 4000 };
+
+        class PenanceOfSilence final : public IMechanic
+        {
+        public:
+            void OnDetach(Ctx& ctx) override { _control.Release(ctx.player); }
+
+            void OnTick(Ctx& ctx, uint32 diffMs) override
+            {
+                if (_control.Tick(ctx.player, diffMs) && ctx.player && ctx.player->GetSession())
+                    ChatHandler(ctx.player->GetSession()).PSendSysMessage(
+                        "|cff20ff20[Gauntlet]|r Your voice returns.");
+            }
+
+            void OnSpellCast(Ctx& ctx, Spell* spell) override;
+
+            // Boon: self-healing is stronger, which is what pays for the
+            // silence -- fewer, bigger heals is exactly the behaviour the curse
+            // is pushing towards.
+            float HealTakenMult(Ctx& ctx, Unit* healer, SpellInfo const*) override
+            {
+                if (!ctx.self || ctx.self->boonMag == 0 || healer != ctx.player)
+                    return 1.0f;
+
+                return 1.0f + float(ctx.self->boonMag) / 100.0f;
+            }
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                uint8 const  i    = RankIndexOf(&self);
+                uint32 const secs = SILENCE_MS[i] / 1000u;
+                uint32 const pct  = self.boonMag;
+
+                std::string out = "Healing yourself silences you for " + std::to_string(secs)
+                                + " seconds.";
+                if (i == 0)
+                    out += " Renew does not count.";
+
+                if (pct != 0)
+                    out += " In exchange your own heals are " + std::to_string(pct) + "% stronger.";
+
+                return out;
+            }
+
+            std::string Diagnose(Ctx&) const override
+            {
+                return std::string("penance: ") + (_control.Held() ? "SILENCED" : "free");
+            }
+
+        private:
+            SelfControl _control;
+        };
+
+        void PenanceOfSilence::OnSpellCast(Ctx& ctx, Spell* spell)
+        {
+            Player* player = ctx.player;
+            if (!player || !spell)
+                return;
+
+            SpellInfo const* info = spell->GetSpellInfo();
+            if (!info || !info->IsPositive())
+                return;
+            if (ctx.run && ctx.run->dead)
+                return;
+
+            // Self-cast only. A priest healing someone else is doing the thing
+            // the class is for and the card does not tax it.
+            Unit* target = spell->m_targets.GetUnitTarget();
+            if (target && target != player)
+                return;
+
+            // Rank I exempts Renew, which is the card's "free before the pull".
+            if (RankIndexOf(ctx.self) == 0
+                && sSpellMgr->GetFirstSpellInChain(info->Id) == SPELL_RENEW)
+                return;
+
+            // A silence, expressed as the closest thing SelfControl has. There
+            // is no UNIT_STATE for silence -- it is an aura mechanic -- and
+            // applying one would need a spell id whose tooltip would then
+            // describe something else, so this is a stun of the same length.
+            // It is a heavier price than the card asks for and Describe() does
+            // not pretend otherwise. TODO(design)
+            uint32 const ms = SILENCE_MS[RankIndexOf(ctx.self)];
+            _control.Apply(player, SelfControl::Kind::Stun, ms);
+
+            AddonFor(ctx)->SendEvent(player, KeyOf(MECHANIC_PENANCE, "c19_penance_of_silence"),
+                                     ms / 1000u, "Penance");
+        }
     }
 
+    GAUNTLET_MECHANIC(45, FaithlessForm);
+    GAUNTLET_MECHANIC(46, PenanceOfSilence);
     GAUNTLET_MECHANIC(44, FrailSoul);
     GAUNTLET_MECHANIC(47, WhispersOfTheDeep);
 }

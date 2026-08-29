@@ -773,9 +773,13 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_ExposedBack();        // 42  C15 rogue
     void AddSC_gauntlet_mechanic_SlowHands();          // 43  C16 rogue
     void AddSC_gauntlet_mechanic_FrailSoul();          // 44  C17 priest
+    void AddSC_gauntlet_mechanic_FaithlessForm();      // 45  C18 priest
+    void AddSC_gauntlet_mechanic_PenanceOfSilence();   // 46  C19 priest
     void AddSC_gauntlet_mechanic_WhispersOfTheDeep();  // 47  C20 priest
     void AddSC_gauntlet_mechanic_RuneStarved();        // 48  C21 death knight
     void AddSC_gauntlet_mechanic_GraveCall();          // 49  C22 death knight
+    void AddSC_gauntlet_mechanic_ColdPresence();       // 50  C23 death knight
+    void AddSC_gauntlet_mechanic_OneWard();            // 51  C24 death knight
     void AddSC_gauntlet_mechanic_OneTotem();           // 52  C25 shaman
     void AddSC_gauntlet_mechanic_TotemicAnchor();      // 53  C26 shaman
     void AddSC_gauntlet_mechanic_ColdFeet();           // 56  C29 mage
@@ -834,9 +838,13 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_ExposedBack();
     AddSC_gauntlet_mechanic_SlowHands();
     AddSC_gauntlet_mechanic_FrailSoul();
+    AddSC_gauntlet_mechanic_FaithlessForm();
+    AddSC_gauntlet_mechanic_PenanceOfSilence();
     AddSC_gauntlet_mechanic_WhispersOfTheDeep();
     AddSC_gauntlet_mechanic_RuneStarved();
     AddSC_gauntlet_mechanic_GraveCall();
+    AddSC_gauntlet_mechanic_ColdPresence();
+    AddSC_gauntlet_mechanic_OneWard();
     AddSC_gauntlet_mechanic_OneTotem();
     AddSC_gauntlet_mechanic_TotemicAnchor();
     AddSC_gauntlet_mechanic_ColdFeet();
