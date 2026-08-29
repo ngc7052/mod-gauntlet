@@ -535,7 +535,11 @@ public:
             { "give",         HandleDebugGive,        SEC_GAMEMASTER, Console::No },
             { "remove",       HandleDebugRemove,      SEC_GAMEMASTER, Console::No },
             { "rank",         HandleDebugRank,        SEC_GAMEMASTER, Console::No },
-            { "cards",        HandleDebugCards,       SEC_GAMEMASTER, Console::No },
+            // Console::Yes: it reads the registry and builds throwaway
+            // instances. It needs no character and no run, and requiring a
+            // logged-in game master to audit the offer text would mean the
+            // check could only be run by someone already playing.
+            { "cards",        HandleDebugCards,       SEC_GAMEMASTER, Console::Yes },
             { "dump",         HandleDebugDump,        SEC_GAMEMASTER, Console::No },
             { "offers",       HandleDebugOffers,      SEC_GAMEMASTER, Console::No },
             { "seed",         HandleDebugSeed,        SEC_GAMEMASTER, Console::No },
