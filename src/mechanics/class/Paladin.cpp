@@ -9,8 +9,10 @@
 #include "GauntletRegistry.h"
 #include "../Boons.h"
 #include "AuraDurationEdit.h"
+#include "SelfControl.h"
 
 #include "Chat.h"
+#include "Creature.h"
 #include "DynamicObject.h"
 #include "Player.h"
 #include "Spell.h"
@@ -304,8 +306,210 @@ namespace Gauntlet
                  + std::to_string(uint32(SAFE_YARDS)) + " yards from your own Consecration."
                    " In exchange it lasts twice as long and costs half. Fight where you consecrate.";
         }
+
+        // ==================================================================
+        // C7 - No Sanctuary (34)
+        //
+        // "Your Hearthstone will not answer under Divine Shield."
+        //
+        // The identity verb, and the card calls it what it is: "the famous
+        // hardcore taboo, enforced". Bubble-hearth is the death every Classic
+        // Hardcore realm has an opinion about; this one lets you keep both
+        // buttons and refuses the combination.
+        //
+        // Rank III goes further and breaks the bubble on your first attack, so
+        // it stops being an offensive cooldown as well as an escape.
+        // ==================================================================
+
+        constexpr uint32 SPELL_HEARTHSTONE        = 8690;
+        constexpr uint32 SPELL_HAND_OF_PROTECTION = 1022;
+
+        class NoSanctuary final : public IMechanic
+        {
+        public:
+            void OnSpellCast(Ctx& ctx, Spell* spell) override;
+
+            // Rank III: the bubble breaks the moment you swing. Watched at the
+            // damage site rather than on a cast, because auto-attack is the
+            // most likely first blow and it is not a spell.
+            void OnCreatureDamaged(Ctx& ctx, Creature* /*victim*/, uint32 /*damage*/) override
+            {
+                Player* player = ctx.player;
+                if (!player || RankIndexOf(ctx.self) < 2)
+                    return;
+                if (!player->HasAura(SPELL_DIVINE_SHIELD))
+                    return;
+
+                player->RemoveAurasDueToSpell(SPELL_DIVINE_SHIELD);
+                ++_broken;
+
+                if (player->GetSession())
+                    ChatHandler(player->GetSession()).PSendSysMessage(
+                        "|cffff2020[Gauntlet]|r The Light will not shield a raised hand.");
+            }
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                uint8 const i = RankIndexOf(&self);
+
+                std::string out = "Your Hearthstone is refused while Divine Shield or Hand of"
+                                  " Protection is on you";
+                if (i >= 1)
+                    out += ", and while Forbearance is up";
+                out += ".";
+
+                if (i >= 2)
+                    out += " Divine Shield also breaks the moment you attack.";
+
+                if (self.boonMag != 0)
+                    out += " In exchange, Divine Shield comes back "
+                         + std::to_string(self.boonMag) + "% sooner.";
+
+                return out;
+            }
+
+            std::string Diagnose(Ctx&) const override
+            {
+                return "no sanctuary: " + std::to_string(_refused) + " hearth(s) refused, "
+                     + std::to_string(_broken) + " bubble(s) broken";
+            }
+
+        private:
+            uint32 _refused = 0;
+            uint32 _broken  = 0;
+        };
+
+        void NoSanctuary::OnSpellCast(Ctx& ctx, Spell* spell)
+        {
+            Player* player = ctx.player;
+            if (!player || !spell)
+                return;
+
+            SpellInfo const* info = spell->GetSpellInfo();
+            if (!info)
+                return;
+
+            // The boon: Divine Shield comes back sooner. The affix takes away
+            // what the bubble was being used for, so it gives back more of the
+            // bubble.
+            if (IsChainOf(info->Id, SPELL_DIVINE_SHIELD) && ctx.self && ctx.self->boonMag != 0)
+            {
+                uint32 const now = player->GetSpellCooldownDelay(info->Id);
+                if (now != 0)
+                    player->ModifySpellCooldown(info->Id,
+                                                -int32(uint64(now) * ctx.self->boonMag / 100u));
+            }
+
+            if (info->Id != SPELL_HEARTHSTONE)
+                return;
+
+            uint8 const i = RankIndexOf(ctx.self);
+
+            bool const shielded = player->HasAura(SPELL_DIVINE_SHIELD)
+                               || player->HasAura(SPELL_HAND_OF_PROTECTION)
+                               || (i >= 1 && player->HasAura(SPELL_FORBEARANCE));
+            if (!shielded)
+                return;
+
+            player->InterruptNonMeleeSpells(false, info->Id);
+            ++_refused;
+
+            if (player->GetSession())
+                ChatHandler(player->GetSession()).PSendSysMessage(
+                    "|cffff2020[Gauntlet]|r No sanctuary. Run, or fight.");
+        }
+
+        // ==================================================================
+        // C8 - Commitment (35)
+        //
+        // "Hammer of Justice roots you for its duration."
+        //
+        // Stun-and-run becomes stun-and-finish. The button that used to buy an
+        // escape now buys free seconds of melee instead, and the card halves
+        // its cooldown to say so: this is not a punishment, it is a different
+        // use for the same button.
+        // ==================================================================
+
+        constexpr uint16 MECHANIC_COMMITMENT = 35;
+
+        constexpr uint32 SPELL_HAMMER_OF_JUSTICE = 853;
+
+        // The card's ladder, in seconds of root on the paladin.
+        constexpr uint32 COMMIT_MS[MAX_RANK] = { 3000, 4000, 6000 };
+
+        class Commitment final : public IMechanic
+        {
+        public:
+            void OnDetach(Ctx& ctx) override { _control.Release(ctx.player); }
+
+            void OnTick(Ctx& ctx, uint32 diffMs) override
+            {
+                if (_control.Tick(ctx.player, diffMs) && ctx.player && ctx.player->GetSession())
+                    ChatHandler(ctx.player->GetSession()).PSendSysMessage(
+                        "|cff20ff20[Gauntlet]|r Your feet are yours again.");
+            }
+
+            void OnSpellCast(Ctx& ctx, Spell* spell) override
+            {
+                Player* player = ctx.player;
+                if (!player || !spell)
+                    return;
+
+                SpellInfo const* info = spell->GetSpellInfo();
+                if (!info || !IsChainOf(info->Id, SPELL_HAMMER_OF_JUSTICE))
+                    return;
+                if (ctx.run && ctx.run->dead)
+                    return;
+
+                uint32 const ms = COMMIT_MS[RankIndexOf(ctx.self)];
+                _control.Apply(player, SelfControl::Kind::Root, ms);
+
+                // The boon: Hammer comes back sooner, cut from the cooldown the
+                // core has just set.
+                if (ctx.self && ctx.self->boonMag != 0)
+                {
+                    uint32 const now = player->GetSpellCooldownDelay(info->Id);
+                    if (now != 0)
+                        player->ModifySpellCooldown(info->Id,
+                                                    -int32(uint64(now) * ctx.self->boonMag / 100u));
+                }
+
+                AddonFor(ctx)->SendEvent(player, KeyOf(MECHANIC_COMMITMENT, "c08_commitment"),
+                                         ms / 1000u, "Committed");
+
+                if (player->GetSession())
+                    ChatHandler(player->GetSession()).PSendSysMessage(
+                        "|cffff2020[Gauntlet]|r Committed: {}. Finish it.",
+                        SelfControl::Describe(SelfControl::Kind::Root));
+            }
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                uint32 const secs = COMMIT_MS[RankIndexOf(&self)] / 1000u;
+
+                std::string out = "Hammer of Justice roots you for " + std::to_string(secs)
+                                + " seconds as well as your target. Stun and finish, not stun and"
+                                  " run.";
+
+                if (self.boonMag != 0)
+                    out += " In exchange it comes back " + std::to_string(self.boonMag)
+                         + "% sooner.";
+
+                return out;
+            }
+
+            std::string Diagnose(Ctx&) const override
+            {
+                return std::string("commitment: ") + (_control.Held() ? "ROOTED" : "free");
+            }
+
+        private:
+            SelfControl _control;
+        };
     }
 
+    GAUNTLET_MECHANIC(34, NoSanctuary);
+    GAUNTLET_MECHANIC(35, Commitment);
     GAUNTLET_MECHANIC(32, LongForbearance);
     GAUNTLET_MECHANIC(33, ConsecratedGround);
 }

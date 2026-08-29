@@ -22,6 +22,7 @@
 #include "SpellInfo.h"
 #include "SpellMgr.h"
 
+#include <array>
 #include <string>
 
 // Design section 3, family C, warrior. The family's own three rules are worth
@@ -498,6 +499,117 @@ namespace Gauntlet
                 player->SetPower(POWER_RAGE, player->GetPower(POWER_RAGE) + int32(info->ManaCost));
         }
 
+        // ==================================================================
+        // C3 - Iron Discipline (30)
+        //
+        // "Changing stance has a ten-second cooldown."
+        //
+        // The identity verb, and wave B's warrior. Stance-dancing is gone:
+        // decide Battle, Defensive or Berserker before the pull, and live with
+        // it. No mid-fight Shield Wall unless you were already in Defensive.
+        //
+        // The boon is the other half of the same idea. Changing stance normally
+        // burns rage; here it does not, so committing to a stance early costs
+        // nothing and the affix is entirely about the commitment rather than
+        // about the cost of making it.
+        // ==================================================================
+
+        // The card's ladder, in seconds of lockout on the other two stances.
+        constexpr uint32 STANCE_LOCK_MS[MAX_RANK] = { 6000, 10000, 20000 };
+
+        constexpr uint32 SPELL_BATTLE_STANCE     = 2457;
+        constexpr uint32 SPELL_DEFENSIVE_STANCE  = 71;
+        constexpr uint32 SPELL_BERSERKER_STANCE  = 2458;
+
+        constexpr std::array<uint32, 3> STANCES = { {
+            SPELL_BATTLE_STANCE, SPELL_DEFENSIVE_STANCE, SPELL_BERSERKER_STANCE
+        } };
+
+        bool IsStance(uint32 spellId)
+        {
+            return spellId == SPELL_BATTLE_STANCE
+                || spellId == SPELL_DEFENSIVE_STANCE
+                || spellId == SPELL_BERSERKER_STANCE;
+        }
+
+        class IronDiscipline final : public IMechanic
+        {
+        public:
+            void OnDetach(Ctx& ctx) override
+            {
+                if (Player* player = ctx.player)
+                    for (uint32 id : STANCES)
+                        player->RemoveSpellCooldown(id, /*update*/ true);
+            }
+
+            void OnSpellCast(Ctx& ctx, Spell* spell) override
+            {
+                Player* player = ctx.player;
+                if (!player || !spell)
+                    return;
+
+                SpellInfo const* info = spell->GetSpellInfo();
+                if (!info || !IsStance(info->Id))
+                    return;
+                if (ctx.run && ctx.run->dead)
+                    return;
+
+                uint32 const ms = STANCE_LOCK_MS[RankIndexOf(ctx.self)];
+
+                // The other two only. The stance just entered is not put on
+                // cooldown, because re-casting the stance you are already in is
+                // a no-op the player may use to clear a debuff and there is no
+                // reason to take that away.
+                for (uint32 id : STANCES)
+                    if (id != info->Id)
+                        player->AddSpellCooldown(id, 0, ms, /*needSendToClient*/ true);
+
+                // The boon: the rage a stance change normally burns is given
+                // straight back. Refunded rather than prevented, because the
+                // loss happens inside the stance aura's own effect, well before
+                // any hook here.
+                if (ctx.self && ctx.self->boonMag != 0)
+                    player->SetPower(POWER_RAGE, _rageBefore);
+
+                ++_changes;
+
+                AddonFor(ctx)->SendEvent(player, KeyOf(30, "c03_iron_discipline"),
+                                         ms / 1000u, "Stance locked");
+            }
+
+            // The rage is read every tick so the refund above has something
+            // true to restore: by the time OnSpellCast runs the stance has
+            // already taken it.
+            void OnTick(Ctx& ctx, uint32 /*diffMs*/) override
+            {
+                if (ctx.player)
+                    _rageBefore = ctx.player->GetPower(POWER_RAGE);
+            }
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                uint32 const secs = STANCE_LOCK_MS[RankIndexOf(&self)] / 1000u;
+
+                std::string out = "Changing stance locks the other two for " + std::to_string(secs)
+                                + " seconds. Choose before the pull.";
+
+                if (self.boonMag != 0)
+                    out += " In exchange you keep your rage through the change.";
+
+                return out;
+            }
+
+            std::string Diagnose(Ctx& ctx) const override
+            {
+                return "iron discipline: " + std::to_string(STANCE_LOCK_MS[RankIndexOf(ctx.self)] / 1000u)
+                     + "s lock, " + std::to_string(_changes) + " change(s)";
+            }
+
+        private:
+            int32  _rageBefore = 0;
+            uint32 _changes    = 0;
+        };
+
         std::string DeafeningRoar::Describe(AffixInstance const& self) const
         {
             uint32 const yards = uint32(ROAR_YARDS[RankIndexOf(&self)]);
@@ -509,6 +621,7 @@ namespace Gauntlet
     }
 
     GAUNTLET_MECHANIC(28, RedMist);
+    GAUNTLET_MECHANIC(30, IronDiscipline);
     GAUNTLET_MECHANIC(29, BerserkersBargain);
     GAUNTLET_MECHANIC(31, DeafeningRoar);
 }

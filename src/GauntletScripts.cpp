@@ -733,9 +733,12 @@ namespace Gauntlet
     // Family C, wave A.
     void AddSC_gauntlet_mechanic_RedMist();            // 28  C1  warrior
     void AddSC_gauntlet_mechanic_BerserkersBargain();  // 29  C2  warrior
+    void AddSC_gauntlet_mechanic_IronDiscipline();     // 30  C3  warrior
     void AddSC_gauntlet_mechanic_DeafeningRoar();      // 31  C4  warrior
     void AddSC_gauntlet_mechanic_LongForbearance();    // 32  C5  paladin
     void AddSC_gauntlet_mechanic_ConsecratedGround();  // 33  C6  paladin
+    void AddSC_gauntlet_mechanic_NoSanctuary();        // 34  C7  paladin
+    void AddSC_gauntlet_mechanic_Commitment();         // 35  C8  paladin
     void AddSC_gauntlet_mechanic_HalfTamed();          // 36  C9  hunter
     void AddSC_gauntlet_mechanic_DeadWeight();         // 37  C10 hunter
     void AddSC_gauntlet_mechanic_WideDeadZone();       // 38  C11 hunter
@@ -788,9 +791,12 @@ static void AnchorMechanics()
 
     AddSC_gauntlet_mechanic_RedMist();
     AddSC_gauntlet_mechanic_BerserkersBargain();
+    AddSC_gauntlet_mechanic_IronDiscipline();
     AddSC_gauntlet_mechanic_DeafeningRoar();
     AddSC_gauntlet_mechanic_LongForbearance();
     AddSC_gauntlet_mechanic_ConsecratedGround();
+    AddSC_gauntlet_mechanic_NoSanctuary();
+    AddSC_gauntlet_mechanic_Commitment();
     AddSC_gauntlet_mechanic_HalfTamed();
     AddSC_gauntlet_mechanic_DeadWeight();
     AddSC_gauntlet_mechanic_WideDeadZone();

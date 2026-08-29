@@ -50,7 +50,7 @@ namespace
     // rather than as a count: a row that gains the flag by accident, or loses
     // it before its dispatch is wired, is an affix offered to a live hardcore
     // character that silently does nothing.
-    constexpr std::array<uint16, 48> OFFERABLE = {
+    constexpr std::array<uint16, 51> OFFERABLE = {
         1, 2, 3, 4, 5,           // S1 Shade, S2 Echo, S3 Carrion, S4 Reinforcements, S5 Ambush
         6, 7, 8, 9, 10, 11, 12, 13,  // E1 Champions .. E8 Keen-nosed
         14, 15, 16, 17, 18,      // T1 Falling Sky .. T5 Hubris
@@ -68,7 +68,10 @@ namespace
         60,                      // C33 Fel Pact
         64,                      // C37 Bound Skin
         68,                      // C41 Faint (all mana users)
-        70, 71                   // C43 Ankh Pact, C44 Stone of the Damned
+        70, 71,                  // C43 Ankh Pact, C44 Stone of the Damned
+
+        // Wave B.
+        30, 34, 35               // C3 Iron Discipline, C7 No Sanctuary, C8 Commitment
     };
 
     // CONTRACT.md section 8's id ranges, which are fixed forever. The Attrition

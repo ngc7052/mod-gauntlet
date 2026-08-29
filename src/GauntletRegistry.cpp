@@ -289,7 +289,7 @@ namespace
 
         // TODO(design): requiresSpell is Defensive Stance, the second stance a warrior trains.
         { 30, "c03_iron_discipline", "Iron Discipline", Family::Class, CM_WARRIOR, 20, 80, 3,
-          MF_NotImplemented, "", Boon::BonusRegen, 71, 0,
+          MF_None, "", Boon::BonusRegen, 71, 0,
           "Changing stance has a ten-second cooldown." },
 
         // Boon changed from BonusRegen in Phase 4. The card's boon is "shouts
@@ -316,12 +316,12 @@ namespace
 
         // The boon takes a minute off Divine Shield's cooldown.
         { 34, "c07_no_sanctuary", "No Sanctuary", Family::Class, CM_PALADIN, 15, 60, 3,
-          MF_NotImplemented, "shortcut:divine-shield", Boon::BonusCooldown, 642, 0,
+          MF_None, "shortcut:divine-shield", Boon::BonusCooldown, 642, 0,
           "Your Hearthstone will not answer under Divine Shield." },
 
         // The boon halves Hammer of Justice's cooldown.
         { 35, "c08_commitment", "Commitment", Family::Class, CM_PALADIN, 20, 80, 3,
-          MF_NotImplemented, "", Boon::BonusCooldown, 853, 0,
+          MF_None, "", Boon::BonusCooldown, 853, 0,
           "Hammer of Justice roots you for its duration." },
 
         // Hunter
