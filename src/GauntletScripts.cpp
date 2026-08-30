@@ -102,8 +102,33 @@ public:
         // is a config-dependent answer that may have changed since login.
         sGauntletAddon->Forget(player->GetGUID());
 
-        if (!sGauntlet->IsEligible(player))
-            return;
+        // No eligibility gate on anything below. This is hardening, not a bug
+        // fix, and the difference is worth writing down because the first
+        // reading of it was wrong.
+        //
+        // It used to return here when IsEligible said no. IsEligible answers
+        // from Gauntlet.PlayersOnly and the session's bot flag, so it is a
+        // *config-dependent* answer that can change under a character that
+        // already has state -- the very thing the addon's Forget above says in
+        // its own comment, three lines earlier. So the early return looked like
+        // a leak: run a realm with PlayersOnly = 0 so bots take affixes, let a
+        // bot draw a Shade, set PlayersOnly = 1, reload, and log the bot out.
+        // DespawnAll never runs.
+        //
+        // It is not a leak, and the reason is two files away.
+        // WorldSession::LogoutPlayer calls OnPlayerLogout at WorldSession.cpp:
+        // 857 and RemovePlayerFromMap at :876, and the second is what fires
+        // OnPlayerLeaveAll -- where GauntletMapScript despawns everything
+        // unconditionally. The map script was covering this handler's early
+        // return, and nothing said so in either place.
+        //
+        // That is the actual fault: not a creature left standing, but a
+        // teardown path whose correctness silently depended on a second
+        // teardown path nineteen lines of core apart. Every call below is
+        // already a no-op for a character with no run -- Save, DespawnAll,
+        // DetachAll and Forget each begin by looking one up -- so making them
+        // unconditional costs a hash lookup and stops the two paths depending
+        // on each other.
 
         // Logging out inside the death window used to be impossible, because
         // the run ended in OnPlayerJustDied. Now that it is a timer, quitting
