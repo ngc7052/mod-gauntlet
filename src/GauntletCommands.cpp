@@ -5,6 +5,7 @@
 
 #include "GauntletAddon.h"
 #include "GauntletAudit.h"
+#include "GauntletBench.h"
 #include "GauntletGenerator.h"
 #include "GauntletMechanic.h"
 #include "GauntletMgr.h"
@@ -701,6 +702,10 @@ public:
             // kill the character it is auditing, none of which belongs behind
             // an optional argument someone might pass by accident.
             { "soak",         HandleDebugSoak,        SEC_GAMEMASTER, Console::Yes },
+            // The whole hook surface, per card, with the verdict derived rather
+            // than hand-written -- so a card added later is covered without any
+            // new test code. See the note on the handler.
+            { "bench",        HandleDebugBench,       SEC_GAMEMASTER, Console::Yes },
             { "dump",         HandleDebugDump,        SEC_GAMEMASTER, Console::No },
             { "offers",       HandleDebugOffers,      SEC_GAMEMASTER, Console::No },
             { "seed",         HandleDebugSeed,        SEC_GAMEMASTER, Console::No },
@@ -1737,6 +1742,222 @@ public:
                                 Optional<std::string_view> whatArg, Optional<uint32> rankArg)
     {
         return RunLeakAudit(handler, whoArg, whatArg, rankArg, /*exercise*/ true);
+    }
+
+    // Every card, through every hook, with the answer derived rather than
+    // declared.
+    //
+    //   .gauntlet debug bench                 every card this character can carry
+    //   .gauntlet debug bench <name> class 4  from the console, one family
+    //   .gauntlet debug bench <name> shade 4  one card, with its probe list
+    //
+    // `leaks` proved OnDetach puts things back. `soak` added the card's own
+    // clock. Neither answers the question that actually matters as the registry
+    // grows: **is this card reachable at all, and by what?**
+    //
+    // The bench attaches one affix and drives the whole of Mgr's dispatch
+    // surface at it -- experience, healing, max health, the lethal path, loot
+    // rolls, the repair bill, talent points, the three economy vetoes, all six
+    // aggregate products flat and against a target, combat entry and exit,
+    // damage dealt and taken, pet damage, periodic damage, a kill, a pet kill,
+    // a zone change, a group change, forty ticks and its own events -- and
+    // records which of them saw the card do something.
+    //
+    // Nothing in it is written per card and nothing has to be. A card added
+    // next year is covered the day its registry row lands. What the summary
+    // ends with is the list of cards **no probe reached**, which is the number
+    // to watch: it is either a card that needs a condition the bench cannot
+    // produce, or a card that does nothing at all, and both are worth knowing
+    // before a player finds out.
+    static bool HandleDebugBench(ChatHandler* handler, Optional<PlayerIdentifier> whoArg,
+                                 Optional<std::string_view> whatArg, Optional<uint32> rankArg)
+    {
+        if (!DebugAllowed(handler))
+            return false;
+
+        Player* p = whoArg ? whoArg->GetConnectedPlayer() : handler->GetPlayer();
+        if (!p)
+        {
+            handler->SendErrorMessage(
+                "|cffff2020[Gauntlet debug]|r No character to bench. From the console, name one who is "
+                "online: .gauntlet debug bench <name> [what] [rank]");
+            return false;
+        }
+
+        RunState* st = MutableRun(handler, p);
+        if (!st)
+            return false;
+
+        bool everyFamily = true;
+        Family wanted = Family::Class;
+        MechanicDef const* onlyOne = nullptr;
+
+        if (whatArg && !whatArg->empty() && !StringEqualI(*whatArg, "all"))
+        {
+            for (uint8 f = 0; f < static_cast<uint8>(Family::MAX); ++f)
+                if (StringEqualI(FamilyName(static_cast<Family>(f)), *whatArg))
+                {
+                    wanted = static_cast<Family>(f);
+                    everyFamily = false;
+                    break;
+                }
+
+            if (everyFamily)
+            {
+                onlyOne = LookupMechanic(*whatArg);
+                if (!onlyOne)
+                {
+                    handler->SendErrorMessage(
+                        "|cffff2020[Gauntlet debug]|r \"{}\" is neither a family nor a mechanic.", *whatArg);
+                    return false;
+                }
+            }
+        }
+
+        uint32 const askedRank = rankArg ? *rankArg : uint32(MAX_RANK);
+        if (askedRank < 1 || askedRank > MAX_RANK)
+        {
+            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Rank {} is out of range: 1 to {}.",
+                                      askedRank, static_cast<uint32>(MAX_RANK));
+            return false;
+        }
+
+        LivePlayerView const view(p);
+
+        // Once, around the whole sweep. Inside a card's before/after it would
+        // register as that card leaking a run-speed change, which is exactly
+        // what the first hostile-target run reported against Reinforcements.
+        BenchSetup const quieted = BenchQuiet(p, st);
+
+        uint32 benched = 0, reached = 0, leaked = 0, offClass = 0, skipped = 0;
+        std::string silent;
+        std::string leakedNames;
+
+        for (MechanicDef const& def : AllMechanics())
+        {
+            if (onlyOne)
+            {
+                if (def.id != onlyOne->id)
+                    continue;
+            }
+            else if (!everyFamily && def.family != wanted)
+                continue;
+
+            if (st->Find(def.id))
+            {
+                ++skipped;
+                continue;
+            }
+
+            if (!onlyOne && def.classMask != 0 && (def.classMask & view.GetClassMask()) == 0)
+            {
+                ++offClass;
+                continue;
+            }
+
+            uint32 const rank = std::min<uint32>(askedRank, std::min<uint8>(def.maxRank, MAX_RANK));
+
+            Footprint const before = Capture(p, st);
+
+            AffixInstance* attached = AuditAttach(p, st, def, rank);
+            if (!attached)
+            {
+                handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Ran out of affix slots.");
+                break;
+            }
+
+            uint8 const slot = attached->slot;
+            ProbeResult const probe = Probe(p, st, slot, def.id);
+
+            if (st->dead || !p->IsAlive())
+            {
+                AuditDetach(p, st, slot);
+                handler->SendErrorMessage(
+                    "|cffff2020[Gauntlet debug]|r {} killed the character. {} benched before that; the "
+                    "rest were not.", def.name, benched);
+                return false;
+            }
+
+            AuditDetach(p, st, slot);
+            Footprint const after = Capture(p, st);
+
+            ++benched;
+
+            std::vector<std::string> const lines = Diff(before, after);
+            if (!lines.empty())
+            {
+                ++leaked;
+                handler->PSendSysMessage("|cffff2020LEAK|r {} (rank {})", def.name, rank);
+                for (std::string const& line : lines)
+                    handler->PSendSysMessage("    {}", line);
+                if (!leakedNames.empty())
+                    leakedNames += ", ";
+                leakedNames += def.key;
+            }
+
+            if (probe.Reached())
+            {
+                ++reached;
+            }
+            else
+            {
+                if (!silent.empty())
+                    silent += ", ";
+                silent += def.key;
+            }
+
+            if (onlyOne)
+            {
+                handler->PSendSysMessage("|cffff2020[{}]|r {} at rank {}", def.key, def.name, rank);
+                if (probe.Reached())
+                    for (std::string const& r : probe.reached)
+                        handler->PSendSysMessage("    answered: {}", r);
+                else
+                    handler->PSendSysMessage(
+                        "    |cffff8040no probe reached it|r -- it needs a condition this bench does not "
+                        "produce, or it does nothing.");
+                handler->PSendSysMessage("    events released: {}", probe.eventsFired);
+                if (!probe.diagnose.empty())
+                    handler->PSendSysMessage("    its own counters: {}", probe.diagnose);
+            }
+
+            if (Scheduler* clock = sGauntlet->ClockFor(p))
+                clock->Cancel(def.id);
+            sGauntletSummons->DespawnFor(p, def.id);
+        }
+
+        BenchRestore(p, st, quieted);
+
+        if (benched == 0)
+        {
+            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Nothing to bench.");
+            return false;
+        }
+
+        handler->PSendSysMessage(
+            "|cffff2020[Gauntlet debug]|r bench at rank {}: {} card(s), |cff60c060{} answered a probe|r, "
+            "{} answered nothing, |cffff2020{} leaked|r.",
+            askedRank, benched, reached, benched - reached, leaked);
+
+        if (offClass != 0)
+            handler->PSendSysMessage("  {} class curse(s) are not for this class and were not benched.",
+                                     offClass);
+        if (skipped != 0)
+            handler->PSendSysMessage("  {} already carried and were not benched.", skipped);
+
+        // The number that matters as the registry grows. A card nothing reached
+        // is not a passing card; it is a card with no evidence either way, and
+        // the list is what a new card should be checked against on the day it
+        // lands.
+        if (!silent.empty())
+            handler->PSendSysMessage(
+                "  |cffff8040Reached by nothing:|r {}. Each needs a condition this bench cannot produce "
+                "-- or does nothing at all. That is the list to shrink.", silent);
+
+        if (!leakedNames.empty())
+            handler->PSendSysMessage("  |cffff2020Leaked:|r {}", leakedNames);
+
+        return true;
     }
 
     static bool HandleDebugDump(ChatHandler* handler)
