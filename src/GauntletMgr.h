@@ -108,6 +108,17 @@ namespace Gauntlet
         // the scheduler with a filled Suppression.
         void Tick(Player* player, uint32 diffMs);
 
+        // Why the scheduler is delivering nothing, in words, or empty when it
+        // is delivering normally.
+        //
+        // Mgr::Tick refuses to release *any* event while the player is mounted,
+        // in flight, in a sanctuary, dead, inside the grace window, or has an
+        // offer on the table. All six are invisible from outside, so "my affix
+        // has not fired for a minute" and "my affix is broken" looked identical
+        // -- which is how Reinforcements got reported as broken while it was
+        // simply never being allowed to act.
+        std::string SuppressionReason(Player* player);
+
         void OnEnterCombat(Player* player, Unit* enemy);
         void OnLeaveCombat(Player* player);
         void OnCreatureKill(Player* player, Creature* killed, bool byPet);

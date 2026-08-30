@@ -1463,6 +1463,36 @@ namespace Gauntlet
         }
     }
 
+    std::string Mgr::SuppressionReason(Player* player)
+    {
+        RunState* st = Get(player);
+        if (!player || !st)
+            return "";
+
+        std::string out;
+        auto add = [&out](char const* what)
+        {
+            if (!out.empty())
+                out += ", ";
+            out += what;
+        };
+
+        // The same six the Suppression in Tick() is built from, read the same
+        // way, so this cannot drift from what actually gates the queue.
+        if (player->IsMounted())        add("mounted");
+        if (player->IsInFlight())       add("in flight");
+        if (!player->IsAlive())         add("dead");
+        if (st->graceMs != 0)           add(Acore::StringFormat("in the grace window ({} ms left)",
+                                                                st->graceMs).c_str());
+        if (!st->pending.empty())       add("an offer is on the table -- pick or it stays quiet");
+
+        if (AreaTableEntry const* area = sAreaTableStore.LookupEntry(player->GetAreaId()))
+            if (area->IsSanctuary())
+                add("in a sanctuary");
+
+        return out;
+    }
+
     void Mgr::OnEnterCombat(Player* player, Unit* enemy)
     {
         if (!_enabled || !IsEligible(player))

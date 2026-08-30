@@ -1164,6 +1164,14 @@ public:
                                  now, sched->Budget(), st.graceMs,
                                  static_cast<uint32>(sched->Queue().size()));
 
+        // The first thing to read when an affix "is not firing". All six of
+        // these stop the whole queue and none of them is visible in game.
+        std::string const held = sGauntlet->SuppressionReason(p);
+        if (held.empty())
+            handler->PSendSysMessage("  |cff60c060nothing is holding the queue back|r");
+        else
+            handler->PSendSysMessage("  |cffff2020EVERY event is suppressed:|r {}", held);
+
         for (ScheduledEvent const& ev : sched->Queue())
         {
             MechanicDef const* def = FindMechanic(ev.mechanic);
@@ -1843,7 +1851,8 @@ public:
         // what the first hostile-target run reported against Reinforcements.
         BenchSetup const quieted = BenchQuiet(p, st);
 
-        uint32 benched = 0, reached = 0, leaked = 0, offClass = 0, skipped = 0;
+        uint32 benched = 0, reached = 0, leaked = 0, offClass = 0, skipped = 0, spawnFailures = 0;
+        std::string spawnFailed;
         std::string silent;
         std::string leakedNames;
 
@@ -1915,6 +1924,19 @@ public:
                 leakedNames += def.key;
             }
 
+            // A Spawn card that never put a creature in the world has failed,
+            // whatever else it moved. "It armed a timer" is not the job.
+            if (def.family == Family::Spawn && probe.maxSummons == 0)
+            {
+                ++spawnFailures;
+                handler->PSendSysMessage(
+                    "|cffff2020FAILED|r {} is a Spawn card and summoned nothing in the whole probe "
+                    "({} event(s) released).", def.name, probe.eventsFired);
+                if (!spawnFailed.empty())
+                    spawnFailed += ", ";
+                spawnFailed += def.key;
+            }
+
             if (probe.Reached())
             {
                 ++reached;
@@ -1976,6 +1998,11 @@ public:
 
         if (!leakedNames.empty())
             handler->PSendSysMessage("  |cffff2020Leaked:|r {}", leakedNames);
+
+        if (spawnFailures != 0)
+            handler->PSendSysMessage(
+                "  |cffff2020Spawned nothing:|r {}. A Spawn card that summons nothing is broken, "
+                "however many probes it answered.", spawnFailed);
 
         return true;
     }

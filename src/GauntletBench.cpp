@@ -256,6 +256,7 @@ namespace Gauntlet
         auto noteFootprint = [&](char const* what)
         {
             Footprint const now = Capture(player, run);
+            out.maxSummons = std::max(out.maxSummons, now.summons);
             if (!Diff(mark, now).empty())
                 out.reached.emplace_back(what);
             mark = now;
@@ -276,6 +277,8 @@ namespace Gauntlet
         {
             Footprint const now = Capture(player, run);
             TargetMark const tm = MarkOf(target);
+
+            out.maxSummons = std::max(out.maxSummons, now.summons);
 
             if (!Diff(mark, now).empty() || Differs(targetMark, tm))
                 out.reached.emplace_back(what);
@@ -298,6 +301,17 @@ namespace Gauntlet
             // setting only the target's leaves the player out of it.
             player->SetInCombatWith(target);
             target->SetInCombatWith(player);
+
+            // And a real attack link in both directions, which is a different
+            // thing from combat state.
+            //
+            // GetVictim() is m_attacking and getAttackers() is m_attackers, and
+            // only Unit::Attack populates either. SetInCombatWith alone leaves
+            // both empty, so a card that asks "what am I fighting" saw nothing
+            // -- which is exactly the hole Reinforcements fell through in play
+            // and the bench reproduced without noticing.
+            player->Attack(target, true);
+            target->Attack(player, true);
 
             sGauntlet->OnEnterCombat(player, target);
             noteBoth("entering combat");

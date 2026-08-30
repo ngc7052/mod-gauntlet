@@ -41,6 +41,17 @@ namespace Gauntlet
         // Scheduled events actually released. Zero for a card that never armed.
         uint32 eventsFired = 0;
 
+        // The most creatures this card had in the world at once, at any point
+        // during the probe.
+        //
+        // This exists because "answered a probe" was too weak a verdict to be
+        // worth anything for the Spawn family. Reinforcements armed a timer,
+        // fired it, and moved the scheduler queue -- so the bench called it
+        // reached and moved on, while the card had never put a single creature
+        // in the world and did not work in play at all. A card whose whole job
+        // is to spawn something has exactly one honest test, and this is it.
+        uint32 maxSummons = 0;
+
         // Cooldowns the bench's own cast started. They have to be cleared by
         // the caller *after* the affix is detached, not before: a card that
         // denies the spell buries the real cooldown while it is carried and

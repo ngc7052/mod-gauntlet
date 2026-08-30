@@ -91,6 +91,21 @@ namespace Gauntlet
         // the same breath.
         constexpr uint32 REGRIP_MS = 30000;   // TODO(design)
 
+        // How long a newly acquired pet is left alone.
+        //
+        // Not on the card, and it has to exist: a freshly tamed pet starts at
+        // the bottom of the happiness ladder, so without this the leash broke in
+        // the same second the taming finished and there was no window in which
+        // to feed it at all. Reported from play as "there is no possibility to
+        // feed them before that".
+        //
+        // A minute is enough to open the bags and press the button this card
+        // exists to make matter again.
+        constexpr uint32 NEW_PET_GRACE_MS = 60000;
+
+        // How often Wide Dead Zone will repeat itself.
+        constexpr uint32 NAG_MS = 5000;
+
         class HalfTamed final : public IMechanic
         {
         public:
@@ -142,6 +157,10 @@ namespace Gauntlet
             void Break(Ctx& ctx, Pet* pet);
 
             uint32 _graceMs = 0;
+
+            // Which pet this affix is watching, so a newly tamed one can be told
+            // from the one it has already given its grace to.
+            ObjectGuid _watching;
             uint32 _broke   = 0;
         };
 
@@ -164,7 +183,20 @@ namespace Gauntlet
 
             Pet* pet = player->GetPet();
             if (!pet || !pet->IsAlive())
+            {
+                // Forget whichever pet we were watching, so the next one to
+                // appear is recognised as new.
+                _watching.Clear();
                 return;
+            }
+
+            // A pet this affix has not seen before gets its minute untouched.
+            if (_watching != pet->GetGUID())
+            {
+                _watching = pet->GetGUID();
+                _graceMs  = NEW_PET_GRACE_MS;
+                return;
+            }
 
             if (uint32(pet->GetHappinessState()) > TURNS_AT[RankIndexOf(ctx.self)])
                 return;
@@ -362,6 +394,50 @@ namespace Gauntlet
         public:
             void OnSpellCast(Ctx& ctx, Spell* spell) override;
 
+            // Auto Shot is an *autorepeat* spell: cast once, then repeated on
+            // its own timer out of Unit::Update. OnSpellCast sees it start and
+            // never sees it fire again, so a hunter could open at range and
+            // walk straight in with the shots still landing -- reported from
+            // play as "possible to make auto from bow in less than 8 yards".
+            //
+            // A dead zone is a state to be enforced, not an event to be
+            // refused, and a state belongs on the tick.
+            void OnTick(Ctx& ctx, uint32 diffMs) override
+            {
+                Player* player = ctx.player;
+                if (!player)
+                    return;
+                if (ctx.run && ctx.run->dead)
+                    return;
+
+                _nagMs = _nagMs > diffMs ? _nagMs - diffMs : 0;
+
+                Spell* repeat = player->GetCurrentSpell(CURRENT_AUTOREPEAT_SPELL);
+                if (!repeat)
+                    return;
+
+                // The shot's own target rather than GetVictim(): the dead zone
+                // is about the thing being shot at.
+                Unit* at = repeat->m_targets.GetUnitTarget();
+                if (!at)
+                    return;
+
+                if (player->GetExactDist2d(at) >= DEAD_ZONE_YARDS[RankIndexOf(ctx.self)])
+                    return;
+
+                player->InterruptSpell(CURRENT_AUTOREPEAT_SPELL);
+                ++_refused;
+
+                // Rate-limited: this runs twice a second, and a hunter standing
+                // inside the zone would otherwise be told so every tick.
+                if (_nagMs == 0 && player->GetSession())
+                {
+                    _nagMs = NAG_MS;
+                    ChatHandler(player->GetSession()).PSendSysMessage(
+                        "|cffff2020[Gauntlet]|r Too close to shoot. Back up, or draw your blade.");
+                }
+            }
+
             // The boon, at the damage site so the distance is the one the shot
             // actually travelled.
             float DamageDoneMult(Ctx& ctx, Unit* victim, SpellInfo const* info) override
@@ -386,6 +462,7 @@ namespace Gauntlet
 
         private:
             uint32 _refused = 0;
+            uint32 _nagMs   = 0;
         };
 
         void WideDeadZone::OnSpellCast(Ctx& ctx, Spell* spell)
@@ -398,16 +475,29 @@ namespace Gauntlet
             if (!info || !info->IsRangedWeaponSpell())
                 return;
 
-            Unit* victim = player->GetVictim();
+            // The shot's own target, and GetVictim only as a fallback.
+            //
+            // This used to read GetVictim() alone and give up when it was null
+            // -- and it is null whenever the hunter is not auto-attacking, which
+            // is most of the time. Pressing a ranged skill next to a mob went
+            // straight through, reported from play as "possible even just when i
+            // press range skill near to mob". Same hole Reinforcements had, in a
+            // different file: m_attacking is the auto-attack target and nothing
+            // more (Unit.h:903).
+            Unit* victim = spell->m_targets.GetUnitTarget();
             if (!victim)
+                victim = player->GetVictim();
+            if (!victim || victim == player)
                 return;
 
             if (player->GetExactDist2d(victim) >= DEAD_ZONE_YARDS[RankIndexOf(ctx.self)])
                 return;
 
-            // InterruptNonMeleeSpells with the spell id named, so a melee swing
-            // in the same instant is untouched (Unit.h:1597).
-            player->InterruptNonMeleeSpells(false, info->Id);
+            // cancel() as well as the interrupt: an instant shot is already
+            // past the point InterruptNonMeleeSpells will reach, so on its own
+            // that refused nothing.
+            spell->cancel();
+            player->InterruptNonMeleeSpells(true, info->Id);
             ++_refused;
 
             if (player->GetSession())
