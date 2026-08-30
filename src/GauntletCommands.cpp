@@ -579,6 +579,66 @@ namespace Gauntlet
             return st->AtSlot(slot);
         }
 
+        // How long the soak drives a mechanic for. Forty ticks is twenty
+        // seconds of its own clock, which is enough for anything that
+        // integrates over time; three fires is enough to catch the *cycle*
+        // rather than the first event, and the cycle is where a summon or an
+        // aura gets left behind.
+        constexpr uint32 SOAK_TICKS = 40;
+        constexpr uint32 SOAK_FIRES = 3;
+
+        // Make the mechanic act, so that what it leaves behind can be seen.
+        //
+        // `leaks` attaches and detaches and does nothing else, so a curse whose
+        // whole behaviour hangs off a hook reports inert -- sixty-three of
+        // sixty-nine on a typical character. That is honest but thin, and it is
+        // exactly how Berserker's Bargain hid: its leak needed a real cooldown
+        // to already be running.
+        //
+        // Two drivers, and they are the only two that need nothing fabricated.
+        // OnTick takes a duration. The scheduler's warn and fire take an event
+        // id the mechanic armed for itself, delivered through Mgr::FireNow --
+        // the same path `.gauntlet debug fire` uses, telegraph included.
+        // Everything else on IMechanic wants a Unit or a Creature, and handing
+        // a mechanic a fabricated enemy tests the fabrication.
+        // Returns the number of the mechanic's own events actually released,
+        // which is the only direct evidence that the soak drove anything. A
+        // mechanic that never arms returns zero, and zero is why it reports
+        // inert -- a different statement from "it leaked nothing".
+        uint32 AuditExercise(Player* p, RunState* st, uint8 slot, uint16 mechanic)
+        {
+            uint32 fired = 0;
+
+            for (uint32 i = 0; i < SOAK_TICKS; ++i)
+            {
+                // Re-read every time rather than holding the pointer: OnTick
+                // may attach something -- a Bargain's rematch does -- and the
+                // affix vector would have moved underneath it.
+                AffixInstance* a = st->AtSlot(slot);
+                if (!a || !a->impl || st->dead || !p->IsAlive())
+                    return fired;
+
+                Ctx ctx = sGauntlet->MakeCtx(p, st, a);
+                a->impl->OnTick(ctx, Scheduler::TICK_MS);
+            }
+
+            for (uint32 i = 0; i < SOAK_FIRES; ++i)
+            {
+                if (st->dead || !p->IsAlive())
+                    return fired;
+
+                // False means it had nothing queued, which is the normal answer
+                // for a mechanic that is not timed. There is no point asking a
+                // second time.
+                if (!sGauntlet->FireNow(p, mechanic))
+                    return fired;
+
+                ++fired;
+            }
+
+            return fired;
+        }
+
         void AuditDetach(Player* p, RunState* st, uint8 slot)
         {
             AffixInstance* a = st->AtSlot(slot);
@@ -636,6 +696,11 @@ public:
             // gets run without a game client at all -- see the note on the
             // handler.
             { "leaks",        HandleDebugLeaks,       SEC_GAMEMASTER, Console::Yes },
+            // The same audit with the mechanic driven in between. Separate verb
+            // rather than a flag on `leaks`: it summons, it fires, and it can
+            // kill the character it is auditing, none of which belongs behind
+            // an optional argument someone might pass by accident.
+            { "soak",         HandleDebugSoak,        SEC_GAMEMASTER, Console::Yes },
             { "dump",         HandleDebugDump,        SEC_GAMEMASTER, Console::No },
             { "offers",       HandleDebugOffers,      SEC_GAMEMASTER, Console::No },
             { "seed",         HandleDebugSeed,        SEC_GAMEMASTER, Console::No },
@@ -1365,8 +1430,11 @@ public:
     // answers "is the character the way it was found", which is a smaller
     // question with a machine-checkable answer -- and the whole of
     // docs/checklists.md is the bigger one.
-    static bool HandleDebugLeaks(ChatHandler* handler, Optional<PlayerIdentifier> whoArg,
-                                 Optional<std::string_view> whatArg, Optional<uint32> rankArg)
+    // The body behind both `leaks` and `soak`. They differ in one bool: whether
+    // the mechanic is made to act between the attach and the detach.
+    static bool RunLeakAudit(ChatHandler* handler, Optional<PlayerIdentifier> whoArg,
+                             Optional<std::string_view> whatArg, Optional<uint32> rankArg,
+                             bool exercise)
     {
         if (!DebugAllowed(handler))
             return false;
@@ -1390,7 +1458,7 @@ public:
         {
             handler->SendErrorMessage(
                 "|cffff2020[Gauntlet debug]|r No character to audit. From the console or SOAP, name one "
-                "who is online: .gauntlet debug leaks <name> [what] [rank]");
+                "who is online: .gauntlet debug {} <name> [what] [rank]", exercise ? "soak" : "leaks");
             return false;
         }
 
@@ -1446,7 +1514,15 @@ public:
             return false;
         }
 
-        uint32 audited = 0, leaked = 0, clean = 0, inert = 0, skipped = 0;
+        uint32 audited = 0, leaked = 0, clean = 0, inert = 0, skipped = 0, offClass = 0;
+
+        // The generator's own view of this character, so the class filter below
+        // is the same one the chooser applies.
+        LivePlayerView const view(p);
+
+        // Soak only: how many of the mechanics' own events were actually
+        // released, and across how many mechanics.
+        uint32 fired = 0, drivenMechanics = 0;
 
         for (MechanicDef const& def : AllMechanics())
         {
@@ -1466,6 +1542,25 @@ public:
                 continue;
             }
 
+            // Neither is a class curse on the wrong class. The generator filters
+            // on classMask, so a warlock is never offered a hunter's curse -- and
+            // auditing one anyway does not find bugs, it invents them.
+            //
+            // Half-Tamed is the case that put this here. Attached to a warlock it
+            // dismissed the demon, which took Fel Vitality with it, and the soak
+            // duly reported max power down by 780 and never restored. All of that
+            // is true and none of it is reachable: on a hunter the dismissal is
+            // the card's own text ("the real pet can be called back afterwards").
+            //
+            // Naming a mechanic explicitly overrides this. `soak <name>
+            // c09_half_tamed 4` still audits it on whoever is standing there,
+            // because an explicit request is a decision rather than a sweep.
+            if (!onlyOne && def.classMask != 0 && (def.classMask & view.GetClassMask()) == 0)
+            {
+                ++offClass;
+                continue;
+            }
+
             uint32 const rank = std::min<uint32>(askedRank, std::min<uint8>(def.maxRank, MAX_RANK));
 
             Footprint const before = Capture(p, st);
@@ -1478,7 +1573,44 @@ public:
             }
 
             uint8 const slot = attached->slot;
+
+            // Held first, then the exercise. `held` is what the attach alone
+            // did, which is what the clean/inert verdict is about; making the
+            // mechanic act afterwards must not change that reading.
             Footprint const held = Capture(p, st);
+
+            uint32 const firedHere = exercise ? AuditExercise(p, st, slot, def.id) : 0u;
+            fired += firedHere;
+            if (firedHere != 0)
+                ++drivenMechanics;
+
+            // The mechanic's own counters, read while it is still carried. This
+            // is the evidence that the soak actually drove something: a fire
+            // count that is still zero after three FireNow calls means the
+            // mechanic never armed anything, which is a different statement
+            // from "it leaked nothing".
+            std::string diag;
+            if (onlyOne)
+                if (AffixInstance* live = st->AtSlot(slot))
+                    if (live->impl)
+                    {
+                        Ctx dctx = sGauntlet->MakeCtx(p, st, live);
+                        diag = live->impl->Diagnose(dctx);
+                    }
+
+            // A mechanic's own event can be lethal -- Falling Sky's is -- and a
+            // death retires the run, which makes every mechanic after this one
+            // unauditable. Stop and say so rather than reporting sixty
+            // mechanics that were never looked at.
+            if (st->dead || !p->IsAlive())
+            {
+                AuditDetach(p, st, slot);
+                handler->SendErrorMessage(
+                    "|cffff2020[Gauntlet debug]|r {} killed the character. {} mechanic(s) audited before "
+                    "that; the rest were not. That is a finding, not a crash.", def.name, audited);
+                return false;
+            }
+
             AuditDetach(p, st, slot);
             Footprint const after = Capture(p, st);
 
@@ -1523,6 +1655,13 @@ public:
                                          did.empty() ? "nothing" : "below");
                 for (std::string const& line : did)
                     handler->PSendSysMessage("    {}", line);
+
+                if (exercise)
+                    handler->PSendSysMessage("  events released by the soak: {}", firedHere);
+
+                if (!diag.empty())
+                    handler->PSendSysMessage("  its own counters {}: {}",
+                                             exercise ? "after the soak" : "at detach", diag);
             }
 
             // After the verdict, never before it: cleaning up first would erase
@@ -1549,10 +1688,17 @@ public:
         }
 
         handler->PSendSysMessage(
-            "|cffff2020[Gauntlet debug]|r attach/detach audit at rank {}: {} audited, "
+            "|cffff2020[Gauntlet debug]|r {} at rank {}: {} audited, "
             "|cffff2020{} leaked|r, {} clean, {} inert{}.",
+            exercise ? "soak" : "attach/detach audit",
             askedRank, audited, leaked, clean, inert,
             skipped ? Acore::StringFormat(", {} skipped as already carried", skipped) : "");
+
+        if (offClass != 0)
+            handler->PSendSysMessage(
+                "  {} class curse(s) are not for this character's class and were not attached: the "
+                "generator would never offer them, so a leak found there would not be reachable. Name "
+                "one explicitly to audit it anyway.", offClass);
 
         if (leaked == 0)
             handler->PSendSysMessage("  Every one of them put back what it took.");
@@ -1560,9 +1706,37 @@ public:
         handler->PSendSysMessage(
             "  \"inert\" means nothing measurable changed at attach -- a hook-driven mechanic, or a "
             "class curse for another class. It is not a pass.");
+
+        if (exercise)
+            handler->PSendSysMessage(
+                "  Each was ticked {} times; {} event(s) were actually released across {} mechanic(s). "
+                "The rest never armed anything, which is why they read inert. Hooks that need an enemy "
+                "-- kills, damage, casts -- were not driven; those are still only in "
+                "docs/checklists.md.", SOAK_TICKS, fired, drivenMechanics);
+        else
+            handler->PSendSysMessage(
+                "  Nothing was driven: this is attach and detach only. .gauntlet debug soak makes each "
+                "mechanic act first, which is the only way a hook-driven curse can leak in front of it.");
+
         handler->PSendSysMessage(
             "  Queued events and summons were cleaned up; any leaked aura or cooldown is still on you.");
         return true;
+    }
+
+    // Attach and detach, and nothing in between.
+    static bool HandleDebugLeaks(ChatHandler* handler, Optional<PlayerIdentifier> whoArg,
+                                 Optional<std::string_view> whatArg, Optional<uint32> rankArg)
+    {
+        return RunLeakAudit(handler, whoArg, whatArg, rankArg, /*exercise*/ false);
+    }
+
+    // The same audit, with the mechanic driven in between: ticked, and its own
+    // events released. Slower, noisier, and the only one of the two that can
+    // see what a hook-driven curse leaves behind.
+    static bool HandleDebugSoak(ChatHandler* handler, Optional<PlayerIdentifier> whoArg,
+                                Optional<std::string_view> whatArg, Optional<uint32> rankArg)
+    {
+        return RunLeakAudit(handler, whoArg, whatArg, rankArg, /*exercise*/ true);
     }
 
     static bool HandleDebugDump(ChatHandler* handler)

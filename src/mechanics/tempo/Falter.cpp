@@ -126,7 +126,31 @@ namespace Gauntlet
         {
         public:
             void OnAttach(Ctx& ctx) override { Sync(ctx); }
-            void OnDetach(Ctx& ctx) override { Disarm(ctx); }
+
+            // Disarm() here is the scheduler's, not the spell's -- this file
+            // uses Arm/Disarm for its own queue entry, and SPELL_DISARM is a
+            // different thing that happens to share the word. Cancelling the
+            // event was all detach used to do, which left whichever debuff had
+            // already landed sitting on the player after the affix was gone.
+            //
+            // `.gauntlet debug soak` found it: it releases a mechanic's own
+            // events and then detaches, and reported "aura 676 still applied"
+            // with six weapon passives dropped behind it -- the collateral of
+            // a disarm nobody was carrying any more.
+            //
+            // It expires on its own in two to four seconds, so this is small.
+            // It is still the rule the rest of the module states plainly: a
+            // curse the player no longer carries must not go on biting.
+            void OnDetach(Ctx& ctx) override
+            {
+                Disarm(ctx);
+
+                if (Player* player = ctx.player)
+                {
+                    player->RemoveAura(SPELL_DISARM);
+                    player->RemoveAura(SPELL_SILENCE);
+                }
+            }
             void OnTick(Ctx& ctx, uint32 /*diffMs*/) override { Sync(ctx); }
 
             void OnEnterCombat(Ctx& ctx, Unit* /*enemy*/, bool /*wasOutOfCombat*/) override { Sync(ctx); }
