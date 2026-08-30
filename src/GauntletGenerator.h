@@ -172,6 +172,19 @@ namespace Gauntlet
         uint32 relaxations = GR_None;
     };
 
+    // The magnitude a boon of this category is worth on this mechanic at this
+    // rank, as a percentage.
+    //
+    // The offer builder's own table, exposed because it has a second honest
+    // caller: anything that wants to *show* what an affix pays without making
+    // an offer -- `.gauntlet debug cards`, and the generated affix table in the
+    // README. A second copy of these numbers somewhere else would be a second
+    // thing that can disagree with what the player is actually paid, which is
+    // the fault this redesign exists to remove.
+    //
+    // Pure: no stream, no state, and calling it does not consume a roll.
+    uint32 BoonMagnitude(uint16 mechanic, Boon boon, uint8 rank);
+
     // Deterministic in (seed, tier, view, carried, count, reg,
     // GeneratorVersion) and in nothing else: no clock, no rand(), no pointer
     // value, no unordered container on a path that feeds a roll. The offers

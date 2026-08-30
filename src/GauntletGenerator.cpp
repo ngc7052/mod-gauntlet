@@ -570,6 +570,13 @@ namespace
 
 namespace Gauntlet
 {
+    // The anonymous namespace's table, published under a name callers outside
+    // the offer builder can use. One line rather than a second copy.
+    uint32 BoonMagnitude(uint16 mechanic, Boon boon, uint8 rank)
+    {
+        return BoonTable(mechanic, boon, rank);
+    }
+
     OfferSet BuildOffers(uint32 seed, uint8 tier, IPlayerView const& view,
                          std::vector<AffixInstance> const& carried,
                          uint32 count, RegistryView reg, uint8 maxCarried)
