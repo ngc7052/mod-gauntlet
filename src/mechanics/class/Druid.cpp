@@ -30,6 +30,10 @@
 // and leaving Cat to heal becomes a commitment rather than a flicker. The card
 // names the real change -- the class decides *before* the pull whether this is
 // a Bear fight or a Cat fight, and learns to heal at 50% instead of 15%.
+//
+// The commitment is priced on the way *in*, not on the way out. Charging the
+// drop to caster as well made cancelling a form cost a second full lockout,
+// which played as a bug rather than as a cost; see OnShapeshift.
 
 namespace Gauntlet
 {
@@ -76,10 +80,25 @@ namespace Gauntlet
             // seconds. Only the ones it locked, though -- see TimedLockout.
             void OnDetach(Ctx& ctx) override { _lock.ReleaseAll(ctx.player); }
 
-            // Fires on every form change including the one *out* of a form,
-            // which is correct: the card prices changing, not entering.
-            void OnShapeshift(Ctx& ctx, uint8 /*form*/) override
+            // Entering a form, and only entering one.
+            //
+            // This used to fire on every form change including the drop back to
+            // caster, on the reasoning that the card prices *changing*. Played,
+            // that is a double charge and it reads as a bug: entering Bear
+            // starts the lock, and cancelling Bear starts a second one, so a
+            // druid who shifts out is held in caster form for a fresh full
+            // lockout they did nothing to earn.
+            //
+            // The cost belongs on the commitment. Dropping out is free; getting
+            // back in is what waits, because entering locked every form
+            // including the one just entered. `form` is the form being set
+            // (Unit.cpp:17289-17292), so FORM_NONE is the drop -- the same test
+            // Nature's Toll makes a few lines below.
+            void OnShapeshift(Ctx& ctx, uint8 form) override
             {
+                if (form == FORM_NONE)
+                    return;
+
                 Player* player = ctx.player;
                 if (!player)
                     return;
@@ -116,8 +135,9 @@ namespace Gauntlet
                 uint32 const secs = SHIFT_LOCK_MS[RankIndexOf(&self)] / 1000u;
                 uint32 const pct  = self.boonMag;
 
-                std::string out = "Changing form locks every form for " + std::to_string(secs)
-                                + " seconds. Decide before the pull whether this is a Bear fight"
+                std::string out = "Entering a form locks every form for " + std::to_string(secs)
+                                + " seconds. Dropping to caster is free; getting back in is what"
+                                  " waits. Decide before the pull whether this is a Bear fight"
                                   " or a Cat fight.";
 
                 if (pct != 0)
