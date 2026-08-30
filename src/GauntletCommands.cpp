@@ -574,6 +574,15 @@ namespace Gauntlet
                 stored.impl->OnAttach(ctx);
             }
 
+            // What Mgr::Load and Mgr::Pick both do after OnAttach
+            // (GauntletMgr.cpp:705 and :1006), and leaving it out made the
+            // audit lie. A MaxHealth factor does not reach GetMaxHealth until
+            // the stat chain is rerun, so a synchronous Capture read the old
+            // number -- and Arcane Frailty duly reported halving the character's
+            // maximum health and never putting it back, with the next card
+            // reporting the restore as its own leak. Neither was true.
+            sGauntlet->RefreshStats(p);
+
             // Re-read rather than returning the reference: OnAttach may have
             // attached something else -- a Bargain's rematch does -- and the
             // vector would have moved under it.
@@ -653,6 +662,11 @@ namespace Gauntlet
             }
             st->DetachSlot(slot);
             sGauntlet->SyncTimedAffixCount(p);
+
+            // Same reason as the attach above: the real teardown refreshes
+            // (GauntletMgr.cpp:1127), so an audit that does not is measuring a
+            // state the game never leaves a character in.
+            sGauntlet->RefreshStats(p);
         }
 
         // Who did it, for the cheat log. The account id is the part that
