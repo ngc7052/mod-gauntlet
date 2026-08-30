@@ -328,6 +328,7 @@ change to the registry or to a mechanic:
 |---|---|
 | `.gauntlet debug cards` | Every affix's offer text at every rank: ranks that read identically, and words too long for the addon's wire protocol to split. Needs no character. |
 | `.gauntlet debug leaks` | Attaches every affix, detaches it, and reports anything the character did not get back — a held cooldown, a leftover aura, an orphaned summon, a bent multiplier. Run `.gauntlet debug leaks self` first: it checks the audit can see the character at all. |
+| `.gauntlet debug bench` | Attaches each card and drives the module's whole hook surface at it — experience, healing, max health, the lethal path, loot, the aggregate products, combat, kills, ticks, its own events — then reports which probes it answered. Nothing is written per card, so a new card is covered the day its registry row lands. The summary ends with the cards **no probe reached**, which is the coverage number to watch. |
 | `.gauntlet debug soak` | The same audit with each mechanic driven in between — ticked, and its own scheduled events released. Slower and noisier, and the only one of the two that can catch a hook-driven curse leaving something behind. It reports how many events it actually released, because a clean soak that drove nothing is not a result. |
 
 ## Installation

@@ -33,6 +33,7 @@ account. Nothing below stakes a real run.
 .gauntlet debug leaks [what] [rank]    # attach and detach every affix: what did not come back
 .gauntlet debug leaks self             # check the audit can see this character before trusting it
 .gauntlet debug soak  [what] [rank]    # the same, but drive each mechanic first: ticks and its own events
+.gauntlet debug bench [what] [rank]    # every hook at every card: which probes it answers, and which cards nothing reaches
 .gauntlet status                       # what the player sees
 .gauntlet top                          # the leaderboard, and now the conducts
 ```
