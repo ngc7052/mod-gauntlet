@@ -19,8 +19,12 @@
 -- when the value goes to zero and the key is one that means nothing at zero.
 -- The whole thing hides itself when there is nothing to say.
 
-local BG     = { 0.06, 0.06, 0.07, 0.88 }
-local BORDER = { 0.20, 0.22, 0.28, 1.00 }
+-- Matched to Panel.lua's BG. The HUD sits over the world for the whole session
+-- rather than being opened and closed, so if anything it wants to be lighter
+-- than the panels, not heavier -- but two different translucencies on screen at
+-- once read as a bug, so it takes the same number.
+local BG     = { 0.04, 0.04, 0.06, 0.62 }
+local BORDER = { 0.30, 0.32, 0.40, 0.85 }
 local ROW_H  = 18
 local WIDTH  = 190
 

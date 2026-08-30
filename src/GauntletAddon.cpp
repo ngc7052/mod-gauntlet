@@ -5,6 +5,7 @@
 
 #include "GauntletAddon.h"
 #include "GauntletWire.h"
+#include "mechanics/Boons.h"
 #include "GauntletMgr.h"
 #include "Chat.h"
 #include "GameTime.h"
@@ -348,6 +349,10 @@ namespace Gauntlet
         // the list authoritative, and the addon replaces rather than merges on
         // it. A run with nothing borne has to be able to say so.
         Emit(player, Frame("AFFIX_END").Str());
+
+        // The totals travel with the list they are the total of, so the two can
+        // never be shown from different moments.
+        SendTotals(player);
     }
 
     void Addon::SendOffers(Player* player)
@@ -490,6 +495,38 @@ namespace Gauntlet
         Frame f("SUMMON");
         f.Text(key, 32);
         f.Num(alive ? 1 : 0);
+        Emit(player, f.Str());
+    }
+
+    void Addon::SendTotals(Player* player)
+    {
+        if (!CanSend(player))
+            return;
+
+        RunState const* st = sGauntlet->Get(player);
+        if (!st)
+            return;
+
+        // As hundredths, so the wire carries integers and the addon divides.
+        auto pct = [](float f) { return int64(f * 100.0f + 0.5f); };
+
+        // Gold is the one that is not an AggregateKind: BonusMoney is paid at
+        // the loot site by each mechanic that carries it, each multiplying the
+        // same purse, so the product across the carried set is what a player
+        // actually receives. Worked out here rather than in the addon for the
+        // reason in the header -- the arithmetic belongs where the truth is.
+        float gold = 1.0f;
+        for (AffixInstance const& a : st->affixes)
+            gold *= BoonMoneyMult(a);
+
+        Frame f("TOTALS");
+        f.Num(pct(sGauntlet->Aggregate(player, AggregateKind::DamageTaken)));
+        f.Num(pct(sGauntlet->Aggregate(player, AggregateKind::DamageDone)));
+        f.Num(pct(sGauntlet->Aggregate(player, AggregateKind::HealTaken)));
+        f.Num(pct(sGauntlet->Aggregate(player, AggregateKind::MaxHealth)));
+        f.Num(pct(sGauntlet->Aggregate(player, AggregateKind::EnemySpeed)));
+        f.Num(pct(sGauntlet->Aggregate(player, AggregateKind::Experience)));
+        f.Num(pct(gold));
         Emit(player, f.Str());
     }
 

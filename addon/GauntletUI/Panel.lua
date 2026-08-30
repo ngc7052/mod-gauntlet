@@ -29,9 +29,18 @@ local function Strip(s)
     return (s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
 end
 
-local BG      = { 0.06, 0.06, 0.07, 0.94 }
-local BORDER  = { 0.20, 0.22, 0.28, 1.00 }
-local ROW_BG  = { 0.10, 0.10, 0.12, 0.60 }
+-- The palette, and every panel in the addon takes it from here.
+--
+-- The backdrop alpha is the whole of "transparent": 0.94 was very nearly opaque
+-- and the panels read as a second UI sitting on top of the game rather than as
+-- part of it. 0.62 lets the world through without letting the text fight it --
+-- the title and the row names are drawn at full alpha regardless, because a
+-- readable panel over a bright zone is worth more than a uniformly faint one.
+local BG        = { 0.04, 0.04, 0.06, 0.62 }
+local BORDER    = { 0.30, 0.32, 0.40, 0.85 }
+local ROW_BG    = { 0.10, 0.10, 0.13, 0.35 }
+local ROW_ALT   = { 0.14, 0.14, 0.18, 0.35 }   -- every other row, for tracking across a wide line
+local HEAD_BG   = { 0.08, 0.09, 0.13, 0.55 }
 
 -- ===================================================== fallback-only ====
 -- Chat-scraped affixes have no mechanic id, so severity and icon can only be
@@ -164,6 +173,17 @@ local function Panel(name, w, h, title)
     })
     f:SetBackdropColor(unpack(BG))
     f:SetBackdropBorderColor(unpack(BORDER))
+
+    -- A one-pixel rule under the title. Cheap, and it is what stops a
+    -- translucent panel reading as a floating pile of text: the eye needs one
+    -- horizontal to hang the header off when the background is not solid.
+    f.rule = f:CreateTexture(nil, "ARTWORK")
+    f.rule:SetTexture("Interface\\Buttons\\WHITE8X8")
+    f.rule:SetVertexColor(unpack(BORDER))
+    f.rule:SetHeight(1)
+    f.rule:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -28)
+    f.rule:SetPoint("TOPRIGHT", f, "TOPRIGHT", -10, -28)
+
     f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
     f:SetScript("OnDragStop", f.StopMovingOrSizing)
@@ -196,10 +216,22 @@ local function AddGlow(btn)
 end
 
 -- ================================================================= main ====
-local main = Panel("GauntletMain", 340, 260, "The Gauntlet")
+--
+-- The carried list, rewritten in Phase 10 for four things it could not do:
+-- show more than sixteen affixes, show what the whole set adds up to, say what
+-- each affix pays as well as what it costs, and let the world through behind
+-- it.
+--
+-- The sixteen was not a display choice, it was MAX_CARRIED leaking into the
+-- renderer: sixteen frames were built at load and a seventeenth affix would
+-- simply not have been drawn. `.gauntlet debug give-class 3 all` attaches more
+-- than sixteen on purpose, so the cap had to go from here whatever the carry
+-- cap does.
+
+local main = Panel("GauntletMain", 440, 320, "The Gauntlet")
 
 main.head = main:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-main.head:SetPoint("TOPLEFT", main, "TOPLEFT", 14, -30)
+main.head:SetPoint("TOPLEFT", main, "TOPLEFT", 14, -36)
 main.head:SetJustifyH("LEFT")
 
 local gear = CreateFrame("Button", nil, main)
@@ -215,10 +247,85 @@ gear:SetScript("OnEnter", function(self)
 end)
 gear:SetScript("OnLeave", function(self) self.glow:Hide(); GameTooltip:Hide() end)
 
--- What the run's timed affixes do to each other's timing. The server sends this
--- whenever the carried set changes; see Addon::SendPace for why it cannot live
--- in the individual blurbs -- the stretch belongs to the whole set, not to any
--- one affix, so no affix can state it.
+-- ---------------------------------------------------------------- totals ----
+--
+-- What the whole set adds up to. Every number is the server's, from the TOTALS
+-- frame: six of the seven are aggregate products *after* the caps have clamped
+-- them, so a run whose damage taken would be x2.4 shows the x2.0 it actually
+-- takes. Adding the boons up in Lua would print the first number while the
+-- player took the second.
+local totals = nil
+
+-- label, key, and which direction is bad news. `worse` decides the colour, not
+-- the arithmetic: 120% damage taken is bad and 120% experience is good, and a
+-- panel that paints both the same colour is not summarising anything.
+local TOTAL_ROWS = {
+    { "Damage taken", "taken", true  },
+    { "Damage dealt", "done",  false },
+    { "Healing",      "heal",  false },
+    { "Max health",   "maxhp", false },
+    { "Enemy speed",  "speed", true  },
+    { "Experience",   "xp",    false },
+    { "Gold",         "gold",  false },
+}
+
+local totalsBox = CreateFrame("Frame", nil, main)
+totalsBox:SetPoint("TOPLEFT", main, "TOPLEFT", 12, -54)
+totalsBox:SetPoint("TOPRIGHT", main, "TOPRIGHT", -12, -54)
+totalsBox:SetHeight(34)
+totalsBox:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
+totalsBox:SetBackdropColor(unpack(HEAD_BG))
+
+totalsBox.cells = {}
+for i = 1, #TOTAL_ROWS do
+    local c = totalsBox:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    c:SetJustifyH("CENTER")
+    c:SetWidth(58)
+    c:SetPoint("TOPLEFT", totalsBox, "TOPLEFT", 4 + (i - 1) * 59, -4)
+
+    local v = totalsBox:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    v:SetJustifyH("CENTER")
+    v:SetWidth(58)
+    v:SetPoint("TOPLEFT", c, "BOTTOMLEFT", 0, -2)
+
+    c:SetText(TOTAL_ROWS[i][1])
+    totalsBox.cells[i] = v
+end
+
+totalsBox.empty = totalsBox:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+totalsBox.empty:SetPoint("LEFT", totalsBox, "LEFT", 8, 0)
+totalsBox.empty:SetText("Nothing you carry changes a number yet.")
+
+local function RefreshTotals()
+    if not totals then
+        for _, v in ipairs(totalsBox.cells) do v:SetText("") end
+        totalsBox.empty:Show()
+        return
+    end
+
+    local any = false
+    for i, spec in ipairs(TOTAL_ROWS) do
+        local v = totals[spec[2]] or 1
+        if math.abs(v - 1) < 0.005 then
+            -- Unchanged. Drawn as a dash rather than "100%": seven identical
+            -- hundreds is a wall of noise with the one number that moved
+            -- hidden in it.
+            totalsBox.cells[i]:SetText("|cff505050-|r")
+        else
+            any = true
+            local worse = spec[3] and v > 1 or (not spec[3]) and v < 1
+            local colour = worse and "|cffff6040" or "|cff40e060"
+            totalsBox.cells[i]:SetText(("%s%d%%|r"):format(colour, math.floor(v * 100 + 0.5)))
+        end
+    end
+    if any then totalsBox.empty:Hide() else totalsBox.empty:Show() end
+end
+
+-- ------------------------------------------------------------------ list ----
+
+-- What the run's timed affixes do to each other's timing, from the PACE frame.
+-- The stretch belongs to the whole carried set, not to any one affix, so no
+-- affix can state it and this is where it is held.
 --
 -- Declared here, above the row loop, and not beside RefreshMain where it is
 -- also read: the row tooltips are closures built inside that loop, and a local
@@ -226,52 +333,73 @@ gear:SetScript("OnLeave", function(self) self.glow:Hide(); GameTooltip:Hide() en
 -- of the same name and read nil for the life of the session.
 local pace = nil
 
-local ROW_H = 26
+local ROW_H     = 34
+local VISIBLE   = 7          -- rows built; the list scrolls through however many there are
+local scrollAt  = 0          -- index of the first row drawn
+
+local list = CreateFrame("Frame", nil, main)
+list:SetPoint("TOPLEFT", main, "TOPLEFT", 12, -92)
+list:SetPoint("BOTTOMRIGHT", main, "BOTTOMRIGHT", -12, 28)
+list:EnableMouseWheel(true)
+
 local rows = {}
-for i = 1, 16 do
-    local r = CreateFrame("Button", nil, main)
-    r:SetWidth(312); r:SetHeight(ROW_H)
-    r:SetPoint("TOPLEFT", main, "TOPLEFT", 14, -48 - (i - 1) * ROW_H)
+for i = 1, VISIBLE do
+    local r = CreateFrame("Button", nil, list)
+    r:SetHeight(ROW_H)
+    r:SetPoint("TOPLEFT", list, "TOPLEFT", 0, -(i - 1) * ROW_H)
+    r:SetPoint("TOPRIGHT", list, "TOPRIGHT", 0, -(i - 1) * ROW_H)
     r:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
-    r:SetBackdropColor(unpack(ROW_BG))
 
     r.icon = r:CreateTexture(nil, "ARTWORK")
-    r.icon:SetWidth(18); r.icon:SetHeight(18)
-    r.icon:SetPoint("LEFT", r, "LEFT", 4, 0)
+    r.icon:SetWidth(22); r.icon:SetHeight(22)
+    r.icon:SetPoint("LEFT", r, "LEFT", 5, 0)
     r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     r.name = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    r.name:SetPoint("LEFT", r.icon, "RIGHT", 7, 0)
-    r.name:SetJustifyH("LEFT"); r.name:SetWidth(150)
+    r.name:SetPoint("TOPLEFT", r.icon, "TOPRIGHT", 8, -1)
+    r.name:SetJustifyH("LEFT")
 
-    -- Rank pip and condition light: only populated for protocol-sourced rows
-    -- (see RefreshMain); hidden for chat-scraped ones, which have neither.
-    r.rank = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    r.rank:SetPoint("LEFT", r.name, "RIGHT", 6, 0)
-    r.rank:SetWidth(24); r.rank:SetJustifyH("LEFT")
+    -- The second line is the whole of "better info": what the affix actually
+    -- does, at the rank it is actually at, in the row rather than only in a
+    -- tooltip nobody hovers.
+    r.effect = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    r.effect:SetPoint("TOPLEFT", r.name, "BOTTOMLEFT", 0, -2)
+    r.effect:SetPoint("RIGHT", r, "RIGHT", -96, 0)
+    r.effect:SetJustifyH("LEFT")
+    r.effect:SetHeight(11)
 
-    -- The condition light that used to sit here is gone. It showed whether an
-    -- affix's Condition was currently in force, which was meaningful while the
-    -- scalars existed; Phase 2 deleted them and nothing has rolled a condition
-    -- since, so every affix is Condition::Always and the light was a grey
-    -- square that never changed and never meant anything. A player asked what
-    -- it was for, which is the answer.
+    r.pays = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    r.pays:SetPoint("RIGHT", r, "RIGHT", -8, 5)
+    r.pays:SetJustifyH("RIGHT")
 
     r.tag = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    r.tag:SetPoint("RIGHT", r, "RIGHT", -6, 0)
+    r.tag:SetPoint("RIGHT", r, "RIGHT", -8, -7)
+    r.tag:SetJustifyH("RIGHT")
 
     AddGlow(r)
     r:SetScript("OnEnter", function(self)
         self.glow:Show()
-        if not self.data then return end
+        local d = self.data
+        if not d then return end
+
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(self.data.name, 1, 0.82, 0)
-        GameTooltip:AddLine(Body(self.data.desc), 1, 1, 1, true)
-        local s = RowColor(self.data)
-        GameTooltip:AddLine(s[4], s[1], s[2], s[3])
-        -- The blurb above states the interval the mechanic asks for. Say what
-        -- the run is doing to it, on the row where the number was read.
+        GameTooltip:SetText(d.name .. (d.rank and ("  " .. (RANK_PIP[d.rank] or "")) or ""), 1, 0.82, 0)
+
+        local s = RowColor(d)
+        GameTooltip:AddLine(s[4] .. " family", s[1], s[2], s[3])
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("What it does", 1, 1, 1)
+        GameTooltip:AddLine(Body(d.desc), 0.85, 0.85, 0.85, true)
+
+        local boon = BoonText(d.boon, d.boonMag)
+        if boon then
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine("What it pays", 1, 1, 1)
+            GameTooltip:AddLine(boon, 0.4, 0.9, 0.4, true)
+        end
+
         if pace and pace.timed > 1 and pace.mult > 1.0 then
+            GameTooltip:AddLine(" ")
             GameTooltip:AddLine(("You carry %d affixes that act on a timer, so this one waits x%.2f longer than the line above says."):
                                 format(pace.timed, pace.mult), 0.6, 0.6, 0.6, true)
         end
@@ -283,67 +411,91 @@ for i = 1, 16 do
 end
 
 main.empty = main:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-main.empty:SetPoint("TOPLEFT", main, "TOPLEFT", 16, -54)
-main.empty:SetText("No affixes yet. The first arrives at level 5.")
+main.empty:SetPoint("TOPLEFT", list, "TOPLEFT", 4, -6)
+main.empty:SetText("No affixes yet. The first arrives at level 1.")
 main.empty:Hide()
 
 main.foot = main:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 main.foot:SetPoint("BOTTOMLEFT", main, "BOTTOMLEFT", 14, 10)
+
+main.count = main:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+main.count:SetPoint("BOTTOMRIGHT", main, "BOTTOMRIGHT", -14, 10)
+main.count:SetJustifyH("RIGHT")
 
 local function RefreshMain()
     local live = (run.state == "alive")
     main.head:SetText(("Tier |cffffd100%d|r   %s   |cff808080seed %s|r"):format(
         run.tier, live and "|cff40e040alive|r" or "|cffff4040retired|r", run.seed))
 
+    RefreshTotals()
+
     -- Grouped by family, then by name. The arrival order is the tier each was
     -- taken at, which meant a run's list shuffled its own families together and
-    -- gave no sense of what the set actually was. With sixteen rows possible
-    -- that matters much more than it did with nine.
+    -- gave no sense of what the set actually was.
     table.sort(affixes, function(x, y)
         if (x.family or 99) ~= (y.family or 99) then return (x.family or 99) < (y.family or 99) end
         return (x.name or "") < (y.name or "")
     end)
 
-    local n = 0
-    for i = 1, 16 do
-        local a = affixes[i]
+    local n = #affixes
+
+    -- Clamp the scroll to what there is. Losing an affix to a swap while
+    -- scrolled to the bottom would otherwise leave the list looking empty.
+    local maxAt = n - VISIBLE
+    if maxAt < 0 then maxAt = 0 end
+    if scrollAt > maxAt then scrollAt = maxAt end
+    if scrollAt < 0 then scrollAt = 0 end
+
+    for i = 1, VISIBLE do
+        local a = affixes[scrollAt + i]
+        local r = rows[i]
         if a then
             local s = RowColor(a)
-            rows[i].data = a
-            rows[i].icon:SetTexture(RowIcon(a))
-            rows[i].name:SetText(a.name)
-            rows[i].name:SetTextColor(s[1], s[2], s[3])
-            -- Family on the right, and the boon in front of it when there is
-            -- one, so the row reads "what it costs you | what it pays".
-            local boon = BoonText(a.boon, a.boonMag)
-            rows[i].tag:SetText(boon and ("|cff60c060+" .. boon .. "|r  " .. s[4]) or s[4])
+            r.data = a
+            r:SetBackdropColor(unpack(((scrollAt + i) % 2 == 0) and ROW_ALT or ROW_BG))
+            r.icon:SetTexture(RowIcon(a))
+            r.name:SetText(("%s|cff707070%s|r"):format(
+                a.name, a.rank and ("  " .. (RANK_PIP[a.rank] or "")) or ""))
+            r.name:SetTextColor(s[1], s[2], s[3])
+            r.effect:SetText(Body(a.desc))
+            r.tag:SetText(("|cff606060%s|r"):format(s[4]))
 
-            if a.rank then
-                rows[i].rank:SetText(RankText(a.rank))
-                rows[i].rank:Show()
-            else
-                rows[i].rank:SetText("")
-            end
-            rows[i]:Show(); n = i
+            local boon = BoonText(a.boon, a.boonMag)
+            r.pays:SetText(boon and ("|cff40e060+" .. boon .. "|r") or "")
+            r:Show()
         else
-            rows[i].data = nil
-            rows[i]:Hide()
+            r.data = nil
+            r:Hide()
         end
     end
 
     if n == 0 then main.empty:Show() else main.empty:Hide() end
+
+    if n > VISIBLE then
+        main.count:SetText(("|cff808080%d-%d of %d   (scroll)|r"):format(
+            scrollAt + 1, math.min(scrollAt + VISIBLE, n), n))
+    elseif n > 0 then
+        main.count:SetText(("|cff808080%d carried|r"):format(n))
+    else
+        main.count:SetText("")
+    end
+
     if pendingOffer then
         main.foot:SetText("|cffffd100A choice is waiting - leave combat.|r")
     elseif pace and pace.timed > 1 and pace.mult > 1.0 then
-        -- Only when it is actually stretching something. A run with one timed
-        -- affix reads its blurbs literally and does not need telling.
-        main.foot:SetText(("|cff808080%d affixes act on a timer, so each waits |r|cffffd100x%.2f|r|cff808080 longer than its card says|r")
+        main.foot:SetText(("|cff808080%d affixes act on a timer, so each waits |r|cffffd100x%.2f|r|cff808080 longer|r")
                           :format(pace.timed, pace.mult))
     else
         main.foot:SetText("/gauntlet top for the furthest runs")
     end
-    main:SetHeight(math.max(120, 76 + math.max(n, 1) * ROW_H))
+
+    main:SetHeight(120 + math.max(math.min(n, VISIBLE), 1) * ROW_H)
 end
+
+list:SetScript("OnMouseWheel", function(_, delta)
+    scrollAt = scrollAt - delta
+    RefreshMain()
+end)
 
 -- ============================================================= settings ====
 local cfg = Panel("GauntletSettings", 250, 130, "Settings")
@@ -461,6 +613,19 @@ local function ShowChooser()
             if o.kind == "rankup" and held and held.rank and o.rank then
                 descText = descText .. "  |cff66b0ff(" .. (RANK_PIP[held.rank] or held.rank)
                          .. " to " .. (RANK_PIP[o.rank] or o.rank) .. ")|r"
+            end
+
+            -- What it pays, on its own line and in its own colour.
+            --
+            -- The sentence above already ends with the boon when the mechanic
+            -- writes one into its own Describe, but most read as "... In
+            -- exchange, you gain 45% more experience." buried at the end of
+            -- four lines of curse. A player choosing between three offers is
+            -- comparing exactly two things, and the second one should not have
+            -- to be found.
+            local boon = BoonText(o.boon, o.boonMag)
+            if boon then
+                descText = descText .. "\n|cff40e060Pays: +" .. boon .. "|r"
             end
 
             cards[i].desc:SetText(descText)
@@ -835,6 +1000,23 @@ local function AskForTop()
     topPanel:Show()
     SendChatMessage(".gauntlet top", "SAY")
 end
+
+-- What the whole carried set adds up to. Server-computed on purpose: six of
+-- the seven are aggregate products after the caps have clamped them, and an
+-- addon adding up the boons it can see would show a player the number before
+-- the clamp while they lived with the number after it.
+GauntletProtocol.On("TOTALS", function(taken, done, heal, maxhp, speed, xp, gold)
+    totals = {
+        taken = (tonumber(taken) or 100) / 100,
+        done  = (tonumber(done)  or 100) / 100,
+        heal  = (tonumber(heal)  or 100) / 100,
+        maxhp = (tonumber(maxhp) or 100) / 100,
+        speed = (tonumber(speed) or 100) / 100,
+        xp    = (tonumber(xp)    or 100) / 100,
+        gold  = (tonumber(gold)  or 100) / 100,
+    }
+    RefreshMain()
+end)
 
 GauntletProtocol.On("PACE", function(timed, budgetPct, minSpacingSecs)
     pace = {

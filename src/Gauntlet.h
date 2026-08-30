@@ -193,6 +193,11 @@ namespace Gauntlet
     // prefer an ordinary new mechanic in a clean family over a bargain it
     // could only place by relaxing a rule. The last of those alone changes
     // every offer set that contains a bargain slot.
+    // 11 is Phase 10's TOTALS frame. A frame alone would not need a bump --
+    // the addon ignores a type it does not know -- but PROTOCOL_VERSION is this
+    // number, and an addon that predates the frame would show a rewritten panel
+    // with an empty summary in it rather than being told to update.
+    //
     // 10 is Phase 7's dead-rank fixes: Ankh Pact and Stone of the Damned drop
     // from four ranks to one, and One Ward's ladder became real. Three rows
     // changing maxRank changes which rank-ups the builder may offer.
@@ -220,7 +225,7 @@ namespace Gauntlet
     // with one test froze an affix taken near the end of its window at whatever
     // rank it happened to get. Every offer set that could contain a rank-up of
     // an out-of-window mechanic moves.
-    constexpr uint16 GeneratorVersion = 11;
+    constexpr uint16 GeneratorVersion = 12;
 
     constexpr uint8 MAX_RANK = 4;
 

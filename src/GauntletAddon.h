@@ -135,6 +135,17 @@ namespace Gauntlet
         // SUMMON key 0/1 - a stalker or ambusher is alive for you.
         void SendSummon(Player* player, std::string_view key, bool alive);
 
+        // TOTALS taken done heal maxhp speed xp gold - what the whole carried
+        // set adds up to, each as a percentage (100 = unchanged).
+        //
+        // Every number here is the server's, not a sum the addon worked out.
+        // Six of the seven are Mgr::Aggregate products, which are the values
+        // after plan section 2.5's caps have clamped them -- so a run whose
+        // damage taken would be x2.4 shows the x2.0 it actually gets. An addon
+        // adding up the boons it can see would print the first number and the
+        // player would take the second.
+        void SendTotals(Player* player);
+
         // PACE timed budgetPct minSpacingSecs - what the run's timed affixes
         // are doing to every cadence in it.
         //
