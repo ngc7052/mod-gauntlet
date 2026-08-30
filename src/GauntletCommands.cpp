@@ -630,9 +630,12 @@ public:
             // logged-in game master to audit the offer text would mean the
             // check could only be run by someone already playing.
             { "cards",        HandleDebugCards,       SEC_GAMEMASTER, Console::Yes },
-            // Console::No, unlike cards above: this one needs a character,
-            // because what it measures is what an affix does *to* one.
-            { "leaks",        HandleDebugLeaks,       SEC_GAMEMASTER, Console::No },
+            // Console::Yes, unlike what it looks like: this one needs a
+            // character, but it does not need the character to be *yours*.
+            // Named from the console it audits anyone online, which is how it
+            // gets run without a game client at all -- see the note on the
+            // handler.
+            { "leaks",        HandleDebugLeaks,       SEC_GAMEMASTER, Console::Yes },
             { "dump",         HandleDebugDump,        SEC_GAMEMASTER, Console::No },
             { "offers",       HandleDebugOffers,      SEC_GAMEMASTER, Console::No },
             { "seed",         HandleDebugSeed,        SEC_GAMEMASTER, Console::No },
@@ -1290,25 +1293,44 @@ public:
         // Timed mechanic in the module -- which is most of the Spawn and Tempo
         // families -- and would report all of them clean.
         Scheduler* clock = sGauntlet->ClockFor(p);
+
+        // A real registry id that this run does not carry. It has to be real:
+        // Scheduler::Arm refuses MECHANIC_NONE outright and returns without
+        // queueing anything (GauntletScheduler.cpp:146), so the obvious
+        // "sentinel nobody uses" probe arms nothing and measures nothing.
+        //
+        // That is not a hypothetical. This self-test was written with the
+        // sentinel, and its first run against a live character failed on
+        // exactly this line -- which is the check doing its job, on its own
+        // probe, before it was ever pointed at the module.
+        //
+        // Not carried matters because Cancel takes a mechanic rather than an
+        // event: cancelling the probe must not take a carried affix's real
+        // queue with it. A run carries at most a handful of sixty-nine, so
+        // there is always one free.
+        uint16 probe = Gauntlet::MECHANIC_NONE;
+        for (MechanicDef const& def : AllMechanics())
+            if (!st->Find(def.id))
+            {
+                probe = def.id;
+                break;
+            }
+
         if (!clock)
         {
             check(false, "this run has a clock to arm");
         }
+        else if (probe == Gauntlet::MECHANIC_NONE)
+        {
+            check(false, "there is a registry id this run does not carry, to probe with");
+        }
         else
         {
-            // Mechanic 0 is the sentinel no mechanic uses, so this cannot
-            // collide with something a carried affix has queued and the Cancel
-            // below cannot take anything real with it.
-            //
-            // Qualified: the core has a MECHANIC_NONE of its own in
-            // SharedDefines.h and the using-directive at the top of this file
-            // makes the bare name ambiguous. Both are zero, so the compiler
-            // catching it is the only thing that would have.
-            clock->Arm(Gauntlet::MECHANIC_NONE, 1u, 600000, 0);
+            clock->Arm(probe, 1u, 600000, 0);
             Footprint const armed = Capture(p, st);
             check(!Diff(at_rest, armed).empty(), "arming an event is visible to the audit");
 
-            clock->Cancel(Gauntlet::MECHANIC_NONE);
+            clock->Cancel(probe);
             Footprint const back = Capture(p, st);
             check(Diff(at_rest, back).empty(), "cancelling it puts the reading back");
         }
@@ -1343,13 +1365,35 @@ public:
     // answers "is the character the way it was found", which is a smaller
     // question with a machine-checkable answer -- and the whole of
     // docs/checklists.md is the bigger one.
-    static bool HandleDebugLeaks(ChatHandler* handler, Optional<std::string_view> whatArg,
-                                 Optional<uint32> rankArg)
+    static bool HandleDebugLeaks(ChatHandler* handler, Optional<PlayerIdentifier> whoArg,
+                                 Optional<std::string_view> whatArg, Optional<uint32> rankArg)
     {
         if (!DebugAllowed(handler))
             return false;
 
-        Player* p = handler->GetPlayer();
+        // The optional name in front is what makes this runnable from the
+        // server console and over SOAP, and that is the whole reason it is
+        // here: everything this audit measures needs a Player, and a Player
+        // needs someone logged in. With mod-playerbots on a test realm there
+        // is one without a game client, which is the only way this command can
+        // ever be run by anything but a person sitting at the game.
+        //
+        // Optional<PlayerIdentifier> first is the core's own shape for this
+        // (cs_misc.cpp's kick, unstuck and additem all read this way): in game
+        // the parser tries the leading word as a character name, fails, and
+        // backs off to the next argument, so `.gauntlet debug leaks class`
+        // still means the family. A character actually named "self", "all" or
+        // "class" would shadow the keyword; naming one that is the way to find
+        // out.
+        Player* p = whoArg ? whoArg->GetConnectedPlayer() : handler->GetPlayer();
+        if (!p)
+        {
+            handler->SendErrorMessage(
+                "|cffff2020[Gauntlet debug]|r No character to audit. From the console or SOAP, name one "
+                "who is online: .gauntlet debug leaks <name> [what] [rank]");
+            return false;
+        }
+
         RunState* st = MutableRun(handler, p);
         if (!st)
             return false;
@@ -1441,7 +1485,16 @@ public:
             ++audited;
 
             std::vector<std::string> const lines = Diff(before, after);
-            std::vector<std::string> const did   = Diff(before, held);
+
+            // What it changed at attach, with the carried count normalised out.
+            // The affix being carried is bookkeeping rather than an effect, and
+            // leaving it in makes every mechanic look like it did something --
+            // which is precisely what the first real run of this audit
+            // reported: 69 clean, 0 inert, on a character whose class most of
+            // those curses are not even for.
+            Footprint attachBase = before;
+            attachBase.carried = held.carried;
+            std::vector<std::string> const did = Diff(attachBase, held);
 
             if (!lines.empty())
             {
