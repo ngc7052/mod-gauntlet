@@ -315,6 +315,14 @@ tests/run-tests.sh       # googletest: registry, generator, aggregate, state, sc
 tests/compile-check.sh   # compile every translation unit against the real core, in seconds
 ```
 
+`tests/compile-check.sh --anchors` runs the two source audits alone, with no
+Docker at all and in a twentieth of a second. The **anchor** audit is the one
+that catches *the mechanic is offered and does nothing*; the **ladder** audit
+checks that every rank table moves in one direction, because the compiler checks
+a table's length and nothing checked its values — and a transposed digit ships a
+rank IV weaker than its rank III. A table that changes direction on purpose says
+so with `LADDER-SENTINEL`; three do, all of them "0 means the button is gone".
+
 `compile-check.sh` is the one that matters for a new mechanic. It keeps a
 long-lived container built from the core's own build stage, bind-mounts the
 repository into it and drives the existing ninja, so a single file recompiles

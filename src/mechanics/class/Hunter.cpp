@@ -239,6 +239,7 @@ namespace Gauntlet
         // ==================================================================
         // 3 min, 5 min, then gone. Rank III is the card's "removes it", which is
         // the family ladder's price -> higher price -> removal in one row.
+        // LADDER-SENTINEL: 0 is not a shorter cooldown, it is no button at all.
         // 3 min, 5 min, then gone. Rank III is a standing denial and there is
         // nothing past never, so Dead Weight keeps maxRank = 3; the fourth entry
         // is unreachable and exists only for the assert.

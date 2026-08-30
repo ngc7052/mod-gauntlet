@@ -66,6 +66,7 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_COLD_FEET = 56;
 
         // 15%, 25%, then gone -- price, higher price, removal, in one row.
+        // LADDER-SENTINEL: 0 is not a cheaper Blink, it is no Blink.
         // 15%, 25%, then gone -- price, higher price, removal, in one row. There
         // is nothing past removal, so Cold Feet keeps maxRank = 3 and the fourth
         // entry is unreachable.

@@ -55,6 +55,7 @@ namespace Gauntlet
         // every tick.
         // ==================================================================
         // 10 min, 30 min, then gone.
+        // LADDER-SENTINEL: 0 is not a shorter cooldown, it is no Vanish.
         // Rank III is a standing denial and there is nothing past never, so Cold
         // Trail keeps maxRank = 3; the fourth entry is unreachable.
         constexpr uint32 VANISH_COOLDOWN_MS[] = { 600000, 1800000, 0, 0 };

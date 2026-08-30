@@ -19,7 +19,7 @@
 #
 #   tests/compile-check.sh                    every module translation unit
 #   tests/compile-check.sh src/GauntletMgr.cpp one file (paths or bare names)
-#   tests/compile-check.sh --anchors           the anchor audit alone, no Docker
+#   tests/compile-check.sh --anchors           the anchor and ladder audits, no Docker
 #   tests/compile-check.sh --rebuild-image     rebuild the base image, then all
 #   tests/compile-check.sh --stop              remove the helper container
 #
@@ -41,6 +41,78 @@ CONTAINER="${GAUNTLET_COMPILE_CONTAINER:-mod-gauntlet-compile}"
 # Where the module is mounted, and the ninja object prefix that follows from it.
 MODULE_PATH=/azerothcore/modules/mod-gauntlet
 OBJ_PREFIX=modules/CMakeFiles/modules.dir/mod-gauntlet
+
+# ---------------------------------------------------------------------------
+# The ladder audit.
+#
+# A rank table is `constexpr T X[] = { a, b, c, d }` with a static_assert on its
+# length beside it. The compiler checks the length. Nothing checks the values,
+# and the values are where the mistakes are: Phase 6 hand-wrote eighty fourth
+# ranks across thirty-four files, and a transposed digit -- 1.15 where 1.55 was
+# meant -- compiles, links, passes every test, and ships a rank IV weaker than
+# its rank III.
+#
+# So every ladder must be monotonic. Going up or going down are both fine; a
+# ladder that changes direction part-way is a typo unless it is deliberate, and
+# a deliberate one says so with LADDER-SENTINEL on the line above.
+#
+# Three tables are deliberate today, all the same shape: 0 is not a smaller
+# number on those ladders, it is "denied outright" -- Feign Death, Vanish and
+# Blink at their top rank. That is a sentinel, and a sentinel has to be marked
+# rather than tolerated, or the next real inversion hides among them.
+#
+# No Docker, no build. Runs with the anchor audit.
+# ---------------------------------------------------------------------------
+ladder_audit() {
+  python3 - "$ROOT" <<'PYEOF'
+import re, sys, glob, os
+
+root = sys.argv[1]
+bad = []
+checked = 0
+
+SENTINEL = "LADDER-SENTINEL"
+NAMES = {"true": 1, "false": 0, "UNHAPPY": 1, "CONTENT": 2}
+
+for path in sorted(glob.glob(os.path.join(root, "src/mechanics/**/*.cpp"), recursive=True)):
+    src = open(path).read()
+    for m in re.finditer(r'constexpr\s+[\w:]+\s+(\w+)\[\]\s*=\s*\{([^}]*)\};', src):
+        name, body = m.group(1), m.group(2)
+
+        # The marker sits on any line of the comment block above the table.
+        head = src[:m.start()].rsplit("\n\n", 1)[-1]
+        if SENTINEL in head:
+            continue
+
+        toks = [t.strip().rstrip("fu") for t in body.split(",") if t.strip()]
+        vals = []
+        for t in toks:
+            try:
+                vals.append(float(eval(t, {"__builtins__": {}}, NAMES)))
+            except Exception:
+                vals = []
+                break
+        if len(vals) < 3:
+            continue
+
+        checked += 1
+        up = all(b >= a for a, b in zip(vals, vals[1:]))
+        down = all(b <= a for a, b in zip(vals, vals[1:]))
+        if not (up or down):
+            rel = os.path.relpath(path, root)
+            bad.append(f"{rel}: {name} = {{{', '.join(t for t in toks)}}}")
+
+if bad:
+    print(f"LADDER  FAIL  {len(bad)} ladder(s) change direction part-way:")
+    for b in bad:
+        print(f"              {b}")
+    print("              A rank that is weaker than the one below it is a typo. If it is")
+    print(f"              deliberate, say so with {SENTINEL} in the comment above the table.")
+    sys.exit(1)
+
+print(f"LADDER  PASS  {checked} rank ladder(s), every one monotonic")
+PYEOF
+}
 
 # ---------------------------------------------------------------------------
 # The anchor audit.
@@ -266,6 +338,7 @@ main() {
   done
 
   anchor_audit || exit 1
+  ladder_audit || exit 1
   [ "$mode" = anchors ] && exit 0
 
   ensure_container
