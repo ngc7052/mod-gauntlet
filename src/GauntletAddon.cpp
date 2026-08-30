@@ -519,13 +519,43 @@ namespace Gauntlet
         for (AffixInstance const& a : st->affixes)
             gold *= BoonMoneyMult(a);
 
+        // A boon the aggregate does not carry, folded in.
+        //
+        // The first version of this frame showed the aggregate products alone
+        // and a player carrying Lone Wolf saw "+15% xp" on its row and a dash
+        // in the Experience column. Neither was lying: Lone Wolf pays its
+        // experience in its own OnXP hook, conditional on being solo, so the
+        // aggregate honestly reads 1.0 -- and a summary that answers "how much
+        // experience do I get" with a dash is no use to anyone.
+        //
+        // Which of the two it is can be asked rather than guessed. Every
+        // mechanic that routes a boon through the aggregate does it the same
+        // way -- `return BoonFactor(self, kind);` -- and not one mixes a curse
+        // and a boon in the *same* kind, so if AggregateFactor gives back
+        // exactly what BoonFactor would, the product above already has it.
+        // Anything else pays at its own site and is missing.
+        auto folded = [st](Player* p, AggregateKind kind) {
+            float total = sGauntlet->Aggregate(p, kind);
+            for (AffixInstance const& a : st->affixes)
+            {
+                float const declared = BoonFactor(a, kind);
+                if (declared == 1.0f)
+                    continue;
+
+                float const viaAggregate = a.impl ? a.impl->AggregateFactor(a, kind) : 1.0f;
+                if (viaAggregate != declared)
+                    total *= declared;   // paid at its own site; the aggregate never saw it
+            }
+            return total;
+        };
+
         Frame f("TOTALS");
-        f.Num(pct(sGauntlet->Aggregate(player, AggregateKind::DamageTaken)));
-        f.Num(pct(sGauntlet->Aggregate(player, AggregateKind::DamageDone)));
-        f.Num(pct(sGauntlet->Aggregate(player, AggregateKind::HealTaken)));
-        f.Num(pct(sGauntlet->Aggregate(player, AggregateKind::MaxHealth)));
-        f.Num(pct(sGauntlet->Aggregate(player, AggregateKind::EnemySpeed)));
-        f.Num(pct(sGauntlet->Aggregate(player, AggregateKind::Experience)));
+        f.Num(pct(folded(player, AggregateKind::DamageTaken)));
+        f.Num(pct(folded(player, AggregateKind::DamageDone)));
+        f.Num(pct(folded(player, AggregateKind::HealTaken)));
+        f.Num(pct(folded(player, AggregateKind::MaxHealth)));
+        f.Num(pct(folded(player, AggregateKind::EnemySpeed)));
+        f.Num(pct(folded(player, AggregateKind::Experience)));
         f.Num(pct(gold));
         Emit(player, f.Str());
     }

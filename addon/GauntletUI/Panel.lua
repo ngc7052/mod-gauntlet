@@ -228,7 +228,7 @@ end
 -- than sixteen on purpose, so the cap had to go from here whatever the carry
 -- cap does.
 
-local main = Panel("GauntletMain", 440, 320, "The Gauntlet")
+local main = Panel("GauntletMain", 452, 320, "The Gauntlet")
 
 main.head = main:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 main.head:SetPoint("TOPLEFT", main, "TOPLEFT", 14, -36)
@@ -259,14 +259,22 @@ local totals = nil
 -- label, key, and which direction is bad news. `worse` decides the colour, not
 -- the arithmetic: 120% damage taken is bad and 120% experience is good, and a
 -- panel that paints both the same colour is not summarising anything.
+-- Short labels. "Damage taken" and "Enemy speed" wrapped to two lines inside a
+-- 58-pixel cell and overflowed the strip; the full names live in the tooltip.
 local TOTAL_ROWS = {
-    { "Damage taken", "taken", true  },
-    { "Damage dealt", "done",  false },
-    { "Healing",      "heal",  false },
-    { "Max health",   "maxhp", false },
-    { "Enemy speed",  "speed", true  },
-    { "Experience",   "xp",    false },
-    { "Gold",         "gold",  false },
+    { "Taken",   "taken", true  },
+    { "Dealt",   "done",  false },
+    { "Healing", "heal",  false },
+    { "Max HP",  "maxhp", false },
+    { "Speed",   "speed", true  },
+    { "XP",      "xp",    false },
+    { "Gold",    "gold",  false },
+}
+
+local TOTAL_LONG = {
+    taken = "Damage taken", done = "Damage dealt", heal  = "Healing received",
+    maxhp = "Maximum health", speed = "Enemy move speed", xp = "Experience",
+    gold  = "Gold from loot",
 }
 
 local totalsBox = CreateFrame("Frame", nil, main)
@@ -280,43 +288,71 @@ totalsBox.cells = {}
 for i = 1, #TOTAL_ROWS do
     local c = totalsBox:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     c:SetJustifyH("CENTER")
-    c:SetWidth(58)
-    c:SetPoint("TOPLEFT", totalsBox, "TOPLEFT", 4 + (i - 1) * 59, -4)
+    c:SetWidth(60)
+    c:SetPoint("TOPLEFT", totalsBox, "TOPLEFT", 3 + (i - 1) * 61, -4)
 
     local v = totalsBox:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     v:SetJustifyH("CENTER")
-    v:SetWidth(58)
+    v:SetWidth(60)
     v:SetPoint("TOPLEFT", c, "BOTTOMLEFT", 0, -2)
 
     c:SetText(TOTAL_ROWS[i][1])
-    totalsBox.cells[i] = v
+    -- The label is hidden with its value when there is nothing to summarise, so
+    -- the "nothing yet" line does not print on top of a row of headings.
+    totalsBox.cells[i] = { value = v, label = c }
 end
+
+totalsBox:EnableMouse(true)
+totalsBox:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+    GameTooltip:SetText("What your affixes add up to", 1, 0.82, 0)
+    GameTooltip:AddLine("Every number is the server's, after the caps have clamped it -- "
+                        .. "so this is what you actually get, not what the cards add to.",
+                        0.8, 0.8, 0.8, true)
+    GameTooltip:AddLine(" ")
+    for _, spec in ipairs(TOTAL_ROWS) do
+        local v = totals and totals[spec[2]] or 1
+        local shown = ("%d%%"):format(math.floor(v * 100 + 0.5))
+        if math.abs(v - 1) < 0.005 then shown = "unchanged" end
+        GameTooltip:AddDoubleLine(TOTAL_LONG[spec[2]], shown, 0.8, 0.8, 0.8, 1, 1, 1)
+    end
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine("Some boons only pay under a condition -- Lone Wolf's experience "
+                        .. "needs you to be alone -- and are counted here as the card "
+                        .. "promises them.", 0.6, 0.6, 0.6, true)
+    GameTooltip:Show()
+end)
+totalsBox:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 totalsBox.empty = totalsBox:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
 totalsBox.empty:SetPoint("LEFT", totalsBox, "LEFT", 8, 0)
 totalsBox.empty:SetText("Nothing you carry changes a number yet.")
 
 local function RefreshTotals()
-    if not totals then
-        for _, v in ipairs(totalsBox.cells) do v:SetText("") end
-        totalsBox.empty:Show()
-        return
+    local any = false
+    if totals then
+        for i, spec in ipairs(TOTAL_ROWS) do
+            local v = totals[spec[2]] or 1
+            if math.abs(v - 1) < 0.005 then
+                -- Unchanged. Drawn as a dash rather than "100%": seven
+                -- identical hundreds is a wall of noise with the one number
+                -- that moved hidden in it.
+                totalsBox.cells[i].value:SetText("|cff505050-|r")
+            else
+                any = true
+                local worse = spec[3] and v > 1 or (not spec[3]) and v < 1
+                local colour = worse and "|cffff6040" or "|cff40e060"
+                totalsBox.cells[i].value:SetText(("%s%d%%|r"):format(colour, math.floor(v * 100 + 0.5)))
+            end
+        end
     end
 
-    local any = false
-    for i, spec in ipairs(TOTAL_ROWS) do
-        local v = totals[spec[2]] or 1
-        if math.abs(v - 1) < 0.005 then
-            -- Unchanged. Drawn as a dash rather than "100%": seven identical
-            -- hundreds is a wall of noise with the one number that moved
-            -- hidden in it.
-            totalsBox.cells[i]:SetText("|cff505050-|r")
-        else
-            any = true
-            local worse = spec[3] and v > 1 or (not spec[3]) and v < 1
-            local colour = worse and "|cffff6040" or "|cff40e060"
-            totalsBox.cells[i]:SetText(("%s%d%%|r"):format(colour, math.floor(v * 100 + 0.5)))
-        end
+    -- Labels and values go together. Showing the "nothing yet" line over a row
+    -- of headings is what the first version did, and it read as a rendering
+    -- fault rather than as a message.
+    for _, cell in ipairs(totalsBox.cells) do
+        if any then cell.value:Show(); cell.label:Show()
+        else        cell.value:Hide(); cell.label:Hide() end
     end
     if any then totalsBox.empty:Hide() else totalsBox.empty:Show() end
 end
@@ -333,8 +369,15 @@ end
 -- of the same name and read nil for the life of the session.
 local pace = nil
 
-local ROW_H     = 34
-local VISIBLE   = 7          -- rows built; the list scrolls through however many there are
+-- One line per affix, and the description only on hover.
+--
+-- The first version put the effect text on a second line in the row. It read
+-- badly and it was wrong twice over: a sentence written for a tooltip does not
+-- truncate into half a row -- "While you are in a group your maximum health is
+-- halv..." -- and halving the rows on screen to show text nobody asked for is a
+-- poor trade when the panel's job is to show a set at a glance.
+local ROW_H     = 24
+local VISIBLE   = 12         -- rows built; the list scrolls through however many there are
 local scrollAt  = 0          -- index of the first row drawn
 
 local list = CreateFrame("Frame", nil, main)
@@ -356,25 +399,22 @@ for i = 1, VISIBLE do
     r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
     r.name = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    r.name:SetPoint("TOPLEFT", r.icon, "TOPRIGHT", 8, -1)
+    r.name:SetPoint("LEFT", r.icon, "RIGHT", 8, 0)
     r.name:SetJustifyH("LEFT")
 
-    -- The second line is the whole of "better info": what the affix actually
-    -- does, at the rank it is actually at, in the row rather than only in a
-    -- tooltip nobody hovers.
-    r.effect = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    r.effect:SetPoint("TOPLEFT", r.name, "BOTTOMLEFT", 0, -2)
-    r.effect:SetPoint("RIGHT", r, "RIGHT", -96, 0)
-    r.effect:SetJustifyH("LEFT")
-    r.effect:SetHeight(11)
+    -- Family on the far right, what it pays just inside it, so the line reads
+    -- "what it is | what it costs you | what it pays".
+    r.tag = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    r.tag:SetPoint("RIGHT", r, "RIGHT", -8, 0)
+    r.tag:SetJustifyH("RIGHT")
+    r.tag:SetWidth(62)
 
     r.pays = r:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    r.pays:SetPoint("RIGHT", r, "RIGHT", -8, 5)
+    r.pays:SetPoint("RIGHT", r.tag, "LEFT", -8, 0)
     r.pays:SetJustifyH("RIGHT")
+    r.pays:SetWidth(96)
 
-    r.tag = r:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    r.tag:SetPoint("RIGHT", r, "RIGHT", -8, -7)
-    r.tag:SetJustifyH("RIGHT")
+    r.name:SetPoint("RIGHT", r.pays, "LEFT", -6, 0)
 
     AddGlow(r)
     r:SetScript("OnEnter", function(self)
@@ -457,7 +497,6 @@ local function RefreshMain()
             r.name:SetText(("%s|cff707070%s|r"):format(
                 a.name, a.rank and ("  " .. (RANK_PIP[a.rank] or "")) or ""))
             r.name:SetTextColor(s[1], s[2], s[3])
-            r.effect:SetText(Body(a.desc))
             r.tag:SetText(("|cff606060%s|r"):format(s[4]))
 
             local boon = BoonText(a.boon, a.boonMag)
@@ -489,7 +528,7 @@ local function RefreshMain()
         main.foot:SetText("/gauntlet top for the furthest runs")
     end
 
-    main:SetHeight(120 + math.max(math.min(n, VISIBLE), 1) * ROW_H)
+    main:SetHeight(122 + math.max(math.min(n, VISIBLE), 1) * ROW_H)
 end
 
 list:SetScript("OnMouseWheel", function(_, delta)
