@@ -146,7 +146,7 @@ namespace Gauntlet
                 _hurried.erase(_hurried.begin() + static_cast<std::ptrdiff_t>(i));
             }
 
-            if (ctx.run && (ctx.run->dead || !ctx.run->pending.empty()))
+            if (ctx.run && (ctx.run->dead || OfferHoldsBack(*ctx.run)))
                 return;
             if (!player->IsAlive() || !player->IsInCombat())
                 return;

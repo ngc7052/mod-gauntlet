@@ -135,7 +135,7 @@ namespace Gauntlet
             Player* player = ctx.player;
             if (!player || !victim || !damage)
                 return;
-            if (ctx.run && (ctx.run->dead || !ctx.run->pending.empty()))
+            if (ctx.run && (ctx.run->dead || OfferHoldsBack(*ctx.run)))
                 return;
 
             if (!IsOrdinaryFoe(victim) || !victim->IsAlive())

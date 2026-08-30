@@ -108,7 +108,7 @@ namespace Gauntlet
                 return;
             _sweepMs = 0;
 
-            if (ctx.run && (ctx.run->dead || !ctx.run->pending.empty()))
+            if (ctx.run && (ctx.run->dead || OfferHoldsBack(*ctx.run)))
                 return;
 
             // The card's own exclusions, and each of them is an escape design

@@ -154,7 +154,7 @@ namespace Gauntlet
 
             if (!player->IsInWorld() || !player->IsAlive() || !player->IsInCombat())
                 return;
-            if (ctx.run && (ctx.run->dead || !ctx.run->pending.empty()))
+            if (ctx.run && (ctx.run->dead || OfferHoldsBack(*ctx.run)))
                 return;
 
             // CURRENT_GENERIC_SPELL is the slot a cast-time spell occupies;

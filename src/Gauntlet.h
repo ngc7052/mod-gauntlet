@@ -423,6 +423,22 @@ namespace Gauntlet
         MAX
     };
 
+    // Whether an offer on the table should still be holding a card back.
+    //
+    // Ten mechanics wrote `!ctx.run->pending.empty()` by hand, and every one of
+    // them therefore went silent for as long as an offer sat unpicked -- the
+    // whole Enemy family at once, reported from play as "grudge, death rattle
+    // is now not visible on mob death". It is the same fault the scheduler had
+    // and it is fixed the same way: see RunState::offerMs. The pause is a
+    // courtesy while three cards are read, not an indefinite stop.
+    //
+    // Written once here so the next card cannot get it wrong, and so that
+    // changing the rule changes it everywhere.
+    inline bool OfferHoldsBack(RunState const& run)
+    {
+        return !run.pending.empty() && run.offerMs < OFFER_QUIET_MS;
+    }
+
     std::string AggregateKindName(AggregateKind kind);
 
     // Clamps on the aggregate product. Defaults are the plan's §2.5 values;

@@ -144,7 +144,7 @@ namespace Gauntlet
             Player* player = ctx.player;
             if (!player || !killed || !player->IsInWorld() || !player->IsAlive())
                 return;
-            if (ctx.run && (ctx.run->dead || !ctx.run->pending.empty()))
+            if (ctx.run && (ctx.run->dead || OfferHoldsBack(*ctx.run)))
                 return;
 
             // Nothing this module spawned leaves a spirit: a Shade killed on

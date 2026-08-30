@@ -296,7 +296,7 @@ namespace Gauntlet
             // reading an offer: design section 4.2's suppression list is
             // written for the scheduler, but "not while the panel is open" is
             // the same courtesy however the event arrived.
-            if (ctx.run && (ctx.run->dead || !ctx.run->pending.empty()))
+            if (ctx.run && (ctx.run->dead || OfferHoldsBack(*ctx.run)))
                 return false;
 
             if (owner->IsGameMaster())

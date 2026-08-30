@@ -93,7 +93,7 @@ namespace Gauntlet
             if (!player || !killed || !player->IsInWorld() || !player->IsAlive())
                 return;
 
-            if (ctx.run && (ctx.run->dead || !ctx.run->pending.empty()))
+            if (ctx.run && (ctx.run->dead || OfferHoldsBack(*ctx.run)))
                 return;
 
             // Nothing this module put into the world may pull the zone in

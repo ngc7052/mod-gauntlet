@@ -190,7 +190,7 @@ namespace Gauntlet
             if (_cooldown != 0)
                 _cooldown = _cooldown > diffMs ? _cooldown - diffMs : 0;
 
-            if (ctx.run && (ctx.run->dead || !ctx.run->pending.empty()))
+            if (ctx.run && (ctx.run->dead || OfferHoldsBack(*ctx.run)))
             {
                 Reset(ctx);
                 return;

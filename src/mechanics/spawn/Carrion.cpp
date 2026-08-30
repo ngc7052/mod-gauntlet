@@ -212,7 +212,7 @@ namespace Gauntlet
             Player* player = ctx.player;
             if (!player || !ctx.clock)
                 return;
-            if (ctx.run && (ctx.run->dead || !ctx.run->pending.empty()))
+            if (ctx.run && (ctx.run->dead || OfferHoldsBack(*ctx.run)))
                 return;
 
             // "Corpses", so a chest, a herb node or a fishing bobber is not

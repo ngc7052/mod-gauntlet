@@ -194,7 +194,7 @@ namespace Gauntlet
                 return;
             if (!player->IsInWorld() || !player->IsAlive())
                 return;
-            if (ctx.run && (ctx.run->dead || !ctx.run->pending.empty()))
+            if (ctx.run && (ctx.run->dead || OfferHoldsBack(*ctx.run)))
                 return;
 
             // Nothing this module spawned bursts: a Shade that dies at the
