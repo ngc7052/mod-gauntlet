@@ -305,7 +305,13 @@ namespace Gauntlet
         // from six affix descriptions. Deliberately not numbered: the addon's
         // chat fallback scrapes any line beginning "<n>. " as an affix
         // (addon/GauntletUI/Panel.lua:430).
-        // What the run's timed affixes are doing to every cadence in it.
+        // What the run's timed affixes are doing to each other's timing.
+        //
+        // "Cadence" is this codebase's word for how often a timed affix acts --
+        // the "every 20 seconds" on its card. It is a fine word in a comment and
+        // a bad one in a chat line, which is what the player-facing text below
+        // learned the hard way: the person who commissioned the module had to
+        // ask what it meant.
         //
         // Each timed affix's blurb states the interval its own mechanic asks
         // for, because that is the only number a mechanic knows. The scheduler
@@ -324,13 +330,15 @@ namespace Gauntlet
 
             if (timed <= 1)
             {
-                handler->PSendSysMessage("  Pacing: {} timed affix; cadences are as written.", timed);
+                handler->PSendSysMessage(
+                    "  Pacing: {} affix acts on a timer; it acts as often as its card says.", timed);
                 return;
             }
 
             handler->PSendSysMessage(
-                "  Pacing: {} timed affixes stretch every stated cadence by x{:.2f} "
-                "(a 20s affix acts every {}s), and no two events land closer than {}s.",
+                "  Pacing: {} affixes act on a timer, so each one waits x{:.2f} longer than its "
+                "card says (a card saying 20s acts every {}s). No two of them land within {}s "
+                "of each other.",
                 timed, mult, uint32(20.0f * mult + 0.5f), clock->MinSpacingMs() / 1000u);
         }
 

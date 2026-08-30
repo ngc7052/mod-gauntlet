@@ -215,7 +215,7 @@ gear:SetScript("OnEnter", function(self)
 end)
 gear:SetScript("OnLeave", function(self) self.glow:Hide(); GameTooltip:Hide() end)
 
--- What the run's timed affixes do to every cadence in it. The server sends this
+-- What the run's timed affixes do to each other's timing. The server sends this
 -- whenever the carried set changes; see Addon::SendPace for why it cannot live
 -- in the individual blurbs -- the stretch belongs to the whole set, not to any
 -- one affix, so no affix can state it.
@@ -272,8 +272,8 @@ for i = 1, 16 do
         -- The blurb above states the interval the mechanic asks for. Say what
         -- the run is doing to it, on the row where the number was read.
         if pace and pace.timed > 1 and pace.mult > 1.0 then
-            GameTooltip:AddLine(("Cadences in this run run x%.2f longer (%d timed affixes)."):
-                                format(pace.mult, pace.timed), 0.6, 0.6, 0.6, true)
+            GameTooltip:AddLine(("You carry %d affixes that act on a timer, so this one waits x%.2f longer than the line above says."):
+                                format(pace.timed, pace.mult), 0.6, 0.6, 0.6, true)
         end
         GameTooltip:Show()
     end)
@@ -337,7 +337,7 @@ local function RefreshMain()
     elseif pace and pace.timed > 1 and pace.mult > 1.0 then
         -- Only when it is actually stretching something. A run with one timed
         -- affix reads its blurbs literally and does not need telling.
-        main.foot:SetText(("|cff808080%d timed affixes: stated cadences run |r|cffffd100x%.2f|r|cff808080 longer|r")
+        main.foot:SetText(("|cff808080%d affixes act on a timer, so each waits |r|cffffd100x%.2f|r|cff808080 longer than its card says|r")
                           :format(pace.timed, pace.mult))
     else
         main.foot:SetText("/gauntlet top for the furthest runs")

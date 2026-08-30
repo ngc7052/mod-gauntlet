@@ -73,7 +73,7 @@ is specific.
 | S4 | A death caused by it names it (`KILLBY`, and the leaderboard's `cause`) |
 | S5 | Anything it summoned despawns on logout, on your death, on a zone change, and on leash |
 | S6 | Nothing fires while mounted, in flight, in a sanctuary, or inside `Gauntlet.Grace.Seconds` of login |
-| S6b | **A stated cadence is a base, not a promise.** The scheduler multiplies every *paced* interval by the event budget — `1 + 0.25 × (timed affixes − 1)` — so a blurb saying "every 20 seconds" acts every 45 on a run carrying six. `.gauntlet status` prints the multiplier and the addon's footer shows it. A *fixed* interval — Death Rattle's two-second fuse, Ambush's and Carrion's telegraph — is exempt and must be exactly what it says at any carried-set size |
+| S6b | **The interval on a card is a base, not a promise.** The scheduler multiplies every *paced* interval by the event budget — `1 + 0.25 × (timed affixes − 1)` — so a card saying "every 20 seconds" acts every 45 on a run carrying six. `.gauntlet status` prints the multiplier and the addon's footer shows it. A *fixed* interval — Death Rattle's two-second fuse, Ambush's and Carrion's telegraph — is exempt and must be exactly what it says at any carried-set size |
 | S7 | Every rank differs from the one below it in the way the entry says, and `.gauntlet status` says so too. **There are four ranks**, except where an entry says "three ranks only" — those eight stop at III because rank III already ends their ladder, and `.gauntlet debug offers` must never offer them a IV |
 | S8 | The boon applies, and the number in the offer matches the number delivered |
 | S9 | The addon shows the state — HUD counter, panel row, or countdown |
