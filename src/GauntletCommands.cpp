@@ -466,8 +466,6 @@ namespace Gauntlet
             return 0;
         }
 
-        // Who did it, for the cheat log. The account id is the part that
-        // matters when two game masters share a character.
         std::string Actor(ChatHandler* handler)
         {
             WorldSession* session = handler->GetSession();
@@ -476,6 +474,71 @@ namespace Gauntlet
 
             return Acore::StringFormat("account {} ({})", session->GetAccountId(), session->GetPlayerName());
         }
+        // One cheat attach, shared by `give` and `give-class`.
+        //
+        // Everything `give` did inline, so the two cannot drift in what they
+        // store, what they log, or the order they do it in -- the scheduler's
+        // budget has to move before OnAttach arms anything, and getting that
+        // wrong in one of two copies is the kind of thing that only shows up as
+        // an affix firing on the wrong cadence.
+        //
+        // Returns the slot it used, or 0 if the run had none free.
+        uint8 AttachCheat(ChatHandler* handler, Player* p, RunState* st,
+                          MechanicDef const* def, uint32 rank, Condition condition)
+        {
+            uint8 const slot = LowestFreeSlot(*st);
+            if (slot == 0)
+                return 0;
+
+            AffixInstance instance;
+            instance.mechanic   = def->id;
+            instance.rank       = static_cast<uint8>(rank);
+            instance.condition  = condition;
+
+            // No boon, and not the registry's. The magnitude that pairs with
+            // one is the offer builder's -- the table is private to
+            // GauntletGenerator.cpp and nothing exports it -- and a boon
+            // adjective in the affix's name with a zero magnitude behind it
+            // would be a lie in the one place a player reads the affix. The
+            // cheat attaches the curse; the boon is what an offer pays for it.
+            instance.boon       = Boon::None;
+            instance.boonMag    = 0;
+            instance.slot       = slot;
+            instance.genVersion = GeneratorVersion;
+
+            AffixInstance& stored = st->Attach(instance);
+
+            // The carried set moved, so the scheduler's event budget did too,
+            // and it has to move before OnAttach arms anything.
+            sGauntlet->SyncTimedAffixCount(p);
+
+            if (stored.impl)
+            {
+                Ctx ctx = sGauntlet->MakeCtx(p, st, &stored);
+                stored.impl->OnAttach(ctx);
+            }
+
+            uint32 const low = p->GetGUID().GetCounter();
+            CharacterDatabase.Execute(
+                "REPLACE INTO `gauntlet_affix` "
+                "(`guid`, `slot`, `mechanic`, `rank`, `cond`, `boon`, `boon_mag`, `gen_version`) "
+                "VALUES ({}, {}, {}, {}, {}, 0, 0, {})",
+                low, static_cast<uint32>(slot), static_cast<uint32>(def->id), rank,
+                static_cast<uint32>(condition), static_cast<uint32>(GeneratorVersion));
+
+            // Deliberately not written to gauntlet_affix_log. Its `action`
+            // column is an ENUM of the five things a run can legitimately do to
+            // an affix, so a cheat goes to the server log instead of being
+            // disguised as a pick.
+            LOG_INFO("module", "Gauntlet: {} gave {} (id {}) rank {} condition {} to {} (guid {}) in slot {}.",
+                     Actor(handler), def->name, static_cast<uint32>(def->id), rank,
+                     ConditionName(condition), p->GetName(), low, static_cast<uint32>(slot));
+
+            return slot;
+        }
+
+        // Who did it, for the cheat log. The account id is the part that
+        // matters when two game masters share a character.
 
         void PrintAffixLine(ChatHandler* handler, uint32 index, AffixInstance const& a)
         {
@@ -502,6 +565,7 @@ public:
         static ChatCommandTable debug =
         {
             { "give",         HandleDebugGive,        SEC_GAMEMASTER, Console::No },
+            { "give-class",   HandleDebugGiveClass,   SEC_GAMEMASTER, Console::No },
             { "remove",       HandleDebugRemove,      SEC_GAMEMASTER, Console::No },
             { "rank",         HandleDebugRank,        SEC_GAMEMASTER, Console::No },
             // Console::Yes: it reads the registry and builds throwaway
@@ -689,64 +753,152 @@ public:
             return false;
         }
 
-        uint8 const slot = LowestFreeSlot(*st);
+        uint8 const slot = AttachCheat(handler, p, st, def, rank, condition);
         if (slot == 0)
         {
             handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r This run has no free affix slot.");
             return false;
         }
 
-        AffixInstance instance;
-        instance.mechanic   = def->id;
-        instance.rank       = static_cast<uint8>(rank);
-        instance.condition  = condition;
-
-        // No boon, and not the registry's. The magnitude that pairs with one
-        // is the offer builder's -- the table is private to
-        // GauntletGenerator.cpp and nothing exports it -- and a boon adjective
-        // in the affix's name with a zero magnitude behind it would be a lie
-        // in the one place a player reads the affix. The cheat attaches the
-        // curse; the boon is what an offer pays for it.
-        instance.boon       = Boon::None;
-        instance.boonMag    = 0;
-        instance.slot       = slot;
-        instance.genVersion = GeneratorVersion;
-
-        AffixInstance& stored = st->Attach(instance);
-
-        // The carried set moved, so the scheduler's event budget did too, and
-        // it has to move before OnAttach arms anything.
-        sGauntlet->SyncTimedAffixCount(p);
-
-        if (stored.impl)
-        {
-            Ctx ctx = sGauntlet->MakeCtx(p, st, &stored);
-            stored.impl->OnAttach(ctx);
-        }
-
-        uint32 const low = p->GetGUID().GetCounter();
-        CharacterDatabase.Execute(
-            "REPLACE INTO `gauntlet_affix` "
-            "(`guid`, `slot`, `mechanic`, `rank`, `cond`, `boon`, `boon_mag`, `gen_version`) "
-            "VALUES ({}, {}, {}, {}, {}, 0, 0, {})",
-            low, static_cast<uint32>(slot), static_cast<uint32>(def->id), rank,
-            static_cast<uint32>(condition), static_cast<uint32>(GeneratorVersion));
-
-        // Deliberately not written to gauntlet_affix_log. Its `action` column
-        // is an ENUM of the five things a run can legitimately do to an affix
-        // (data/sql/db-characters/base/gauntlet.sql:67) and this step does not
-        // own the schema, so a cheat goes to the server log instead of being
-        // disguised as a pick.
-        LOG_INFO("module", "Gauntlet: {} gave {} (id {}) rank {} condition {} to {} (guid {}) in slot {}.",
-                 Actor(handler), def->name, static_cast<uint32>(def->id), rank,
-                 ConditionName(condition), p->GetName(), low, static_cast<uint32>(slot));
-
+        AffixInstance const* stored = st->AtSlot(slot);
         handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r CHEAT: attached slot {} - {}",
                                  static_cast<uint32>(slot),
                                  sGauntlet->NameOf(def->id, condition, Boon::None));
-        handler->PSendSysMessage("  {}", sGauntlet->DescribeOf(stored));
-        if (!stored.impl)
+        if (stored)
+            handler->PSendSysMessage("  {}", sGauntlet->DescribeOf(*stored));
+        if (!stored || !stored->impl)
             handler->PSendSysMessage("  No implementation in this build: it is carried and stored, but inert.");
+        return true;
+    }
+
+    // Every affix this character's class can be offered, attached at once.
+    //
+    // `.gauntlet debug give` takes one key and there are forty-four class
+    // curses; testing a class meant typing four commands and looking up which
+    // four. This takes the question the tester actually has -- "what can a
+    // paladin get, and what does it do to me" -- and answers it in one line.
+    //
+    //   .gauntlet debug give-class              the Class family, at rank 1
+    //   .gauntlet debug give-class 4            the Class family, at rank IV
+    //   .gauntlet debug give-class 3 all        everything relevant, rank III
+    //   .gauntlet debug give-class 1 spawn      one family
+    //
+    // Relevance is the generator's own, through LivePlayerView, so what lands
+    // is exactly what this character could be offered -- including the spell
+    // and talent-tree gates, which is the part worth reporting rather than
+    // silently applying. A curse keyed on a spell you have not trained is
+    // carried and inert, and looks identical to a broken one; the summary says
+    // which those are so a tester does not file the difference as a bug.
+    //
+    // MAX_CARRIED is deliberately not enforced. It is what makes a *run* a set
+    // of choices, and this is not a run.
+    static bool HandleDebugGiveClass(ChatHandler* handler, Optional<uint32> rankArg,
+                                     Optional<std::string_view> familyArg)
+    {
+        if (!DebugAllowed(handler))
+            return false;
+
+        Player* p = handler->GetPlayer();
+        RunState* st = MutableRun(handler, p);
+        if (!st)
+            return false;
+
+        uint32 const rank = rankArg ? *rankArg : 1u;
+        if (rank < 1 || rank > MAX_RANK)
+        {
+            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Rank {} is out of range: 1 to {}.",
+                                      rank, static_cast<uint32>(MAX_RANK));
+            return false;
+        }
+
+        // Default to the Class family, because that is the question the command
+        // was asked for. "all" is every family.
+        bool everyFamily = false;
+        Family wanted = Family::Class;
+        if (familyArg && !familyArg->empty())
+        {
+            if (StringEqualI(*familyArg, "all"))
+                everyFamily = true;
+            else
+            {
+                bool found = false;
+                for (uint8 f = 0; f < static_cast<uint8>(Family::MAX); ++f)
+                    if (StringEqualI(FamilyName(static_cast<Family>(f)), *familyArg))
+                    {
+                        wanted = static_cast<Family>(f);
+                        found  = true;
+                        break;
+                    }
+
+                if (!found)
+                {
+                    handler->SendErrorMessage(
+                        "|cffff2020[Gauntlet debug]|r No family called \"{}\". Try one of "
+                        "spawn, enemy, tempo, attrition, rules, bargain, class -- or all.",
+                        *familyArg);
+                    return false;
+                }
+            }
+        }
+
+        LivePlayerView const view(p);
+
+        uint32 attached = 0, already = 0, gated = 0;
+        std::string gatedNames;
+
+        for (MechanicDef const& def : AllMechanics())
+        {
+            if (!everyFamily && def.family != wanted)
+                continue;
+            if (def.classMask != 0 && (def.classMask & view.GetClassMask()) == 0)
+                continue;
+            if (st->Find(def.id))
+            {
+                ++already;
+                continue;
+            }
+
+            // The gates the generator would also apply. Reported rather than
+            // obeyed: a tester wants the curse on so they can train the spell
+            // and watch it start working.
+            bool const needsSpell = def.requiresSpell != 0 && !view.HasSpell(def.requiresSpell);
+            bool const needsTree  = def.requiresTree  != 0 && def.requiresTree != view.GetTalentTree();
+
+            uint32 const capped = std::min<uint32>(rank, std::min<uint8>(def.maxRank, MAX_RANK));
+            uint8 const slot = AttachCheat(handler, p, st, &def, capped, Gauntlet::Condition::Always);
+            if (slot == 0)
+            {
+                handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Ran out of affix slots.");
+                break;
+            }
+
+            ++attached;
+            handler->PSendSysMessage("  |cffffff00{}|r  slot {}  rank {}{}", def.name,
+                                     static_cast<uint32>(slot), capped,
+                                     capped < rank ? " (its ceiling)" : "");
+
+            if (needsSpell || needsTree)
+            {
+                ++gated;
+                if (!gatedNames.empty())
+                    gatedNames += ", ";
+                gatedNames += def.name;
+            }
+        }
+
+        handler->PSendSysMessage(
+            "|cffff2020[Gauntlet debug]|r CHEAT: attached {} affix(es) at rank {}{}.",
+            attached, rank, already ? Acore::StringFormat(", {} already carried", already) : "");
+
+        if (gated != 0)
+            handler->PSendSysMessage(
+                "  |cffff8040{} of them are gated on a spell or a talent tree you do not have "
+                "yet: {}. They are carried and will do nothing until you train it -- that is "
+                "the gate, not a bug.|r", gated, gatedNames);
+
+        if (attached != 0)
+            handler->PSendSysMessage("  .gauntlet status lists them; .gauntlet debug dump has each "
+                                     "one's own counters.");
         return true;
     }
 

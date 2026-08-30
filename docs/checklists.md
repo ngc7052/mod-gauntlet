@@ -20,6 +20,7 @@ account. Nothing below stakes a real run.
 
 ```
 .gauntlet debug give <key|id> [rank]   # attach an affix at a rank
+.gauntlet debug give-class [rank] [family]  # every affix your class can be offered, at once
 .gauntlet debug rank <slot> <n>        # move a carried affix to rank n
 .gauntlet debug remove <slot>          # detach one
 .gauntlet debug dump                   # affixes, aggregate products, scheduler, summons, state
@@ -43,6 +44,13 @@ and a word longer than the addon's 200-byte chunk, which the wire splits
 mid-word and rejoins with a space that was never there. It found one on
 its first run (Half-Tamed I and II) and it is the cheapest check in this file:
 one command, no character, no run staked.
+
+**`.gauntlet debug give-class` is how you set up a class's section below.**
+`give-class` alone attaches every class curse your character can be offered at
+rank I; `give-class 4` does it at rank IV; `give-class 3 all` attaches every
+relevant affix of every family. It reports which of them are gated on a spell or
+talent tree you have not got — those are carried and inert until you train it,
+which looks exactly like a broken curse and is not one.
 
 **Every mechanic's `Diagnose()` is in `.gauntlet debug dump`.** It reports what
 that mechanic has actually done this run — fires, kills counted, spells refused
