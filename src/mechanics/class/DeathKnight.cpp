@@ -9,6 +9,7 @@
 #include "GauntletRegistry.h"
 #include "GauntletSummons.h"
 #include "../Nearby.h"
+#include "TimedLockout.h"
 #include "AuraDurationEdit.h"
 
 #include "Chat.h"
@@ -390,12 +391,10 @@ namespace Gauntlet
         class ColdPresence final : public IMechanic
         {
         public:
-            void OnDetach(Ctx& ctx) override
-            {
-                if (Player* player = ctx.player)
-                    for (uint32 id : PRESENCES)
-                        player->RemoveSpellCooldown(id, /*update*/ true);
-            }
+            // Only this affix's own lockouts. See TimedLockout: clearing the
+            // whole group handed back a free presence swap, which is what
+            // `.gauntlet debug leaks` reported against 48263/48265/48266.
+            void OnDetach(Ctx& ctx) override { _lock.ReleaseAll(ctx.player); }
 
             void OnSpellCast(Ctx& ctx, Spell* spell) override
             {
@@ -414,7 +413,7 @@ namespace Gauntlet
                 uint32 const ms = PRESENCE_LOCK_MS[RankIndexOf(ctx.self)];
                 for (uint32 id : PRESENCES)
                     if (id != info->Id)
-                        player->AddSpellCooldown(id, 0, ms, /*needSendToClient*/ true);
+                        _lock.Lock(player, id, ms);
 
                 AddonFor(ctx)->SendEvent(player, KeyOf(MECHANIC_COLD_PRESENCE, "c23_cold_presence"),
                                          ms / 1000u, "Presence locked");
@@ -440,6 +439,9 @@ namespace Gauntlet
                 return "cold presence: " + std::to_string(PRESENCE_LOCK_MS[RankIndexOf(ctx.self)] / 1000u)
                      + "s lock";
             }
+
+        private:
+            TimedLockout _lock;
         };
 
         // ==================================================================
@@ -471,12 +473,11 @@ namespace Gauntlet
         class OneWard final : public IMechanic
         {
         public:
-            void OnDetach(Ctx& ctx) override
-            {
-                if (Player* player = ctx.player)
-                    for (uint32 id : { SPELL_ANTI_MAGIC_SHELL, SPELL_ICEBOUND_FORTITUDE, SPELL_LICHBORNE })
-                        player->RemoveSpellCooldown(id, /*update*/ true);
-            }
+            // Only this affix's own lockouts, and this is the curse where it
+            // matters most: the shared cooldown runs two to eight minutes,
+            // which is the same order as the real cooldowns on all three wards.
+            // Clearing the group unconditionally gave every one of them back.
+            void OnDetach(Ctx& ctx) override { _lock.ReleaseAll(ctx.player); }
 
             void OnSpellCast(Ctx& ctx, Spell* spell) override
             {
@@ -504,8 +505,7 @@ namespace Gauntlet
                     if (id == SPELL_LICHBORNE && !rankThree)
                         continue;
 
-                    player->AddSpellCooldown(id, 0, WARD_SHARED_MS[RankIndexOf(ctx.self)],
-                                             /*needSendToClient*/ true);
+                    _lock.Lock(player, id, WARD_SHARED_MS[RankIndexOf(ctx.self)]);
                 }
 
                 AddonFor(ctx)->SendEvent(player, KeyOf(MECHANIC_ONE_WARD, "c24_one_ward"),
@@ -554,6 +554,9 @@ namespace Gauntlet
                 return "one ward: " + std::to_string(WARD_SHARED_MS[RankIndexOf(ctx.self)] / 60000u)
                      + "-minute shared cooldown";
             }
+
+        private:
+            TimedLockout _lock;
         };
     }
 

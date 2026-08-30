@@ -9,6 +9,7 @@
 #include "GauntletRegistry.h"
 #include "../Boons.h"
 #include "SelfControl.h"
+#include "TimedLockout.h"
 
 #include "Chat.h"
 #include "Player.h"
@@ -70,14 +71,10 @@ namespace Gauntlet
         class BoundSkin final : public IMechanic
         {
         public:
-            void OnDetach(Ctx& ctx) override
-            {
-                // Every form back immediately. A druid who swapped this affix
-                // away should not be stuck in caster form for ten seconds.
-                if (Player* player = ctx.player)
-                    for (uint32 id : FORM_SPELLS)
-                        player->RemoveSpellCooldown(id, /*update*/ true);
-            }
+            // Every form this affix locked, back immediately: a druid who
+            // swapped it away should not be stuck in caster form for ten
+            // seconds. Only the ones it locked, though -- see TimedLockout.
+            void OnDetach(Ctx& ctx) override { _lock.ReleaseAll(ctx.player); }
 
             // Fires on every form change including the one *out* of a form,
             // which is correct: the card prices changing, not entering.
@@ -92,7 +89,7 @@ namespace Gauntlet
                 uint32 const ms = SHIFT_LOCK_MS[RankIndexOf(ctx.self)];
 
                 for (uint32 id : FORM_SPELLS)
-                    player->AddSpellCooldown(id, 0, ms, /*needSendToClient*/ true);
+                    _lock.Lock(player, id, ms);
 
                 ++_shifts;
 
@@ -138,6 +135,7 @@ namespace Gauntlet
 
         private:
             uint32 _shifts = 0;
+            TimedLockout _lock;
         };
 
         // ==================================================================

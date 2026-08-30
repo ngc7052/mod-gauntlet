@@ -9,6 +9,7 @@
 #include "GauntletRegistry.h"
 #include "AuraDurationEdit.h"
 #include "SelfControl.h"
+#include "TimedLockout.h"
 
 #include "SharedDefines.h"
 
@@ -275,11 +276,8 @@ namespace Gauntlet
         class FaithlessForm final : public IMechanic
         {
         public:
-            void OnDetach(Ctx& ctx) override
-            {
-                if (ctx.player)
-                    ctx.player->RemoveSpellCooldown(SPELL_SHADOWFORM, /*update*/ true);
-            }
+            // Only this affix's own lockout. See TimedLockout.
+            void OnDetach(Ctx& ctx) override { _lock.ReleaseAll(ctx.player); }
 
             // OnAuraRemoved rather than OnSpellCast: a priest leaves Shadowform
             // by cancelling the aura, which is not a cast and produces no
@@ -322,6 +320,7 @@ namespace Gauntlet
 
         private:
             uint32 _left = 0;
+            TimedLockout _lock;
         };
 
         void FaithlessForm::OnAuraRemoved(Ctx& ctx, Unit* target, AuraApplication* app)
@@ -341,7 +340,7 @@ namespace Gauntlet
                 return;
 
             uint32 const ms = SHADOWFORM_LOCK_MS[RankIndexOf(ctx.self)];
-            player->AddSpellCooldown(SPELL_SHADOWFORM, 0, ms, /*needSendToClient*/ true);
+            _lock.Lock(player, SPELL_SHADOWFORM, ms);
             ++_left;
 
             AddonFor(ctx)->SendEvent(player, KeyOf(MECHANIC_FAITHLESS, "c18_faithless_form"),

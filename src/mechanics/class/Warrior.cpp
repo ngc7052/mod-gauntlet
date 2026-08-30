@@ -12,6 +12,7 @@
 #include "AuraDurationEdit.h"
 #include "PermanentCooldown.h"
 #include "SelfControl.h"
+#include "TimedLockout.h"
 
 #include "Chat.h"
 #include "Creature.h"
@@ -546,12 +547,10 @@ namespace Gauntlet
         class IronDiscipline final : public IMechanic
         {
         public:
-            void OnDetach(Ctx& ctx) override
-            {
-                if (Player* player = ctx.player)
-                    for (uint32 id : STANCES)
-                        player->RemoveSpellCooldown(id, /*update*/ true);
-            }
+            // Only the lockouts this affix placed, and only while they are
+            // still running. See TimedLockout: releasing the whole group
+            // unconditionally hands back a free stance change.
+            void OnDetach(Ctx& ctx) override { _lock.ReleaseAll(ctx.player); }
 
             void OnSpellCast(Ctx& ctx, Spell* spell) override
             {
@@ -573,7 +572,7 @@ namespace Gauntlet
                 // reason to take that away.
                 for (uint32 id : STANCES)
                     if (id != info->Id)
-                        player->AddSpellCooldown(id, 0, ms, /*needSendToClient*/ true);
+                        _lock.Lock(player, id, ms);
 
                 // The boon: the rage a stance change normally burns is given
                 // straight back. Refunded rather than prevented, because the
@@ -619,6 +618,7 @@ namespace Gauntlet
         private:
             int32  _rageBefore = 0;
             uint32 _changes    = 0;
+            TimedLockout _lock;
         };
 
         std::string DeafeningRoar::Describe(AffixInstance const& self) const
