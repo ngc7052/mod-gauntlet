@@ -44,8 +44,28 @@ namespace Gauntlet
 
         // Both ladders are stated on the card -- cadence 25/20/15 s, severity
         // 25/35/50% of maximum health -- so neither is a chosen number.
-        constexpr uint32 CADENCE_MS[]   = { 25000, 20000, 15000, 12000 };
-        static_assert(std::size(CADENCE_MS) >= MAX_RANK, "CADENCE_MS is short a rank");
+        // How long you may stand still, in combat, before the sky notices.
+        //
+        // This used to be a cadence: every N seconds, wherever you were and
+        // whatever you were doing, the sky marked you and you stepped sideways.
+        // A metronome is not a decision -- you are not choosing anything, you
+        // are waiting for a beep -- and it was reported from play as one of six
+        // cards that felt like taxes.
+        //
+        // The sky now marks the ground you have refused to leave, so the card
+        // has a verb and the verb is movement. Stand and cast and it finds you;
+        // keep moving and it never does. See docs/tempo-redesign.md.
+        //
+        // The lowest rank is deliberately generous: eight seconds is longer
+        // than any cast in the game, so rank I asks a caster to weave rather
+        // than to stop casting.
+        constexpr uint32 STILL_MS[]     = { 8000, 6000, 4500, 3000 };
+        static_assert(std::size(STILL_MS) >= MAX_RANK, "STILL_MS is short a rank");
+
+        // How far counts as having moved. Wide enough that turning on the spot
+        // or a step of melee shuffle is not movement, short enough that leaving
+        // the mark is unambiguous.
+        constexpr float MOVED_YARDS = 5.0f;
         // Rank IV is past the card at 12 s and 65%. The three-second warning
         // does not move at any rank, so the ladder prices standing still and
         // never shortens the answer to it.
@@ -220,7 +240,7 @@ namespace Gauntlet
             // state rather than counting the diff. That also makes this
             // correct whether integration calls OnTick every 500 ms or every
             // world tick.
-            void OnTick(Ctx& ctx, uint32 /*diffMs*/) override { Sync(ctx); }
+            void OnTick(Ctx& ctx, uint32 diffMs) override { Sync(ctx); Watch(ctx, diffMs); }
 
             void OnEnterCombat(Ctx& ctx, Unit* /*enemy*/, bool /*wasOutOfCombat*/) override { Sync(ctx); }
             void OnLeaveCombat(Ctx& ctx) override { Disarm(ctx); }
@@ -232,6 +252,7 @@ namespace Gauntlet
 
         private:
             void Sync(Ctx& ctx);
+            void Watch(Ctx& ctx, uint32 diffMs);
             void Arm(Ctx& ctx);
             void Disarm(Ctx& ctx);
             void ClearMark(Ctx& ctx, bool announce);
@@ -246,6 +267,10 @@ namespace Gauntlet
             // resets on login by design, and a mark three seconds from landing
             // means nothing to a character who logs in somewhere else. There
             // is no counter behind this affix to carry across a session.
+            // Where the stillness count started, and how long it has run.
+            Position _stillFrom;
+            uint32   _stillMs      = 0;
+
             Position _mark;
             uint32   _markMap      = 0;
             uint32   _markInstance = 0;
@@ -271,6 +296,8 @@ namespace Gauntlet
 
         // The cadence runs while the player is fighting and at no other time.
         // Everything else that can stop an event is the scheduler's business.
+        // Leaving combat is still what stops it; entering combat no longer
+        // starts it, because standing still is what starts it now.
         void FallingSky::Sync(Ctx& ctx)
         {
             Player* player = ctx.player;
@@ -278,20 +305,58 @@ namespace Gauntlet
                 return;
 
             bool const fighting = player->IsInWorld() && player->IsAlive() && player->IsInCombat();
-            if (fighting == _armed)
+            if (!fighting && _armed)
+                Disarm(ctx);
+
+            if (!fighting)
+                _stillMs = 0;
+        }
+
+        // The whole card. Watch the ground under the player and arm when they
+        // have refused to leave it.
+        void FallingSky::Watch(Ctx& ctx, uint32 diffMs)
+        {
+            Player* player = ctx.player;
+            if (!player || !ctx.clock)
+                return;
+            if (ctx.run && ctx.run->dead)
+                return;
+            if (!player->IsInWorld() || !player->IsAlive() || !player->IsInCombat())
                 return;
 
-            if (fighting)
-                Arm(ctx);
-            else
-                Disarm(ctx);
+            // Moving is measured against where the count started, not against
+            // the last tick: a player edging sideways a yard at a time is
+            // standing still, and measuring tick to tick would call it running.
+            if (_stillFrom.GetExactDist2d(player) > MOVED_YARDS || _stillMs == 0)
+            {
+                _stillFrom = player->GetPosition();
+                _stillMs   = 0;
+
+                // Moved out from under a mark that has not landed: the sky
+                // loses interest. This is the counterplay, and it has to be
+                // able to cancel a warning or the warning is decoration.
+                if (_armed)
+                    Disarm(ctx);
+            }
+
+            _stillMs += diffMs;
+
+            if (_armed || _stillMs < STILL_MS[RankIndexOf(ctx)])
+                return;
+
+            Arm(ctx);
         }
 
         void FallingSky::Arm(Ctx& ctx)
         {
             ++_eventId;
             _armed = true;
-            ctx.clock->Arm(FALLING_SKY, _eventId, CADENCE_MS[RankIndexOf(ctx)], WARN_MS);
+
+            // Pacing::Fixed: the warning is the whole event here -- three
+            // seconds to step off ground you have already been standing on --
+            // and stretching it with the event budget would make the telegraph
+            // mean different things on different runs.
+            ctx.clock->Arm(FALLING_SKY, _eventId, WARN_MS, WARN_MS, Pacing::Fixed);
         }
 
         void FallingSky::Disarm(Ctx& ctx)
@@ -545,10 +610,11 @@ namespace Gauntlet
         {
             uint8 const rank = RankIndex(self.rank);
 
-            std::string out = "In combat, every " + std::to_string(CADENCE_MS[rank] / 1000)
-                            + " seconds the sky marks your spot; " + std::to_string(WARN_MS / 1000)
+            std::string out = "Stand still in combat for " + std::to_string(STILL_MS[rank] / 1000)
+                            + " seconds and the sky marks the ground under you; "
+                            + std::to_string(WARN_MS / 1000)
                             + " seconds later it strikes for " + std::to_string(SEVERITY_PCT[rank])
-                            + "% of your maximum health. Move out of the mark.";
+                            + "% of your maximum health. Keep moving and it never finds you.";
 
             // Not BoonClause. The shared clause reads " In exchange, you move
             // 10% faster.", which is true of a Scalar's rolled boon and false

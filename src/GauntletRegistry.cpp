@@ -184,7 +184,7 @@ namespace
         // clean dodge is worth testing" -- so BonusMoveSpeed is a reading, not a value.
         { 14, "falling_sky", "Falling Sky", Family::Tempo, 0, 25, 80, 4,
           MF_Timed, "", Boon::BonusMoveSpeed, 0, 0,
-          "In combat, every 20 seconds the sky marks your spot; three seconds later it strikes." },
+          "Stand still in combat and the sky marks the ground under you. Keep moving." },
 
         { 15, "frenzy", "Frenzy", Family::Tempo, 0, 8, 80, 4,
           MF_RewardShaped, "", Boon::BonusDamage, 0, 0,
@@ -557,7 +557,7 @@ namespace
         // ---------------------------------------------------------------
         { 74, "a05_killing_floor", "Killing Floor", Family::Attrition, 0, 10, 80, 4,
           MF_RewardShaped, "", Boon::None, 0, 0,
-          "Nothing heals you while something you have wounded still lives. Every kill gives health back instead." },
+          "Healing is held while something you have wounded lives. A kill hands it back." },
 
         };
     }

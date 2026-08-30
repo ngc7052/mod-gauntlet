@@ -13,6 +13,7 @@
 #include "../Boons.h"
 
 #include <algorithm>
+#include <limits>
 #include <string>
 #include <iterator>
 
@@ -82,8 +83,31 @@ namespace Gauntlet
         // with rank, because the curse half is fixed -- healing is blocked, at
         // every rank -- and the only axis left to make a rank harder is how
         // much the release is worth.
-        constexpr uint32 KILL_HEAL_PCT[] = { 10, 8, 6, 5 };
-        static_assert(std::size(KILL_HEAL_PCT) >= MAX_RANK, "KILL_HEAL_PCT is short a rank");
+        // What share of the banked healing a kill hands back.
+        //
+        // The card used to refuse healing outright and pay a flat percentage of
+        // maximum health on a kill. Refusing a core verb is not a cost, it is
+        // an amputation: the player has a healthbar and a button and the card
+        // says no, and the compensation arrives on a kill they may not live to
+        // make. It was reported from play as one of six cards that felt like
+        // taxes, and it is the harshest of the six.
+        //
+        // Healing is now *delayed rather than denied*. Every heal that lands in
+        // combat goes into a bank; a kill pays the bank out. Nothing is taken
+        // away -- it is held, and the player decides whether to push for the
+        // kill that releases it or break off and take what is left. See
+        // docs/tempo-redesign.md.
+        constexpr uint32 KILL_PAYOUT_PCT[] = { 100, 85, 70, 50 };
+        static_assert(std::size(KILL_PAYOUT_PCT) >= MAX_RANK, "KILL_PAYOUT_PCT is short a rank");
+
+        // What the bank loses if the fight ends without a kill to release it.
+        //
+        // This is what stops "walk away" being strictly better than "win". At
+        // rank I nothing is lost and the card is pure delay; by rank IV half
+        // the bank evaporates, and breaking off becomes a real price rather
+        // than a free reset.
+        constexpr uint32 LEAVE_LOSS_PCT[] = { 0, 15, 30, 50 };
+        static_assert(std::size(LEAVE_LOSS_PCT) >= MAX_RANK, "LEAVE_LOSS_PCT is short a rank");
 
         // Rank III keeps the block up after the fight, so disengaging is no
         // longer an instant out. Zero at ranks I and II: leaving combat lifts
@@ -145,7 +169,9 @@ namespace Gauntlet
                 if (!_wounded || heal == 0)
                     return;
 
+                // Banked, not burned. The number is what comes back.
                 _blocked += heal;
+                _bank    += heal;
                 heal = 0;
             }
 
@@ -165,9 +191,13 @@ namespace Gauntlet
                 if (!_wounded)
                     return;   // nothing was being withheld, so nothing is released
 
-                uint32 const max = player->GetMaxHealth();
-                uint32 const pct = KILL_HEAL_PCT[RankIndexOf(ctx.self)];
-                int32  const heal = int32(uint64(max) * pct / 100u);
+                if (_bank == 0)
+                    return;   // nothing was withheld, so there is nothing to release
+
+                uint32 const pct  = KILL_PAYOUT_PCT[RankIndexOf(ctx.self)];
+                int32  const heal = int32(std::min<uint64>(_bank * pct / 100u,
+                                                           std::numeric_limits<int32>::max()));
+                _bank = 0;
                 if (heal <= 0)
                     return;
 
@@ -201,6 +231,23 @@ namespace Gauntlet
                 if (_lingerMs < linger)
                     return;
 
+                // The fight ended without a kill to release the bank. What is
+                // left is paid out minus the rank's loss, so breaking off is a
+                // choice with a price rather than a free reset.
+                if (_bank != 0)
+                {
+                    uint32 const loss = LEAVE_LOSS_PCT[RankIndexOf(ctx.self)];
+                    int32 const back = int32(std::min<uint64>(_bank * (100u - loss) / 100u,
+                                                              std::numeric_limits<int32>::max()));
+                    _bank = 0;
+                    if (back > 0)
+                    {
+                        uint32 const before = player->GetHealth();
+                        player->ModifyHealth(back);
+                        _healed += player->GetHealth() - before;
+                    }
+                }
+
                 _wounded  = false;
                 _lingerMs = 0;
                 Publish(ctx);
@@ -213,9 +260,13 @@ namespace Gauntlet
                 // No BoonClause: the upside is the other half of the same
                 // sentence, not a separate promise. Frenzy and Berserker's
                 // Bargain read the same way and for the same reason.
-                std::string out = "While you are in a fight with something you have wounded, no"
-                                  " healing reaches you. Every enemy you kill gives back "
-                                + std::to_string(KILL_HEAL_PCT[i]) + "% of your health instead.";
+                std::string out = "While you are in a fight with something you have wounded, healing"
+                                  " does not reach you -- it is held. A kill hands back "
+                                + std::to_string(KILL_PAYOUT_PCT[i]) + "% of what is held.";
+
+                if (LEAVE_LOSS_PCT[i] != 0)
+                    out += " Break off instead and " + std::to_string(LEAVE_LOSS_PCT[i])
+                         + "% of it is lost.";
 
                 if (LINGER_MS[i] != 0)
                     out += " The block holds for " + std::to_string(LINGER_MS[i] / 1000)
@@ -236,7 +287,8 @@ namespace Gauntlet
             std::string Diagnose(Ctx& ctx) const override
             {
                 return std::string("killing floor: ") + (_wounded ? "blocking" : "clear")
-                     + ", " + std::to_string(_blocked) + " healing refused, "
+                     + ", " + std::to_string(_bank) + " held now, "
+                     + std::to_string(_blocked) + " healing banked in all, "
                      + std::to_string(_kills) + " kill(s) released "
                      + std::to_string(_healed) + " health"
                      + (_wounded && ctx.player && !ctx.player->IsInCombat()
@@ -269,6 +321,9 @@ namespace Gauntlet
             }
 
             uint64 _blocked  = 0;
+
+            // Healing held back and not yet handed over.
+            uint64 _bank     = 0;
             uint64 _healed   = 0;
             uint32 _kills    = 0;
             uint32 _lingerMs = 0;
