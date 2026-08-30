@@ -796,6 +796,7 @@ namespace Gauntlet
 
         st->pending     = set.offers;
         st->pendingTier = tier;
+        st->offerMs     = 0;
 
         ChatHandler ch(player->GetSession());
         ch.PSendSysMessage("|cffff2020[Gauntlet]|r Tier {} reached. Choose your affix:", tier);
@@ -849,6 +850,7 @@ namespace Gauntlet
         st->dirty = true;
         st->pending.clear();
         st->pendingTier = 0;
+        st->offerMs     = 0;
 
         // A swap deletes a row and writes two log lines; doing that in three
         // separate async statements would leave a window in which the run has
@@ -1425,7 +1427,9 @@ namespace Gauntlet
         sup.inFlight     = player->IsInFlight();                // Unit.h:1709
         sup.dead         = !player->IsAlive();                  // Unit.h:1793
         sup.inGrace      = st->graceMs != 0;
-        sup.offerPending = !st->pending.empty();
+        // Time-boxed, not open-ended. See RunState::offerMs.
+        st->offerMs = st->pending.empty() ? 0u : st->offerMs + elapsed;
+        sup.offerPending = !st->pending.empty() && st->offerMs < OFFER_QUIET_MS;
 
         // The core's own sanctuary test (PlayerUpdates.cpp:1242) is exactly
         // this pair. pvpInfo.IsInNoPvPArea would need no DBC lookup but is a
@@ -1484,7 +1488,9 @@ namespace Gauntlet
         if (!player->IsAlive())         add("dead");
         if (st->graceMs != 0)           add(Acore::StringFormat("in the grace window ({} ms left)",
                                                                 st->graceMs).c_str());
-        if (!st->pending.empty())       add("an offer is on the table -- pick or it stays quiet");
+        if (!st->pending.empty() && st->offerMs < OFFER_QUIET_MS)
+            add(Acore::StringFormat("an offer is on the table ({} ms of quiet left)",
+                                    OFFER_QUIET_MS - st->offerMs).c_str());
 
         if (AreaTableEntry const* area = sAreaTableStore.LookupEntry(player->GetAreaId()))
             if (area->IsSanctuary())

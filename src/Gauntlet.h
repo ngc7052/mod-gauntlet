@@ -272,6 +272,11 @@ namespace Gauntlet
     // throwaway an offer line is described through, and it is held in a
     // unique_ptr for the length of that line. The members are defined in
     // GauntletMgr.cpp, where IMechanic is complete.
+    // How long an offer on the table holds the scheduler back. Long enough to
+    // read three cards, short enough that forgetting to pick does not stop the
+    // run.
+    constexpr uint32 OFFER_QUIET_MS = 20000;   // TODO(design)
+
     struct RunState
     {
         uint32 seed        = 0;
@@ -286,6 +291,19 @@ namespace Gauntlet
         // They are never stored: BuildOffers rebuilds them from the seed.
         std::vector<Offer> pending;
         uint32 pendingTier = 0;
+
+        // How long the offer has been on the table, in milliseconds.
+        //
+        // An offer suppresses every scheduled event, which is right for the few
+        // seconds someone spends reading three cards and wrong for ever. A
+        // player who did not pick -- or did not notice -- had the whole run
+        // freeze silently: the queue kept filling with events that came due and
+        // were held, and from inside the game it looked exactly like the module
+        // being broken. It was reported as exactly that.
+        //
+        // So the pause is time-boxed. Take as long as you like over the choice;
+        // the world starts moving again after OFFER_QUIET_MS either way.
+        uint32 offerMs = 0;
 
         // Death is no longer instant (plan section 6, decision 5): dying arms
         // this timer, releasing or letting it run out ends the run, and a
