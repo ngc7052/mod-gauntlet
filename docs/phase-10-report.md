@@ -119,26 +119,76 @@ and two copies of a label the player reads is how the two drift.
 ```
 ANCHOR  PASS  69 registered mechanic(s), every one anchored
 LADDER  PASS  78 rank ladder(s), every one monotonic
-COMPILE PASS  60 object(s)          (58 before: +GauntletAudit, +GauntletAuditLive)
-LINK    PASS  60 objects, no duplicate definitions
+COMPILE PASS  61 object(s)          (58 before: +GauntletAudit, +GauntletAuditLive, +TimedLockout)
+LINK    PASS  61 objects, no duplicate definitions
         PASSED  150 tests           (129 before: +21)
 ```
 
-The worldserver image is rebuilt and carries the command; the realm itself is
-down and was left that way.
+The worldserver image is rebuilt and carries the command. The live realm was
+down throughout and was left that way; all testing ran on an isolated copy.
 
-## 6. What Phase 11 should know
+## 6. It has now been run — and it found three bugs
 
-1. **The audit has never been run against the module.** It is written, compiled,
-   deployed and unit-tested, and its first real run is still ahead. The first
-   thing to do with it is `leaks self`, then `leaks`, and the result is a finding
-   either way: a leak is a bug, and sixty-nine clean is the first machine
-   statement anyone has been able to make about `OnDetach`.
-2. **A high `inert` count is a result, not a pass.** If most of the registry
-   reports inert, the audit is measuring the wrong dimensions and the footprint
-   needs widening — that is the honest reading, not "the module is fine".
-3. **This closes one row of `docs/checklists.md`, not the file.** It answers
-   "does detaching put everything back" for every mechanic at once. It cannot
-   answer whether the effect was *correct* while it was on, which is the rest of
-   the 672 lines and still needs a screen.
-4. **`CAP_CLASS` is still 3 and still `TODO(design)`.** Seven phases.
+The section that stood here said the audit had never been run and its first real
+run was still ahead. It has been run. `docs/testing-without-a-client.md` is how:
+mod-playerbots puts real `Player` objects in the world with no game client, the
+server console can address them by name, and console commands execute in the
+world thread so the three captures are atomic. An isolated realm on a copy of
+the database, and no part of the live one touched.
+
+**Its own probe failed first.** `Scheduler::Arm` refuses `MECHANIC_NONE` and
+returns without queueing anything, so `leaks self` was measuring an `Arm` that
+never happened — and said so, on the first run, before the audit was ever
+pointed at the module. That is the phase's rule working on the phase's own code.
+
+**The clean/inert split was meaningless.** `Capture` records the carried-affix
+count, which necessarily moves while an affix is attached, so every mechanic
+looked like it had done something. The first full run read *69 clean, 0 inert*
+on a warrior most of those curses are not for. Normalised out, the same run
+reads 6 clean, 63 inert — which is the truth.
+
+**Then three real leaks**, all the same fault:
+
+| Curse | Left behind |
+|---|---|
+| Iron Discipline IV | warrior stance cooldowns 71, 2457, 2458 cleared |
+| Berserker's Bargain IV | Shield Wall (871) cleared |
+| Cold Presence IV | presences 48263, 48265, 48266 cleared |
+
+Five class curses lock a group of abilities against each other and all five
+released by clearing the whole group in `OnDetach` — which also clears whatever
+cooldown the spell was on for its own reasons. `TimedLockout` replaces the five
+copies and clears only locks it placed that are still running.
+`PermanentCooldown::Allow` had it too, and now releases only what `IsDenied`
+recognises as ours.
+
+Berserker's Bargain is the one to remember: **it appeared on the first pass and
+not the second**, because the audit itself consumed the real Shield Wall cooldown
+that made it visible. A single clean run proves less than it looks like.
+
+And worth stating plainly: **Phase 9 read all four `PermanentCooldown` users by
+hand and called them clean.** They are symmetric — `Deny` pairs with `Allow` on
+every one. Reading could not have found this, because what makes it a bug is a
+cooldown that was already there. That is the argument for the audit, made
+against the phase that did the reading.
+
+Final state: 20 audits, two passes over one bot of each of the ten classes,
+**0 leaked**.
+
+## 7. What Phase 11 should know
+
+1. **`inert` is the headline, not `leaked`.** 63 of 69 report inert on a typical
+   character, because the audit attaches and detaches and never makes the player
+   cast, kill, or take a hit. What it proved is that `OnDetach` is now honest.
+   What it did not touch is every curse whose behaviour lives on a hook.
+2. **The rig is the asset, more than the audit is.** There is now a way to run
+   this module against live `Player` objects with no client and no human. Driving
+   the hooks from it is the obvious next build, and it is most of what
+   `docs/checklists.md` is still holding.
+3. **Run it twice, against a bot that has been fighting.** See Berserker's
+   Bargain above.
+4. **Two lockouts deliberately survive detach**: Cold Trail's Vanish and Dead
+   Weight's Feign Death. Those are minutes-long prices for an ability already
+   spent, and whether losing the affix should refund them is a design question
+   that has not been answered.
+5. **`CAP_CLASS` is still 3 and still `TODO(design)`.** Seven phases.
