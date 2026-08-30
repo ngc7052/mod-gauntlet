@@ -41,6 +41,15 @@ namespace Gauntlet
         // Scheduled events actually released. Zero for a card that never armed.
         uint32 eventsFired = 0;
 
+        // Cooldowns the bench's own cast started. They have to be cleared by
+        // the caller *after* the affix is detached, not before: a card that
+        // denies the spell buries the real cooldown while it is carried and
+        // PermanentCooldown::Allow puts it back on the way out, so clearing it
+        // any earlier just means it reappears in the final reading. Dead Weight
+        // reported exactly that -- "spell 5384 still on cooldown", on a Feign
+        // Death cooldown the bench had started by casting Feign Death.
+        std::vector<uint32> castCooldowns;
+
         bool Reached() const { return !reached.empty(); }
     };
 
@@ -73,7 +82,12 @@ namespace Gauntlet
     // same gating, condition checks and actor-noting the live game does -- and
     // so that a hook added to Mgr is a hook the bench drives, without this file
     // knowing the name of a single mechanic.
-    ProbeResult Probe(Player* player, RunState* run, uint8 slot, uint16 mechanic);
+    // `requiresSpell` is the card's own registry gate. Casting it is how a
+    // cast-driven card is reached without the bench knowing a thing about which
+    // card it is: the row already declares the spell, so a new card that
+    // declares one is driven the day it lands.
+    ProbeResult Probe(Player* player, RunState* run, uint8 slot, uint16 mechanic,
+                      uint32 requiresSpell);
 }
 
 #endif

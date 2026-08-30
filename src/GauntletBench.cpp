@@ -49,6 +49,40 @@ namespace Gauntlet
 
         bool Moved(float a, float b) { return std::fabs(a - b) > 0.0001f; }
 
+        std::vector<uint32> CooldownIds(Player* player)
+        {
+            std::vector<uint32> ids;
+            for (auto const& cd : player->GetSpellCooldownMap())
+                ids.push_back(cd.first);
+            std::sort(ids.begin(), ids.end());
+            return ids;
+        }
+
+        std::vector<uint32> AuraIds(Player* player)
+        {
+            std::vector<uint32> ids;
+            for (auto const& applied : player->GetAppliedAuras())
+                ids.push_back(applied.first);
+            std::sort(ids.begin(), ids.end());
+            return ids;
+        }
+
+        // Every id `b` has more copies of than `a` does. Same multiset walk
+        // GauntletAudit uses, and for the same reason: a second stack of an
+        // aura the player already had is a change.
+        std::vector<uint32> Added(std::vector<uint32> const& a, std::vector<uint32> const& b)
+        {
+            std::vector<uint32> out;
+            std::size_t i = 0, j = 0;
+            while (j < b.size())
+            {
+                if (i >= a.size() || b[j] < a[i]) { out.push_back(b[j]); ++j; }
+                else if (a[i] < b[j])             { ++i; }
+                else                              { ++i; ++j; }
+            }
+            return out;
+        }
+
         // What the bench can see about the *target*.
         //
         // Footprint watches the player, and a whole family of cards does not
@@ -130,7 +164,8 @@ namespace Gauntlet
         run->graceMs  = saved.graceMs;
     }
 
-    ProbeResult Probe(Player* player, RunState* run, uint8 slot, uint16 mechanic)
+    ProbeResult Probe(Player* player, RunState* run, uint8 slot, uint16 mechanic,
+                      uint32 requiresSpell)
     {
         ProbeResult out;
         if (!player || !run)
@@ -228,6 +263,9 @@ namespace Gauntlet
 
         TempSummon* target = player->SummonCreature(BENCH_TARGET_ENTRY, player->GetPosition(),
                                                     TEMPSUMMON_TIMED_DESPAWN, BENCH_TARGET_LIFE_MS);
+
+        // The bench's own cast, and what it displaced, so both can be undone.
+        std::vector<uint32> castAdded, castRemoved;
 
         TargetMark targetMark = MarkOf(target);
 
@@ -351,8 +389,77 @@ namespace Gauntlet
                 NoteIf(out, xp != 1000, "experience (kill)");
             }
 
+            // Real damage, through the core's own pipeline, rather than only
+            // calling the hook.
+            //
+            // Craven watches for a creature crossing a health threshold and a
+            // synthetic OnCreatureDamaged never moves the creature's health, so
+            // the threshold was never crossed and the card could not answer.
+            // The same is true of anything that reads the victim's state rather
+            // than the number it was handed.
             sGauntlet->OnCreatureDamaged(player, target->ToCreature(), 100);
             noteBoth("damaging a creature");
+
+            if (target->IsAlive())
+            {
+                uint32 const bite = std::max<uint32>(1, target->GetMaxHealth() / 3);
+                Unit::DealDamage(player, target, bite);
+                noteBoth("really damaging a creature");
+            }
+
+            // The card's own spell gate, cast for real at the target. The
+            // registry row declares it, so this reaches a cast-driven card
+            // without the bench knowing which card it is holding.
+            if (requiresSpell != 0 && player->HasSpell(requiresSpell))
+            {
+                // Exactly what the cast changes, so exactly that can be undone.
+                //
+                // Undoing only the aura of the spell itself is not enough: a
+                // cast applies more than its own name. Casting Vanish stealths
+                // the rogue, casting a paladin's bubble leaves Forbearance, and
+                // casting a stance displaces the one before it -- and every one
+                // of those came back as a leak against the card, which had done
+                // none of it. Iron Discipline, Long Forbearance and Cold Trail
+                // were all the bench blaming a card for the bench's own cast.
+                //
+                // Reading immediately either side of the cast is what makes the
+                // delta *the cast's* rather than the card's, so undoing it
+                // cannot quietly erase a leak the card is responsible for.
+                std::vector<uint32> pre    = AuraIds(player);
+                std::vector<uint32> preCds = CooldownIds(player);
+
+                player->CastSpell(target, requiresSpell, true);
+
+                std::vector<uint32> post    = AuraIds(player);
+                std::vector<uint32> postCds = CooldownIds(player);
+
+                noteBoth("casting the spell it names");
+
+                castAdded   = Added(pre, post);
+                castRemoved = Added(post, pre);
+
+                // A cast starts the spell's own cooldown, and that is the
+                // bench's doing too. Dead Weight came back as leaking a Feign
+                // Death cooldown that the bench had started by casting Feign
+                // Death at it.
+                out.castCooldowns = Added(preCds, postCds);
+            }
+
+            // Full power, for the cards gated on a resource rather than a
+            // spell -- Red Mist waits for a hundred rage. Generic: it is
+            // whatever this class's primary power happens to be.
+            {
+                Powers const type = player->getPowerType();
+                uint32 const parked = player->GetPower(type);
+                player->SetPower(type, player->GetMaxPower(type));
+                noteBoth("at full power");
+
+                for (uint32 i = 0; i < 4; ++i)
+                    sGauntlet->Tick(player, Scheduler::TICK_MS);
+                noteBoth("ticking at full power");
+
+                player->SetPower(type, parked);
+            }
 
             // The clock, *while still in combat*.
             //
@@ -386,6 +493,30 @@ namespace Gauntlet
 
             sGauntlet->OnCreatureKill(player, target->ToCreature(), /*byPet*/ true);
             noteBoth("a pet killing");
+
+            // And then kill it for real. A corpse is a different thing from a
+            // hook call: Carrion wants something to scavenge, Echo wants a
+            // creature to copy, Grave Call wants a body, and Killing Floor's
+            // heal is paid on the death rather than on the callback.
+            if (target->IsAlive())
+            {
+                Unit::Kill(player, target);
+                noteBoth("really killing it");
+
+                for (uint32 i = 0; i < 8; ++i)
+                    sGauntlet->Tick(player, Scheduler::TICK_MS);
+                noteBoth("ticking over the corpse");
+
+                for (uint32 i = 0; i < BENCH_FIRES; ++i)
+                {
+                    if (run->dead || !player->IsAlive())
+                        break;
+                    if (!sGauntlet->FireNow(player, mechanic))
+                        break;
+                    ++out.eventsFired;
+                }
+                noteBoth("firing over the corpse");
+            }
 
             sGauntlet->OnLeaveCombat(player);
             noteBoth("leaving combat");
@@ -430,6 +561,18 @@ namespace Gauntlet
                 Ctx ctx = sGauntlet->MakeCtx(player, run, live);
                 out.diagnose = live->impl->Diagnose(ctx);
             }
+
+        // Undo the bench's own cast before anything reads the character again.
+        // The aura it applied comes off, and anything it displaced goes back --
+        // re-cast rather than re-added, because these were on the player a
+        // moment ago and putting them back is restoring state rather than
+        // inventing it.
+        for (uint32 id : castAdded)
+            player->RemoveAura(id);
+
+        for (uint32 id : castRemoved)
+            if (!player->HasAura(id) && player->HasSpell(id))
+                player->CastSpell(player, id, true);
 
         // The bench's own litter. The target is despawned rather than left to
         // time out, because the next card is probed immediately and a stale one

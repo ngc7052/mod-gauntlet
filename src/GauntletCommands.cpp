@@ -1881,7 +1881,7 @@ public:
             }
 
             uint8 const slot = attached->slot;
-            ProbeResult const probe = Probe(p, st, slot, def.id);
+            ProbeResult const probe = Probe(p, st, slot, def.id, def.requiresSpell);
 
             if (st->dead || !p->IsAlive())
             {
@@ -1893,6 +1893,12 @@ public:
             }
 
             AuditDetach(p, st, slot);
+
+            // The bench's own residue, cleared after the detach rather than
+            // before it. See ProbeResult::castCooldowns.
+            for (uint32 id : probe.castCooldowns)
+                p->RemoveSpellCooldown(id, /*update*/ true);
+
             Footprint const after = Capture(p, st);
 
             ++benched;
