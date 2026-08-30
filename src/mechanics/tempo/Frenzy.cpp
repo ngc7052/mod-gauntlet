@@ -76,9 +76,29 @@ namespace Gauntlet
             void OnPetKill(Ctx& ctx, Creature* killed) override { Chain(ctx, killed); }
             void OnTick(Ctx& ctx, uint32 diffMs) override;
 
-            float DamageTakenMult(Ctx& ctx, Unit* /*attacker*/, SpellInfo const*) override
+            // Damage taken is no longer touched.
+            //
+            // Frenzy used to raise damage dealt *and* damage taken per stack,
+            // which made the card fight itself: it asked the player to
+            // chain-pull and then punished them for the chain they built, so
+            // the correct play was often to let it fall off. A card whose best
+            // line is "do not use it" is not a choice.
+            //
+            // The cost is the chain's fragility instead. Taking a hit resets it
+            // to nothing (see OnDamageTaken), so the stacks are kept by playing
+            // cleanly rather than by accepting a tax -- and that puts the card
+            // in tension with Falling Sky, whose strike now costs a Frenzy
+            // chain as well as health. See docs/tempo-redesign.md.
+            void OnDamageTaken(Ctx& ctx, Unit* /*attacker*/, uint32 amount) override
             {
-                return 1.0f + Pct(ctx) * float(_stacks);
+                if (amount == 0 || _stacks == 0)
+                    return;
+
+                Reset(ctx);
+
+                if (ctx.player && ctx.player->GetSession())
+                    ChatHandler(ctx.player->GetSession()).PSendSysMessage(
+                        "|cffff2020[Gauntlet]|r The chain breaks.");
             }
 
             // The boon half. It is a Mult callback and not AggregateFactor
@@ -103,11 +123,6 @@ namespace Gauntlet
             std::string Describe(AffixInstance const& self) const override;
 
         private:
-            static float Pct(Ctx const& ctx)
-            {
-                return float(PCT_PER_STACK[RankIndex(ctx.self)]) / 100.0f;
-            }
-
             void Chain(Ctx& ctx, Creature* killed);
             void Reset(Ctx& ctx);
             void Publish(Ctx& ctx);
@@ -219,16 +234,14 @@ namespace Gauntlet
         {
             uint8 const  i    = RankIndex(&self);
             uint32 const up   = self.boonMag != 0 ? uint32(self.boonMag) : PCT_PER_STACK[i];
-            uint32 const down = PCT_PER_STACK[i];
 
             // No BoonClause here, and that is deliberate: this affix's boon is
             // not "in exchange" for anything, it is the other half of the same
             // stack, and a second sentence promising it again would read as a
             // second bonus.
             return "Each kill within eight seconds of the last stacks Frenzy, up to five: +"
-                 + std::to_string(up) + "% damage dealt and +" + std::to_string(down)
-                 + "% damage taken per stack. Chain-pull for speed, or pause to let it fall"
-                   " off before something dangerous.";
+                 + std::to_string(up) + "% damage dealt per stack. Any damage you take breaks the"
+                   " chain. Chain-pull clean, or lose it.";
         }
     }
 

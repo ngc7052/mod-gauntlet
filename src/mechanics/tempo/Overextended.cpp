@@ -39,8 +39,25 @@ namespace Gauntlet
         // rank IV -- where three extra attackers is the whole of
         // Gauntlet.Caps.DamageTaken on its own, which is the point: the top
         // rank makes a bad pull immediately fatal rather than gradually so.
-        constexpr uint32 PER_ATTACKER_PCT[] = { 15, 20, 30, 40 };
-        static_assert(std::size(PER_ATTACKER_PCT) >= MAX_RANK, "PER_ATTACKER_PCT is short a rank");
+        // What an enemy behind you adds to the damage it deals.
+        //
+        // This card used to price the *number* of things attacking you, and
+        // that is very often not the player's choice: a patrol, an add, a
+        // respawn on top of a pull. It punished bad luck and good pulls
+        // identically, and there was nothing to do about it once it started --
+        // a passive multiplier with no verb, which is why it was reported from
+        // play as a tax.
+        //
+        // It prices your back now. An enemy you are not facing hits harder, so
+        // the verb is facing: turn, back into a corner, keep the pack in front
+        // of you. It is the same lesson every melee fight already teaches and
+        // this card simply charges for it.
+        //
+        // It chains with Hubris, which prices *who* you open on: one card asks
+        // which way you are pointed and the other asks at what. Carrying both
+        // turns a pull into a plan. See docs/tempo-redesign.md.
+        constexpr uint32 BEHIND_PCT[] = { 20, 30, 45, 60 };
+        static_assert(std::size(BEHIND_PCT) >= MAX_RANK, "BEHIND_PCT is short a rank");
 
         // The readout's ceiling, for the addon's counter. Not a cap on the
         // effect -- plan section 2.5's damage-taken ceiling is what bounds that,
@@ -60,35 +77,25 @@ namespace Gauntlet
             return def ? def->key : "overextended";
         }
 
-        // How many things are hitting *you*. Unit::getAttackers is the set of
-        // units currently attacking this one (Unit.h:901), which is exactly the
-        // card's meaning and is exactly why a pet's attackers are not in it.
-        uint32 AttackerCount(Player* player)
-        {
-            if (!player || !player->IsInWorld() || !player->IsInCombat())
-                return 0;
-
-            uint32 count = 0;
-            for (Unit* attacker : player->getAttackers())
-                if (attacker && attacker->IsAlive())
-                    ++count;
-
-            return count;
-        }
-
         class Overextended final : public IMechanic
         {
         public:
             void OnTick(Ctx& ctx, uint32 diffMs) override;
             void OnLeaveCombat(Ctx& ctx) override { Publish(ctx, 0); }
 
-            float DamageTakenMult(Ctx& ctx, Unit* /*attacker*/, SpellInfo const*) override
+            float DamageTakenMult(Ctx& ctx, Unit* attacker, SpellInfo const*) override
             {
-                uint32 const extra = Extra(ctx.player);
-                if (extra == 0)
+                Player* player = ctx.player;
+                if (!player || !attacker)
                     return 1.0f;
 
-                return 1.0f + float(PER_ATTACKER_PCT[RankIndex(ctx.self)]) / 100.0f * float(extra);
+                // The core's own arc test, the same one every behind-me
+                // requirement in the game uses, so "behind" means to the player
+                // what it means to a rogue's Backstab.
+                if (!attacker->isInBack(player))
+                    return 1.0f;
+
+                return 1.0f + float(BEHIND_PCT[RankIndex(ctx.self)]) / 100.0f;
             }
 
             // BonusHealing. The curse is paid in damage taken while surrounded;
@@ -105,10 +112,22 @@ namespace Gauntlet
             std::string Describe(AffixInstance const& self) const override;
 
         private:
-            static uint32 Extra(Player* player)
+            // How many attackers are currently behind the player. This is
+            // what the card charges for, so it is what the readout shows: a
+            // scalar you cannot see acting is one you cannot learn from
+            // (design section 5), and publishing the old attacker count would
+            // now be showing a number the card does not use.
+            static uint32 Behind(Player* player)
             {
-                uint32 const n = AttackerCount(player);
-                return n > 1 ? n - 1 : 0;
+                if (!player || !player->IsInWorld() || !player->IsInCombat())
+                    return 0;
+
+                uint32 n = 0;
+                for (Unit* attacker : player->getAttackers())
+                    if (attacker && attacker->IsAlive() && attacker->isInBack(player))
+                        ++n;
+
+                return n;
             }
 
             void Publish(Ctx& ctx, uint32 extra);
@@ -123,7 +142,7 @@ namespace Gauntlet
             // coming. Design section 5's fourth rule for a scalar that earns
             // its place: "visible when active. A scalar you cannot see acting
             // is a scalar you cannot learn from."
-            Publish(ctx, Extra(ctx.player));
+            Publish(ctx, Behind(ctx.player));
         }
 
         void Overextended::Publish(Ctx& ctx, uint32 extra)
@@ -140,9 +159,9 @@ namespace Gauntlet
         {
             uint8 const i = RankIndex(&self);
 
-            std::string out = "Every enemy attacking you beyond the first increases the damage you"
-                              " take by " + std::to_string(PER_ATTACKER_PCT[i])
-                            + "%. Anything holding your pet does not count.";
+            std::string out = "Anything hitting you from behind deals "
+                            + std::to_string(BEHIND_PCT[i])
+                            + "% more damage. Keep them in front of you.";
 
             out += BoonClause(self.boon, self.boonMag);
             return out;

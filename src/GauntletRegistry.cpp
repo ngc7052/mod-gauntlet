@@ -188,7 +188,7 @@ namespace
 
         { 15, "frenzy", "Frenzy", Family::Tempo, 0, 8, 80, 4,
           MF_RewardShaped, "", Boon::BonusDamage, 0, 0,
-          "Each kill within 8 seconds of the last stacks Frenzy: +6% damage dealt and +6% damage taken per stack." },
+          "Each kill within 8 seconds stacks Frenzy: +6% damage dealt. Any damage taken breaks the chain." },
 
         // TODO(design): the card says tiers 3-12. Moved to 1, and this is the
         // largest of the three window changes. Section 4.6 gives the tiers 1-2
@@ -201,7 +201,7 @@ namespace
         // pull one at a time -- needs no button at all.
         { 16, "overextended", "Overextended", Family::Tempo, 0, 1, 60, 4,
           MF_None, "", Boon::BonusHealing, 0, 0,
-          "Each enemy attacking you beyond the first increases the damage you take by 20%." },
+          "Anything hitting you from behind deals 30% more damage. Keep them in front of you." },
 
         { 17, "falter", "Falter", Family::Tempo, 0, 25, 65, 4,
           MF_Timed | MF_RoleTax, "roletax", Boon::BonusMaxHealth, 0, 0,

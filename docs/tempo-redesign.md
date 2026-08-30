@@ -42,7 +42,7 @@ Card by card, the specific failure:
 | **Falling Sky** | Every 20s the sky marks your spot | The sky marks **where you have stood still** | Keep moving |
 | **Overextended** | Each extra attacker raises damage taken | Enemies **behind you** hit harder | Face them; use terrain |
 | **Hubris** | Enemies below your level give no XP | The enemy you **open on** is your duel — less damage from it, more from everything else | Choose your opening target |
-| **Frenzy** | Kills stack damage dealt *and* taken | Kills stack damage **and speed**; **taking damage resets the chain** | Keep the chain clean |
+| **Frenzy** | Kills stack damage dealt *and* taken | Kills stack damage only; **any damage taken breaks the chain** | Keep the chain clean |
 
 ### How they chain
 
@@ -50,8 +50,13 @@ Card by card, the specific failure:
   cashed by a kill, Deep Wounds' wounds close on a kill, Frenzy's chain is built
   by a kill. Carry all three and the run has one verb: *keep winning fights*.
 - **Falling Sky now threatens Frenzy, not just health.** The mark forces
-  movement, and taking a hit from it resets the chain — so the sky costs you
+  movement, and taking a hit from it breaks the chain — so the sky costs you
   something even when you survive it.
+
+  (The design first had Frenzy stacks grant movement speed as well. Dropped:
+  player movement speed is not an `AggregateKind`, and shipping a no-op
+  `AggregateFactor` to stand in for it would have been a lie in the source. The
+  chain pays damage; speed is what `Boon::BonusMoveSpeed` is for.)
 - **Overextended and Hubris both make where you are pointed matter.** One is
   facing, one is target selection. Together they turn a pull into a plan.
 - **Killing Floor plus Deep Wounds is deliberately brutal**: nothing heals until
@@ -80,9 +85,13 @@ Every one of them now pays something that is felt in the moment:
 nothing. The `BoonMoneyMult` plumbing in the addon totals stays: it costs
 nothing, and it is the seam to use if a gold boon is ever wanted again.
 
-## 4. Order of work
+## 4. State
 
-Deep Wounds and Hubris first: their faults are the clearest and their
-replacements touch the least. Then Falling Sky and Killing Floor, which are the
-two that change how a fight feels. Overextended and Frenzy last, because both
-depend on the others being in to judge.
+All six are in, with the rewards, across three commits. None of it has been
+played yet — the numbers in every ladder are judgement, not measurement, and the
+first thing worth doing is finding out which of them is wrong.
+
+The two most likely to need tuning: Falling Sky's `STILL_MS` at rank IV (three
+seconds is very little for a caster) and Killing Floor's `LEAVE_LOSS_PCT` at
+rank IV (losing half the bank may make breaking off never worth it, which would
+put the card back where it started).
