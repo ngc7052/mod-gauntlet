@@ -32,6 +32,7 @@ account. Nothing below stakes a real run.
 .gauntlet debug cards [key]            # every card at every rank: dead ranks, and words the addon cannot split
 .gauntlet debug leaks [what] [rank]    # attach and detach every affix: what did not come back
 .gauntlet debug leaks self             # check the audit can see this character before trusting it
+.gauntlet debug soak  [what] [rank]    # the same, but drive each mechanic first: ticks and its own events
 .gauntlet status                       # what the player sees
 .gauntlet top                          # the leaderboard, and now the conducts
 ```
@@ -52,6 +53,16 @@ It is the cheapest check in this file that needs a character, and it covers, in
 one command, the "does detaching it put everything back" half of S1-S8 for every
 mechanic at once. What it cannot answer is whether the effect was *right* while
 it was on -- that is the rest of this file.
+
+**Then `.gauntlet debug soak`,** which is the same audit with each mechanic
+driven first: forty ticks of its own clock, and up to three of its own scheduled
+events released. It is the only one of the two that can see what a *hook-driven*
+curse leaves behind, and it found Falter leaving a disarm on a player who no
+longer carried it. It reports how many events it actually released -- a clean
+soak that drove nothing is not a result, and most curses never arm anything.
+
+Both sweeps skip class curses this character's class cannot be offered, and say
+how many. Name one explicitly to audit it anyway.
 
 Three verdicts, and the middle one is the one to read carefully:
 

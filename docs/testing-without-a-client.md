@@ -94,8 +94,8 @@ docker exec gt-db mysql -uroot -ppassword -N -B acore_characters -e \
      ORDER BY level DESC LIMIT 1) ORDER BY class;"
 ```
 
-Then, for each name: `.gauntlet debug leaks <name> self` once, and
-`.gauntlet debug leaks <name> all 4`.
+Then, for each name: `.gauntlet debug leaks <name> self` once, then
+`.gauntlet debug leaks <name> all 4`, then `.gauntlet debug soak <name> all 4`.
 
 Strip the colours before reading the log, and mind that the count is welded to
 its colour code — `|cffff20201 leaked` — so a lazy `s/|cff[0-9a-f]*//g` eats the
@@ -118,12 +118,41 @@ sed 's/\x1b\[[0-9;]*m//g; s/|c[0-9a-fA-F]\{8\}//g; s/|r//g' ws.log
   pass came back clean. Run it against a bot that has been fighting, and run it
   more than once.
 
+## Driving the hooks: `soak`
+
+`leaks` attaches and detaches and nothing else, which is why 63 of 69 read inert.
+`.gauntlet debug soak` is the same audit with each mechanic made to act first —
+forty ticks of its own clock, and up to three of its own scheduled events
+released through the same path `.gauntlet debug fire` uses.
+
+It reports how many events it actually released. That number is the point: a
+soak that drove nothing and found nothing has proved nothing, and most curses
+never arm anything at all. On a typical run it is 3 events across 1 mechanic;
+on a character carrying several timed affixes, 12 across 4.
+
+It found Falter leaving its disarm on a player who no longer carried it —
+invisible to `leaks`, because `leaks` never lets Falter fire.
+
+Both sweeps skip class curses the character's class cannot be offered. Without
+that filter the audit invents bugs: Half-Tamed attached to a warlock dismissed
+the demon, took Fel Vitality's mana bonus with it, and reported a permanent max
+power drop — all true, none of it reachable in play.
+
+## Two measurement artifacts to know about
+
+**Auras the core re-applies asynchronously.** Straight after a disarm or silence
+is lifted, weapon-dependent passives can read "removed and not restored": the
+capture is synchronous and the core puts them back on a later update. A second
+pass comes back clean. Do not chase one of these without reproducing it.
+
+**A leak can consume the condition that reveals it.** Berserker's Bargain showed
+up on the first pass and not the second, because the run itself cleared the real
+Shield Wall cooldown that made it visible. Run against a bot that has been
+fighting, and run more than once.
+
 ## What it still cannot do
 
-The audit attaches and detaches. It never makes the player cast, kill, get hit,
-or change zone, so a curse whose whole behaviour is on a hook reports **inert** —
-63 of 69 on a typical character. Inert is not a pass; it means there was nothing
-to look at.
-
-Driving the hooks is the next thing worth building on this rig, and it is the
-part `docs/checklists.md` is still holding.
+Hooks that need another unit — kills, damage taken, spell casts, combat entry —
+are not driven, because handing a mechanic a fabricated enemy tests the
+fabrication. That is the remaining gap, and it is most of what
+`docs/checklists.md` is still holding.

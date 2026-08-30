@@ -317,7 +317,8 @@ in its own description.
 With `Gauntlet.Debug.Enable = 1`, a gamemaster-only `.gauntlet debug` subtree is
 available for testing and tuning affixes without waiting on a real run:
 `give`, `give-class`, `remove`, `rank`, `dump`, `offers`, `seed`, `fire`, `set`,
-`events`, `hurt` and `export-addon`. The commands are restricted to gamemasters
+`events`, `hurt` and `export-addon`. All three audits take an optional character
+name, so they can be run from the server console against anyone online. The commands are restricted to gamemasters
 whether the setting is on or off; the setting decides whether they answer at all.
 
 Two of them are audits rather than cheats, and both are worth running after any
@@ -327,6 +328,7 @@ change to the registry or to a mechanic:
 |---|---|
 | `.gauntlet debug cards` | Every affix's offer text at every rank: ranks that read identically, and words too long for the addon's wire protocol to split. Needs no character. |
 | `.gauntlet debug leaks` | Attaches every affix, detaches it, and reports anything the character did not get back — a held cooldown, a leftover aura, an orphaned summon, a bent multiplier. Run `.gauntlet debug leaks self` first: it checks the audit can see the character at all. |
+| `.gauntlet debug soak` | The same audit with each mechanic driven in between — ticked, and its own scheduled events released. Slower and noisier, and the only one of the two that can catch a hook-driven curse leaving something behind. It reports how many events it actually released, because a clean soak that drove nothing is not a result. |
 
 ## Installation
 
