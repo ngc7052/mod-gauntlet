@@ -162,7 +162,30 @@ target (health, max health, level, aura count, faction, speed, alive). The secon
 exists because a whole family never touches the player — Champions promotes a
 creature, Craven makes one run, Grudge answers when one dies.
 
-### Four things that silently cost coverage
+### The bench must *cause* events, not call hooks
+
+Calling `Mgr::OnCreatureDamaged` does not move a creature's health, so Craven's
+threshold is never crossed. Calling `OnCreatureKill` leaves no corpse, so Carrion
+has nothing to scavenge and Killing Floor's heal is never paid. That difference
+was 14 of 28 cards versus 28 of 28.
+
+So the bench deals real damage (`Unit::DealDamage`), makes a real kill
+(`Unit::Kill`), casts the card's own `requiresSpell` for real, and fills the
+character's primary power. The spell comes from the registry row, so a
+cast-driven card added later is driven the day it lands — no bench change.
+
+**Everything the bench does to the character must be undone, or a card gets
+blamed for it.** Casting Defensive Stance swaps a warrior's stance; casting a
+paladin's bubble leaves Forbearance; casting Vanish stealths the rogue. All three
+came back as leaks against cards that had done none of it. The undo reads the
+aura and cooldown sets *immediately either side of the cast*, so the delta is the
+cast's rather than the card's — reversing it cannot erase a real leak.
+
+Cooldowns the cast started are cleared **after the detach**, never before: a card
+that denies the spell buries the real cooldown while carried and
+`PermanentCooldown::Allow` restores it on the way out.
+
+### Four more things that silently cost coverage
 
 Each of these made the bench under-report, and each is worth knowing before
 writing another probe:
