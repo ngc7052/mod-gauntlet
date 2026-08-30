@@ -5,6 +5,7 @@
 
 #include "GauntletAddon.h"
 #include "GauntletMechanic.h"
+#include "GauntletRules.h"
 #include "GauntletState.h"
 #include "Chat.h"
 #include "GauntletSummons.h"
@@ -43,6 +44,11 @@ namespace Gauntlet
 {
     namespace
     {
+        // The ladders and the arithmetic live in GauntletRules.h so that
+        // tests/RulesTest.cpp can reach them: this file includes Player.h and
+        // is therefore invisible to the Player-free test build.
+        using namespace Gauntlet::Rules;
+
         // The design card's severity ladder: 30 -> 40 -> 50% of the damage
         // taken becomes wound, at ranks I, II and III.
         // Rank IV is 60%, past the card. Gauntlet.Caps.MaxHealth still floors
@@ -50,8 +56,6 @@ namespace Gauntlet
         // that floor in fewer blows rather than a deeper hole: the ladder is
         // about how often you have to go and rest, which is the decision the
         // affix exists to create.
-        constexpr int32 WOUND_PCT[] = { 30, 40, 50, 60 };
-        static_assert(std::size(WOUND_PCT) >= MAX_RANK, "WOUND_PCT is short a rank");
 
         // ...capped at 40% of the pool, which is the same number plan section
         // 2.5 states as the floor on maximum health ("max health >= 0.6 x base
@@ -74,8 +78,6 @@ namespace Gauntlet
         //
         // The ladder tightens from both ends -- higher ranks wound more (above)
         // and close less (here).
-        constexpr int32 KILL_CLOSE_PCT[] = { 12, 10, 8, 6 };
-        static_assert(std::size(KILL_CLOSE_PCT) >= MAX_RANK, "KILL_CLOSE_PCT is short a rank");
 
         // Maximum health is a replicated field and a full stat recompute, so
         // the wound is written onto it on a boundary rather than on every hit:
@@ -405,8 +407,7 @@ namespace Gauntlet
                 if (base == 0)
                     return;
 
-                int32 const closed = std::max<int32>(
-                    1, int32(int64(base) * CloseFor(ctx.self ? ctx.self->rank : 1) / 100));
+                int32 const closed = DeepWoundsClose(ctx.self ? ctx.self->rank : 1, base);
 
                 SetWound(std::max<int64>(0, int64(_wound) - closed));
                 Mirror(ctx);

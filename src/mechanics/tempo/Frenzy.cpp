@@ -4,6 +4,7 @@
  */
 
 #include "GauntletMechanic.h"
+#include "GauntletRules.h"
 
 #include "GauntletAddon.h"
 #include "GauntletRegistry.h"
@@ -37,17 +38,19 @@ namespace Gauntlet
 {
     namespace
     {
+        // The ladders and the arithmetic live in GauntletRules.h so that
+        // tests/RulesTest.cpp can reach them: this file includes Player.h and
+        // is therefore invisible to the Player-free test build.
+        using namespace Gauntlet::Rules;
+
         constexpr uint16 MECHANIC_FRENZY = 15;
 
         // The card's ladder: 4 -> 6 -> 8% per stack, both ways, and 10 at
         // rank IV. BoonTable's override for this row is 2 + 2 * rank, which
         // gives 10 at rank IV on its own -- the two have to agree, because
         // the boon is the damage-dealt half of this same number.
-        constexpr uint32 PCT_PER_STACK[] = { 4, 6, 8, 10 };
-        static_assert(std::size(PCT_PER_STACK) >= MAX_RANK, "PCT_PER_STACK is short a rank");
 
         // The card's two fixed numbers.
-        constexpr uint32 MAX_STACKS = 5;
         constexpr uint32 WINDOW_MS  = 8000;
 
         uint8 RankIndex(AffixInstance const* self)
@@ -113,11 +116,8 @@ namespace Gauntlet
                 if (_stacks == 0)
                     return 1.0f;
 
-                uint32 const pct = (ctx.self && ctx.self->boonMag != 0)
-                                 ? uint32(ctx.self->boonMag)
-                                 : PCT_PER_STACK[RankIndex(ctx.self)];
-
-                return 1.0f + float(pct) / 100.0f * float(_stacks);
+                return FrenzyDoneMult(ctx.self ? ctx.self->rank : 1, _stacks,
+                                      ctx.self ? ctx.self->boonMag : 0);
             }
 
             std::string Describe(AffixInstance const& self) const override;

@@ -4,6 +4,7 @@
  */
 
 #include "GauntletMechanic.h"
+#include "GauntletRules.h"
 #include "GauntletAddon.h"
 #include "GauntletRegistry.h"
 #include "GauntletScheduler.h"
@@ -40,6 +41,11 @@ namespace Gauntlet
 {
     namespace
     {
+        // The ladders and the arithmetic live in GauntletRules.h so that
+        // tests/RulesTest.cpp can reach them: this file includes Player.h and
+        // is therefore invisible to the Player-free test build.
+        using namespace Gauntlet::Rules;
+
         constexpr uint16 FALLING_SKY = 14;
 
         // Both ladders are stated on the card -- cadence 25/20/15 s, severity
@@ -59,13 +65,10 @@ namespace Gauntlet
         // The lowest rank is deliberately generous: eight seconds is longer
         // than any cast in the game, so rank I asks a caster to weave rather
         // than to stop casting.
-        constexpr uint32 STILL_MS[]     = { 8000, 6000, 4500, 3000 };
-        static_assert(std::size(STILL_MS) >= MAX_RANK, "STILL_MS is short a rank");
 
         // How far counts as having moved. Wide enough that turning on the spot
         // or a step of melee shuffle is not movement, short enough that leaving
         // the mark is unambiguous.
-        constexpr float MOVED_YARDS = 5.0f;
         // Rank IV is past the card at 12 s and 65%. The three-second warning
         // does not move at any rank, so the ladder prices standing still and
         // never shortens the answer to it.
@@ -327,7 +330,7 @@ namespace Gauntlet
             // Moving is measured against where the count started, not against
             // the last tick: a player edging sideways a yard at a time is
             // standing still, and measuring tick to tick would call it running.
-            if (_stillFrom.GetExactDist2d(player) > MOVED_YARDS || _stillMs == 0)
+            if (FallingSkyMoved(_stillFrom.GetExactDist2d(player)) || _stillMs == 0)
             {
                 _stillFrom = player->GetPosition();
                 _stillMs   = 0;
@@ -341,7 +344,7 @@ namespace Gauntlet
 
             _stillMs += diffMs;
 
-            if (_armed || _stillMs < STILL_MS[RankIndexOf(ctx)])
+            if (_armed || !FallingSkyArms(ctx.self ? ctx.self->rank : 1, _stillMs))
                 return;
 
             Arm(ctx);

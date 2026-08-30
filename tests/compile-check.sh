@@ -74,7 +74,12 @@ checked = 0
 SENTINEL = "LADDER-SENTINEL"
 NAMES = {"true": 1, "false": 0, "UNHAPPY": 1, "CONTENT": 2}
 
-for path in sorted(glob.glob(os.path.join(root, "src/mechanics/**/*.cpp"), recursive=True)):
+# Headers too, and all of src rather than only the mechanics: the redesigned
+# cards keep their ladders in src/GauntletRules.h so that the tests can reach
+# them, and a ladder must not escape this audit by changing file.
+paths = sorted(glob.glob(os.path.join(root, "src/**/*.cpp"), recursive=True)
+             + glob.glob(os.path.join(root, "src/**/*.h"), recursive=True))
+for path in paths:
     src = open(path).read()
     for m in re.finditer(r'constexpr\s+[\w:]+\s+(\w+)\[\]\s*=\s*\{([^}]*)\};', src):
         name, body = m.group(1), m.group(2)

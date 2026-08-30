@@ -4,6 +4,7 @@
  */
 
 #include "GauntletMechanic.h"
+#include "GauntletRules.h"
 
 #include "GauntletAddon.h"
 #include "GauntletRegistry.h"
@@ -45,6 +46,11 @@ namespace Gauntlet
 {
     namespace
     {
+        // The ladders and the arithmetic live in GauntletRules.h so that
+        // tests/RulesTest.cpp can reach them: this file includes Player.h and
+        // is therefore invisible to the Player-free test build.
+        using namespace Gauntlet::Rules;
+
         constexpr uint16 MECHANIC_HUBRIS = 18;
 
         // What the duel does to damage taken, as percentages.
@@ -54,12 +60,6 @@ namespace Gauntlet
         // deal for a player who picks correctly and a worse one for a player
         // who does not. That asymmetry is the point: the ladder escalates the
         // *stakes* of the choice rather than the size of a tax.
-        constexpr uint32 DUEL_TAKEN_PCT[]  = { 85, 75, 65, 50 };
-        static_assert(std::size(DUEL_TAKEN_PCT) >= MAX_RANK, "DUEL_TAKEN_PCT is short a rank");
-
-        constexpr uint32 OTHER_TAKEN_PCT[] = { 115, 130, 150, 175 };
-        static_assert(std::size(OTHER_TAKEN_PCT) >= MAX_RANK, "OTHER_TAKEN_PCT is short a rank");
-
         uint8 RankIndex(AffixInstance const* self)
         {
             uint8 const rank = self ? self->rank : 1;
@@ -106,10 +106,8 @@ namespace Gauntlet
                 if (!attacker || _duel.IsEmpty())
                     return 1.f;
 
-                uint8 const i = RankIndex(ctx.self);
-                uint32 const pct = attacker->GetGUID() == _duel ? DUEL_TAKEN_PCT[i]
-                                                                : OTHER_TAKEN_PCT[i];
-                return float(pct) / 100.f;
+                return HubrisTakenMult(ctx.self ? ctx.self->rank : 1,
+                                       attacker->GetGUID() == _duel);
             }
 
             std::string Describe(AffixInstance const& self) const override

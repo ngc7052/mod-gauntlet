@@ -4,6 +4,7 @@
  */
 
 #include "GauntletMechanic.h"
+#include "GauntletRules.h"
 
 #include "GauntletAddon.h"
 #include "GauntletRegistry.h"
@@ -33,6 +34,11 @@ namespace Gauntlet
 {
     namespace
     {
+        // The ladders and the arithmetic live in GauntletRules.h so that
+        // tests/RulesTest.cpp can reach them: this file includes Player.h and
+        // is therefore invisible to the Player-free test build.
+        using namespace Gauntlet::Rules;
+
         constexpr uint16 MECHANIC_OVEREXTENDED = 16;
 
         // The card's ladder: 15 -> 20 -> 30% per extra attacker, and 40 at
@@ -56,8 +62,6 @@ namespace Gauntlet
         // It chains with Hubris, which prices *who* you open on: one card asks
         // which way you are pointed and the other asks at what. Carrying both
         // turns a pull into a plan. See docs/tempo-redesign.md.
-        constexpr uint32 BEHIND_PCT[] = { 20, 30, 45, 60 };
-        static_assert(std::size(BEHIND_PCT) >= MAX_RANK, "BEHIND_PCT is short a rank");
 
         // The readout's ceiling, for the addon's counter. Not a cap on the
         // effect -- plan section 2.5's damage-taken ceiling is what bounds that,
@@ -95,7 +99,7 @@ namespace Gauntlet
                 if (!attacker->isInBack(player))
                     return 1.0f;
 
-                return 1.0f + float(BEHIND_PCT[RankIndex(ctx.self)]) / 100.0f;
+                return OverextendedTakenMult(ctx.self ? ctx.self->rank : 1, /*behind*/ true);
             }
 
             // BonusHealing. The curse is paid in damage taken while surrounded;

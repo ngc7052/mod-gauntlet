@@ -5,6 +5,7 @@
 
 #include "GauntletAddon.h"
 #include "GauntletMechanic.h"
+#include "GauntletRules.h"
 #include "GauntletState.h"
 #include "GauntletSummons.h"
 #include "Chat.h"
@@ -66,6 +67,11 @@ namespace Gauntlet
 {
     namespace
     {
+        // The ladders and the arithmetic live in GauntletRules.h so that
+        // tests/RulesTest.cpp can reach them: this file includes Player.h and
+        // is therefore invisible to the Player-free test build.
+        using namespace Gauntlet::Rules;
+
         // The addon's STAT key, spelled out the way DeepWounds spells its own:
         // the registry key is the contract with Data.lua and a literal here
         // cannot drift from it without RegistryTest noticing the key changed.
@@ -97,18 +103,12 @@ namespace Gauntlet
         // away -- it is held, and the player decides whether to push for the
         // kill that releases it or break off and take what is left. See
         // docs/tempo-redesign.md.
-        constexpr uint32 KILL_PAYOUT_PCT[] = { 100, 85, 70, 50 };
-        static_assert(std::size(KILL_PAYOUT_PCT) >= MAX_RANK, "KILL_PAYOUT_PCT is short a rank");
-
         // What the bank loses if the fight ends without a kill to release it.
         //
         // This is what stops "walk away" being strictly better than "win". At
         // rank I nothing is lost and the card is pure delay; by rank IV half
         // the bank evaporates, and breaking off becomes a real price rather
         // than a free reset.
-        constexpr uint32 LEAVE_LOSS_PCT[] = { 0, 15, 30, 50 };
-        static_assert(std::size(LEAVE_LOSS_PCT) >= MAX_RANK, "LEAVE_LOSS_PCT is short a rank");
-
         // Rank III keeps the block up after the fight, so disengaging is no
         // longer an instant out. Zero at ranks I and II: leaving combat lifts
         // it at once.
@@ -194,9 +194,9 @@ namespace Gauntlet
                 if (_bank == 0)
                     return;   // nothing was withheld, so there is nothing to release
 
-                uint32 const pct  = KILL_PAYOUT_PCT[RankIndexOf(ctx.self)];
-                int32  const heal = int32(std::min<uint64>(_bank * pct / 100u,
-                                                           std::numeric_limits<int32>::max()));
+                int32 const heal = int32(std::min<uint64>(
+                    KillingFloorPayout(ctx.self ? ctx.self->rank : 1, _bank),
+                    std::numeric_limits<int32>::max()));
                 _bank = 0;
                 if (heal <= 0)
                     return;
@@ -236,9 +236,9 @@ namespace Gauntlet
                 // choice with a price rather than a free reset.
                 if (_bank != 0)
                 {
-                    uint32 const loss = LEAVE_LOSS_PCT[RankIndexOf(ctx.self)];
-                    int32 const back = int32(std::min<uint64>(_bank * (100u - loss) / 100u,
-                                                              std::numeric_limits<int32>::max()));
+                    int32 const back = int32(std::min<uint64>(
+                        KillingFloorLeaveBack(ctx.self ? ctx.self->rank : 1, _bank),
+                        std::numeric_limits<int32>::max()));
                     _bank = 0;
                     if (back > 0)
                     {
