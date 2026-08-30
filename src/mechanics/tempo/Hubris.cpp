@@ -1,5 +1,5 @@
 /*
- * mod-gauntlet - T5 Hubris: easy kills are worth nothing, hard ones are worth more
+ * mod-gauntlet - T5 Hubris: the one you open on is the one you can fight
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
@@ -9,28 +9,37 @@
 #include "GauntletRegistry.h"
 #include "../Boons.h"
 
+#include "Creature.h"
 #include "Player.h"
 #include "Unit.h"
 
 #include <algorithm>
-#include <limits>
 #include <string>
 #include <iterator>
 
-// Registry id 18. Design section 3, card T5: "Enemies below your level give no
-// experience; enemies above give 40% more."
+// Registry id 18.
 //
-// This is the affix that replaces Forgetful, and the difference between them is
-// the whole argument of design section 5. Forgetful was a flat experience tax:
-// no moment, no verb, and the always-safe pick that made the other two offers
-// irrelevant. Hubris is a *route* rule with real risk attached -- level in the
-// zone one step ahead, fight orange and red with cooldowns up, or accept
-// quest-only experience for a stretch -- and the player turns it every time they
-// choose where to grind.
+// Hubris was an experience rule: enemies below your level paid nothing, enemies
+// above paid more. It was written to replace Forgetful, whose fault design
+// section 5 names exactly -- "a flat experience tax: no moment, no verb" -- and
+// it made the same mistake in a different currency. It never acted. It sat
+// there and made ordinary play worth less, and its whole instruction to the
+// player was "go and grind somewhere else", which is a routing tax rather than
+// a decision. Reported from play as one of six cards that felt like taxes; see
+// docs/tempo-redesign.md.
 //
-// It is reward-shaped in the registry because the upside is real: the bonus on
-// anything above your level is the boon, and it is what the row's
-// Boon::BonusExperience names.
+// What it does now happens in the first second of every fight and asks a
+// question the player answers with their target key.
+//
+// The first enemy you strike is your duel. It hits you for less; everything
+// else hits you for more. Open on the dangerous one and the rest of the pull is
+// sharper than usual, or open on a straggler and be soft to the thing you were
+// actually worried about. The duel is redeclared the moment you leave combat,
+// so it is a decision per pull rather than a state to be managed.
+//
+// It chains with Overextended, which prices *facing*: one card asks who you are
+// pointed at and the other asks which way. Carrying both turns a pull into a
+// plan.
 
 namespace Gauntlet
 {
@@ -38,36 +47,18 @@ namespace Gauntlet
     {
         constexpr uint16 MECHANIC_HUBRIS = 18;
 
-        // The card's ladder: x0.5/x1.2 -> x0.25/x1.3 -> x0/x1.4. The penalty is
-        // a percentage kept, so 50 -> 25 -> 0.
+        // What the duel does to damage taken, as percentages.
         //
-        // Rank IV needed a second axis rather than a fourth number. The curse
-        // is already absolute at rank III -- an enemy below your level gives
-        // nothing, and nothing is the floor -- so continuing the ladder would
-        // have moved only ABOVE_BONUS_PCT, which is the *boon*. That is a
-        // rank-up with no downside and a bigger reward, which is not a choice
-        // and is the shape this redesign exists to delete.
-        //
-        // So the fourth rank widens what "below" means instead: an enemy at
-        // exactly your level counts as below it, and only something higher than
-        // you pays experience at all. The card's own instruction -- "level in
-        // the zone one step ahead" -- stops being advice and becomes the rule.
-        constexpr uint32 BELOW_KEEP_PCT[] = { 50, 25, 0, 0 };
-        static_assert(std::size(BELOW_KEEP_PCT) >= MAX_RANK, "BELOW_KEEP_PCT is short a rank");
+        // The duel is a shelter that gets deeper as the rank rises, and the
+        // rest of the pull gets sharper faster -- so a higher rank is a better
+        // deal for a player who picks correctly and a worse one for a player
+        // who does not. That asymmetry is the point: the ladder escalates the
+        // *stakes* of the choice rather than the size of a tax.
+        constexpr uint32 DUEL_TAKEN_PCT[]  = { 85, 75, 65, 50 };
+        static_assert(std::size(DUEL_TAKEN_PCT) >= MAX_RANK, "DUEL_TAKEN_PCT is short a rank");
 
-        // The bonus half, and the fallback when an instance carries no boon
-        // magnitude. The generator gives this row its own BoonTable entry so
-        // that boonMag is 20/30/40/50 and the offer card promises exactly what
-        // the mechanic pays; this array is what a hand-built instance falls back
-        // to. BoonTable's override for this row is 10 * (rank + 1), which gives
-        // 50 at rank IV on its own, so the two agree without either knowing
-        // about the other.
-        constexpr uint32 ABOVE_BONUS_PCT[] = { 20, 30, 40, 50 };
-        static_assert(std::size(ABOVE_BONUS_PCT) >= MAX_RANK, "ABOVE_BONUS_PCT is short a rank");
-
-        // Rank IV only: an enemy at your own level is treated as below it.
-        constexpr bool EQUAL_IS_BELOW[] = { false, false, false, true };
-        static_assert(std::size(EQUAL_IS_BELOW) >= MAX_RANK, "EQUAL_IS_BELOW is short a rank");
+        constexpr uint32 OTHER_TAKEN_PCT[] = { 115, 130, 150, 175 };
+        static_assert(std::size(OTHER_TAKEN_PCT) >= MAX_RANK, "OTHER_TAKEN_PCT is short a rank");
 
         uint8 RankIndex(AffixInstance const* self)
         {
@@ -84,103 +75,78 @@ namespace Gauntlet
         class Hubris final : public IMechanic
         {
         public:
-            void OnXP(Ctx& ctx, uint32& amount, Unit* victim) override;
-            void OnTick(Ctx& ctx, uint32 diffMs) override;
+            // The duel is declared on the first blow of the fight, in either
+            // direction: the enemy that opened on you counts just as much as
+            // the one you opened on, because a player who is ambushed still
+            // made no choice and should not be punished for the order.
+            void OnEnterCombat(Ctx& ctx, Unit* enemy, bool /*wasOutOfCombat*/) override
+            {
+                if (_duel.IsEmpty() && enemy)
+                    Declare(ctx, enemy);
+            }
 
-            std::string Describe(AffixInstance const& self) const override;
+            void OnCreatureDamaged(Ctx& ctx, Creature* victim, uint32 /*damage*/) override
+            {
+                if (_duel.IsEmpty() && victim)
+                    Declare(ctx, victim);
+            }
+
+            // A new pull is a new question.
+            void OnLeaveCombat(Ctx& ctx) override
+            {
+                _duel.Clear();
+                if (ctx.addon && ctx.player)
+                    ctx.addon->QueueStat(ctx.player, MechanicKey(), 0);
+            }
+
+            // The whole card. Everything that is not the duel hits harder, and
+            // the duel itself hits softer.
+            float DamageTakenMult(Ctx& ctx, Unit* attacker, SpellInfo const*) override
+            {
+                if (!attacker || _duel.IsEmpty())
+                    return 1.f;
+
+                uint8 const i = RankIndex(ctx.self);
+                uint32 const pct = attacker->GetGUID() == _duel ? DUEL_TAKEN_PCT[i]
+                                                                : OTHER_TAKEN_PCT[i];
+                return float(pct) / 100.f;
+            }
+
+            std::string Describe(AffixInstance const& self) const override
+            {
+                uint8 const i = RankIndex(&self);
+
+                std::string out = "The first enemy in a fight becomes your duel: it deals "
+                                + std::to_string(100 - DUEL_TAKEN_PCT[i])
+                                + "% less damage to you and everything else deals "
+                                + std::to_string(OTHER_TAKEN_PCT[i] - 100)
+                                + "% more. Open on the one that frightens you.";
+
+                out += BoonClause(self.boon, self.boonMag);
+                return out;
+            }
+
+            std::string Diagnose(Ctx& ctx) const override
+            {
+                uint8 const i = RankIndex(ctx.self);
+                return "hubris: duel " + std::string(_duel.IsEmpty() ? "none" : _duel.ToString())
+                     + ", duel x" + std::to_string(DUEL_TAKEN_PCT[i])
+                     + "%, others x" + std::to_string(OTHER_TAKEN_PCT[i]) + "%";
+            }
 
         private:
-            void Publish(Ctx& ctx);
+            void Declare(Ctx& ctx, Unit* who)
+            {
+                _duel = who->GetGUID();
 
-            // What the last kill was worth, so the addon can show the rule
-            // acting. -100 means "that one paid nothing".
-            int32  _lastDelta = 0;
-            uint32 _publishMs = 0;
+                if (ctx.addon && ctx.player)
+                    ctx.addon->SendEvent(ctx.player, MechanicKey(), 0, "Duel declared");
+            }
+
+            // Cleared on leaving combat, so it never outlives the pull that
+            // set it.
+            ObjectGuid _duel;
         };
-
-        void Hubris::OnXP(Ctx& ctx, uint32& amount, Unit* victim)
-        {
-            Player* player = ctx.player;
-            if (!player || amount == 0)
-                return;
-
-            // "Quest XP untouched." Player::GiveXP is called with a null victim
-            // for a quest reward and for every other non-kill source
-            // (Player.cpp, GiveQuestSourceItem and friends), so the absence of
-            // a victim is the core's own answer to "was this a kill" and needs
-            // no extra plumbing through the hook.
-            if (!victim)
-                return;
-
-            uint8 const i = RankIndex(ctx.self);
-
-            uint8 const mine   = player->GetLevel();
-            uint8 const theirs = victim->GetLevel();
-
-            if (theirs < mine || (theirs == mine && EQUAL_IS_BELOW[i]))
-            {
-                uint32 const keep = BELOW_KEEP_PCT[i];
-                amount = static_cast<uint32>(static_cast<uint64>(amount) * keep / 100u);
-                _lastDelta = -100 + int32(keep);
-                return;
-            }
-
-            if (theirs > mine)
-            {
-                uint32 const bonus = (ctx.self && ctx.self->boonMag != 0)
-                                   ? uint32(ctx.self->boonMag)
-                                   : ABOVE_BONUS_PCT[i];
-
-                uint64 const raised = static_cast<uint64>(amount) * (100u + bonus) / 100u;
-                amount = static_cast<uint32>(std::min<uint64>(raised, std::numeric_limits<uint32>::max()));
-                _lastDelta = int32(bonus);
-                return;
-            }
-
-            // Exactly your level: the card names only "below" and "above", so a
-            // kill at your own level is left alone. It is also the level band a
-            // player routing around this affix will spend most of their time
-            // in, which makes "stay level with the zone" the neutral choice
-            // rather than the punished one.
-            _lastDelta = 0;
-        }
-
-        void Hubris::OnTick(Ctx& ctx, uint32 diffMs)
-        {
-            // Coalesced rather than sent from OnXP: a chain of kills would
-            // otherwise be one message each, and the useful reading is "what is
-            // this grind paying" rather than "what did that one pay".
-            _publishMs += diffMs;
-            if (_publishMs < 1000)
-                return;
-            _publishMs = 0;
-
-            Publish(ctx);
-        }
-
-        void Hubris::Publish(Ctx& ctx)
-        {
-            if (ctx.addon && ctx.player)
-                ctx.addon->QueueStat(ctx.player, MechanicKey(), _lastDelta);
-        }
-
-        std::string Hubris::Describe(AffixInstance const& self) const
-        {
-            uint8 const  i     = RankIndex(&self);
-            uint32 const keep  = BELOW_KEEP_PCT[i];
-            uint32 const bonus = self.boonMag != 0 ? uint32(self.boonMag) : ABOVE_BONUS_PCT[i];
-
-            std::string out = EQUAL_IS_BELOW[i] ? "Enemies at or below your level give "
-                                                : "Enemies below your level give ";
-            out += keep == 0 ? "no experience" : ("only " + std::to_string(keep) + "% of their experience");
-            out += "; enemies above your level give " + std::to_string(bonus)
-                 + "% more. Quest experience is untouched. Level in the zone one step ahead.";
-
-            // No BoonClause: the bonus above is this affix's boon, already
-            // named in the sentence, and a second "in exchange" line would read
-            // as a second reward.
-            return out;
-        }
     }
 
     GAUNTLET_MECHANIC(18, Hubris);

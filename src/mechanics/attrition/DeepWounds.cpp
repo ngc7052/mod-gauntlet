@@ -7,6 +7,8 @@
 #include "GauntletMechanic.h"
 #include "GauntletState.h"
 #include "Chat.h"
+#include "GauntletSummons.h"
+#include "Creature.h"
 #include "Player.h"
 #include "../Boons.h"
 
@@ -57,15 +59,23 @@ namespace Gauntlet
         // carrying only this affix can never make the aggregate's clamp bite.
         constexpr int32 WOUND_CAP_PCT = 40;
 
-        // "Decays at 2%/s while resting in an inn or city". Two percent *of
-        // the pool*, not of the remaining wound: a linear decay is a number a
-        // player can plan a town trip around (a full wound is twenty seconds
-        // of sitting), where an exponential one only ever approaches zero.
-        constexpr int32 DECAY_PCT_PER_SEC = 2;   // TODO(design)
-
-        // Milliseconds x health units per point of wound healed, so the decay
-        // can be carried across ticks instead of rounded away on each one.
-        constexpr int64 DECAY_DIVISOR = 1000 * 100 / DECAY_PCT_PER_SEC;
+        // What one kill closes, as a percentage of the unwounded pool.
+        //
+        // This card used to heal only while sitting in an inn or a city, and
+        // that was its worst feature by a distance: the counterplay to a combat
+        // affix was a journey. Travelling somewhere to sit down is a chore
+        // rather than gameplay, and it stopped the run instead of shaping it.
+        //
+        // Kills close wounds now. The verb is already in the player's hands, it
+        // happens where the damage happened, and it puts this card on the same
+        // currency as Killing Floor and Frenzy: carry two of the three and the
+        // run has one instruction, which is to keep winning fights. See
+        // docs/tempo-redesign.md.
+        //
+        // The ladder tightens from both ends -- higher ranks wound more (above)
+        // and close less (here).
+        constexpr int32 KILL_CLOSE_PCT[] = { 12, 10, 8, 6 };
+        static_assert(std::size(KILL_CLOSE_PCT) >= MAX_RANK, "KILL_CLOSE_PCT is short a rank");
 
         // Maximum health is a replicated field and a full stat recompute, so
         // the wound is written onto it on a boundary rather than on every hit:
@@ -170,6 +180,11 @@ namespace Gauntlet
             // It must not also be dispatched from ModifyMeleeDamage /
             // ModifySpellDamageTaken / ModifyPeriodicDamageAurasTick, or every
             // hit is counted twice.
+            // A kill closes part of the wound. Pet kills count: the card is
+            // about the fight being won, not about who landed the blow.
+            void OnKill(Ctx& ctx, Creature* killed) override    { Close(ctx, killed); }
+            void OnPetKill(Ctx& ctx, Creature* killed) override { Close(ctx, killed); }
+
             void OnDamageTaken(Ctx& ctx, Unit* /*attacker*/, uint32 amount) override
             {
                 ++_sawDamage;
@@ -214,7 +229,6 @@ namespace Gauntlet
                     return;
 
                 CheckLevel(ctx, player);
-                Decay(player, diffMs);
 
                 _sinceApplyMs += diffMs;
                 _sinceStatMs  += diffMs;
@@ -297,7 +311,7 @@ namespace Gauntlet
                      + " | saved " + std::to_string(_savedWound)
                      + " | cap " + std::to_string(CapFor(base))
                      + " | level " + std::to_string(uint32(_level))
-                     + (ctx.player && Resting(ctx.player) ? " | resting" : "")
+                     + " | a kill closes " + std::to_string(CloseFor(ctx.self ? ctx.self->rank : 1)) + "%"
                      + (_detached ? " | DETACHED" : "")
                      + " | ticks " + std::to_string(_sawTick)
                      + " blows " + std::to_string(_sawDamage)
@@ -307,12 +321,17 @@ namespace Gauntlet
             std::string Describe(AffixInstance const& self) const override
             {
                 std::string out = std::to_string(PctFor(self.rank))
-                                + "% of the damage you take becomes a wound that only rest in an inn or a city heals.";
+                                + "% of the damage you take becomes a wound. Only a kill closes one.";
                 out += BoonClause(self.boon, self.boonMag);
                 return out;
             }
 
         private:
+            static int32 CloseFor(uint8 rank)
+            {
+                return KILL_CLOSE_PCT[std::clamp<uint8>(rank, 1, MAX_RANK) - 1];
+            }
+
             static int32 PctFor(uint8 rank)
             {
                 return WOUND_PCT[std::clamp<uint8>(rank, 1, MAX_RANK) - 1];
@@ -326,16 +345,6 @@ namespace Gauntlet
             static int32 CapFor(uint32 base)
             {
                 return int32(int64(base) * WOUND_CAP_PCT / 100);
-            }
-
-            static bool Resting(Player* player)
-            {
-                // The card says "in an inn or city"; these are the two flags
-                // the core sets for exactly that (Player.h:806-810, and
-                // HasRestFlag at Player.h:1221). REST_FLAG_IN_FACTION_AREA is
-                // left out on purpose: it covers whole friendly zones, which
-                // would make the trip free.
-                return player->HasRestFlag(REST_FLAG_IN_TAVERN) || player->HasRestFlag(REST_FLAG_IN_CITY);
             }
 
             // The unwounded pool. `_base` is refreshed on every recompute, so
@@ -374,35 +383,35 @@ namespace Gauntlet
                 // Any change, not only an increase: a level taken away by a GM
                 // shrinks the pool the wound is measured against, and the card
                 // gives no reason to keep a wound across either direction.
-                _level      = level;
-                _decayCarry = 0;
+                _level = level;
                 SetWound(0);
                 Mirror(ctx);
             }
 
-            void Decay(Player* player, uint32 diffMs)
+            void Close(Ctx& ctx, Creature* killed)
             {
-                if (_wound <= 0 || !player->IsAlive() || !Resting(player))
-                {
-                    _decayCarry = 0;
+                Player* player = ctx.player;
+                if (_detached || !player || !killed || _wound <= 0)
                     return;
-                }
+                if (ctx.run && ctx.run->dead)
+                    return;
+
+                // Nothing this module summoned closes a wound. One card must
+                // not be able to farm the cure for another card's cost.
+                if (sGauntletSummons->IsGauntletSummon(killed))
+                    return;
 
                 uint32 const base = Base(player);
                 if (base == 0)
                     return;
 
-                // Carried rather than rounded: at a world tick of a few
-                // milliseconds, per-tick rounding would floor every step to
-                // zero and the wound would never heal at all.
-                _decayCarry += int64(base) * diffMs;
+                int32 const closed = std::max<int32>(
+                    1, int32(int64(base) * CloseFor(ctx.self ? ctx.self->rank : 1) / 100));
 
-                int64 const healed = _decayCarry / DECAY_DIVISOR;
-                if (healed <= 0)
-                    return;
-
-                _decayCarry -= healed * DECAY_DIVISOR;
-                SetWound(int64(_wound) - healed);
+                SetWound(std::max<int64>(0, int64(_wound) - closed));
+                Mirror(ctx);
+                Publish(ctx, player, /*force*/ true);
+                ApplyIfDue(player);
             }
 
             void ApplyIfDue(Player* player)
@@ -514,7 +523,6 @@ namespace Gauntlet
             int32  _applied      = 0;    // what OnMaxHealth last subtracted
             int32  _requested    = 0;    // what the last recompute was asked for
             uint32 _base         = 0;    // the pool without the wound in it
-            int64  _decayCarry   = 0;    // base-milliseconds of rest not yet spent
             uint32 _sinceApplyMs = 0;
             uint32 _sinceStatMs  = 0;   // since the addon was last told
             int32  _lastPct      = -1;   // last percentage sent to the addon

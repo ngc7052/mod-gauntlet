@@ -152,7 +152,14 @@ namespace
             case Boon::BonusHealing:    base = 10; break;   // TODO(design)
             case Boon::BonusMoveSpeed:  base =  5; break;   // TODO(design)
             case Boon::BonusExperience: base = 15; break;   // TODO(design)
-            case Boon::BonusMoney:      base = 25; break;   // TODO(design)
+            // Gold is not felt while playing. You notice it at a vendor, an
+            // hour later, in a different zone, which makes it the worst
+            // available answer to "what am I getting for carrying this curse".
+            // Nothing declares it any more; the enum value stays because live
+            // characters have it stored in gauntlet_affix, and paying a stored
+            // one nothing is better than paying it a number the card no longer
+            // describes.
+            case Boon::BonusMoney:      return 0;
             case Boon::BonusMaxHealth:  base =  5; break;   // TODO(design)
             case Boon::BonusRegen:      base = 15; break;   // TODO(design)
             default:                    return 0;           // Boon::None

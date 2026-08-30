@@ -120,7 +120,7 @@ namespace
           "Every 25th enemy you kill returns as an echo of yourself." },
 
         { 3, "carrion", "Carrion", Family::Spawn, 0, 1, 50, 4,
-          MF_Timed | MF_OnKill | MF_RewardShaped, "", Boon::BonusMoney, 0, 0,
+          MF_Timed | MF_OnKill | MF_RewardShaped, "", Boon::BonusMoveSpeed, 0, 0,
           "Every 4th corpse you loot draws scavengers." },
 
         { 4, "reinforcements", "Reinforcements", Family::Spawn, 0, 25, 80, 4,
@@ -155,7 +155,7 @@ namespace
           "Killing an enemy alerts its nearest kin." },
 
         { 9, "death_rattle", "Death Rattle", Family::Enemy, CM_MELEE, 20, 60, 4,
-          MF_Timed | MF_OnKill, "onkill-positional", Boon::BonusMoney, 0, 0,
+          MF_Timed | MF_OnKill, "onkill-positional", Boon::BonusDamage, 0, 0,
           "Corpses burst two seconds after death, hurting anyone within five yards." },
 
         { 10, "grudge", "Grudge", Family::Enemy, CM_MELEE, 8, 50, 4,
@@ -176,7 +176,7 @@ namespace
         // hugging the edge of a path and pulling singles, and a level-10
         // character can do both.
         { 13, "keen_nosed", "Keen-nosed", Family::Enemy, 0, 4, 55, 4,
-          MF_None, "", Boon::BonusMoney, 0, 0,
+          MF_None, "", Boon::BonusMoveSpeed, 0, 0,
           "Enemies notice you from further away." },
 
         // --- Family T: tempo and position ------------------------------
@@ -208,8 +208,8 @@ namespace
           "Every 45 seconds in combat your hands fail you for three seconds." },
 
         { 18, "hubris", "Hubris", Family::Tempo, 0, 1, 50, 4,
-          MF_RewardShaped, "", Boon::BonusExperience, 0, 0,
-          "Enemies below your level give no experience; enemies above give 40% more." },
+          MF_RewardShaped, "", Boon::BonusDamage, 0, 0,
+          "The first enemy in a fight is your duel: it hurts you less, everything else more." },
 
         // --- Family A: attrition with counterplay -----------------------
         // TODO(design): the card says tiers 4-12; section 4.6's tier table puts
@@ -220,8 +220,8 @@ namespace
         // tier above it. Nothing about the mechanic changes: it is answered by
         // taking less damage, which a level-15 character can already do.
         { 19, "deep_wounds", "Deep Wounds", Family::Attrition, 0, 10, 60, 4,
-          MF_None, "", Boon::None, 0, 0,
-          "A third of the damage you take becomes a wound that only rest can heal." },
+          MF_None, "", Boon::BonusDamage, 0, 0,
+          "A third of the damage you take becomes a wound. Only a kill closes one." },
 
         { 20, "blood_magic", "Blood Magic", Family::Attrition, CM_MANA_USERS, 25, 60, 4,
           MF_None, "", Boon::BonusDamage, 0, 0,
@@ -237,7 +237,7 @@ namespace
 
         // --- Family R: rules -------------------------------------------
         { 23, "self_found", "Self-found", Family::Rules, 0, 1, 20, 1,
-          MF_None, "rule", Boon::BonusMoney, 0, 0,
+          MF_None, "rule", Boon::BonusDamage, 0, 0,
           "You cannot trade, mail, or use the auction house." },
 
         // The blurb is not the card's, and the mechanic is not the card's
@@ -277,7 +277,7 @@ namespace
         // constant won every time. Registry.BargainsOpenWhereTheGeneratorSaysThey
         // Do keeps the two from drifting apart again.
         { 27, "cursed_hoard", "Cursed Hoard", Family::Bargain, 0, 30, 80, 4,
-          MF_RewardShaped, "", Boon::BonusMoney, 0, 0,
+          MF_RewardShaped, "", Boon::BonusDamage, 0, 0,
           "Chests give twice as much loot, but opening one makes you take triple damage"
           " until you kill three enemies." },
 
