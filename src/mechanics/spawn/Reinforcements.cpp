@@ -125,17 +125,46 @@ namespace Gauntlet
         // seven other Phase 2 mechanics that ask the same question.
         Creature* CopyableVictim(Player* player)
         {
-            Unit* victim = player->GetVictim();               // Unit.h:1042
-            Creature* creature = victim ? victim->ToCreature() : nullptr;
-            if (!creature || !IsOrdinaryFoe(creature))
-                return nullptr;
+            auto usable = [](Unit* unit) -> Creature*
+            {
+                Creature* creature = unit ? unit->ToCreature() : nullptr;
+                if (!creature || !IsOrdinaryFoe(creature))
+                    return nullptr;
 
-            // Never a copy of a copy, and never a copy of a Shade: this module
-            // must not be able to feed itself.
-            if (sGauntletSummons->IsGauntletSummon(creature))
-                return nullptr;
+                // Never a copy of a copy, and never a copy of a Shade: this
+                // module must not be able to feed itself.
+                if (sGauntletSummons->IsGauntletSummon(creature))
+                    return nullptr;
 
-            return creature;
+                return creature;
+            };
+
+            // What the player is swinging at, when there is such a thing.
+            if (Creature* attacking = usable(player->GetVictim()))    // Unit.h:903
+                return attacking;
+
+            // ...and otherwise whatever is swinging at them.
+            //
+            // GetVictim() is m_attacking, and only Unit::Attack sets it
+            // (Unit.cpp:7289) -- it is the *auto-attack* target and nothing
+            // else. A mage, a warlock, a druid casting from caster form: none
+            // of them has a victim at any point in a fight, so this card could
+            // never copy anything for those classes at all, and for the melee
+            // classes only while the swing timer happened to hold a target.
+            //
+            // Reported from play as "reinforcements still doesn't work", and
+            // `.gauntlet debug bench` had already printed the reason in its own
+            // diagnose line -- "NO VICTIM (nothing to copy)" -- on a probe that
+            // had put the player in combat but never made them auto-attack.
+            //
+            // What is attacking the player is also the better reading of "the
+            // fight" for this card in particular: it is the one about being
+            // swarmed, and the swarm is what is on you.
+            for (Unit* attacker : player->getAttackers())             // Unit.h:900
+                if (Creature* creature = usable(attacker))
+                    return creature;
+
+            return nullptr;
         }
 
         class Reinforcements final : public IMechanic
@@ -182,13 +211,21 @@ namespace Gauntlet
                 {
                     out += ctx.player->IsInCombat() ? ", in combat" : ", out of combat";
 
-                    Unit* victim = ctx.player->GetVictim();
-                    if (!victim)
-                        out += ", NO VICTIM (nothing to copy)";
-                    else if (!CopyableVictim(ctx.player))
-                        out += ", victim not copyable (elite, boss, or one of ours)";
+                    // Reported against the same lookup the card uses, not
+                    // against GetVictim alone. The old line said "NO VICTIM"
+                    // whenever the player was not auto-attacking, which was true
+                    // and useless: it is the normal state for a caster, and it
+                    // read as an explanation when it was the bug.
+                    if (Creature* copyable = CopyableVictim(ctx.player))
+                    {
+                        out += ", copying " + std::to_string(copyable->GetEntry());
+                        out += ctx.player->GetVictim() == copyable ? " (my target)"
+                                                                  : " (attacking me)";
+                    }
+                    else if (!ctx.player->GetVictim() && ctx.player->getAttackers().empty())
+                        out += ", nothing is fighting this character";
                     else
-                        out += ", victim copyable";
+                        out += ", nothing copyable in this fight (elite, boss, or one of ours)";
                 }
 
                 return out;
