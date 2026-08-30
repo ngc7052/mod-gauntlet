@@ -405,6 +405,8 @@ namespace Gauntlet
         MAX
     };
 
+    std::string AggregateKindName(AggregateKind kind);
+
     // Clamps on the aggregate product. Defaults are the plan's §2.5 values;
     // every field is overridable from mod_gauntlet.conf.
     struct AggregateCaps

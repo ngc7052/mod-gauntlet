@@ -30,6 +30,8 @@ account. Nothing below stakes a real run.
 .gauntlet debug set <state-key> <n>    # push a counter to the edge of its trigger
 .gauntlet debug hurt <percent>         # test a death path without staking a run
 .gauntlet debug cards [key]            # every card at every rank: dead ranks, and words the addon cannot split
+.gauntlet debug leaks [what] [rank]    # attach and detach every affix: what did not come back
+.gauntlet debug leaks self             # check the audit can see this character before trusting it
 .gauntlet status                       # what the player sees
 .gauntlet top                          # the leaderboard, and now the conducts
 ```
@@ -37,7 +39,29 @@ account. Nothing below stakes a real run.
 Keys are the registry's own (`shade`, `c13_cold_trail`, …) and are listed in
 `src/GauntletRegistry.cpp` next to each id.
 
-**Run `.gauntlet debug cards` first, once, and read the tail.** It prints every
+**Run `.gauntlet debug leaks self`, then `.gauntlet debug leaks`, before any of
+the sections below.** The first answers whether the audit can see the character
+at all -- Capture reads nine getters and a wrong one would return an empty
+footprint, which compares equal to every other empty footprint and reports every
+mechanic clean. The second attaches all sixty-nine affixes at their top rank,
+detaches each one, and prints whatever the character did not get back: a
+cooldown still held, an aura still applied, a summon still standing, a
+multiplier still bent.
+
+It is the cheapest check in this file that needs a character, and it covers, in
+one command, the "does detaching it put everything back" half of S1-S8 for every
+mechanic at once. What it cannot answer is whether the effect was *right* while
+it was on -- that is the rest of this file.
+
+Three verdicts, and the middle one is the one to read carefully:
+
+| Verdict | Meaning |
+|---|---|
+| `LEAK` | The character is not the way it was found. The lines below it say how. |
+| clean | The affix changed something at attach and put all of it back. |
+| inert | Nothing measurable changed at attach. A hook-driven mechanic, or a class curse for another class. **Not a pass** -- it means the audit had nothing to look at. |
+
+**Run `.gauntlet debug cards` next, once, and read the tail.** It prints every
 mechanic's offer text at every rank and shouts at two things: two consecutive
 ranks that read identically — a rank-up that costs a tier and changes nothing —
 and a word longer than the addon's 200-byte chunk, which the wire splits

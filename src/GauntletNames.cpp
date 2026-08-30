@@ -99,4 +99,23 @@ namespace Gauntlet
             default:                 return "Unknown";
         }
     }
+
+    // Moved here from GauntletCommands.cpp, where a comment had been asking
+    // for the move since the switchover: the six labels were a file-local
+    // static in the command file, and the audit in GauntletAudit.cpp is the
+    // second caller that would otherwise have had to copy them. Two copies of
+    // a label the player reads is how the two drift.
+    std::string AggregateKindName(AggregateKind kind)
+    {
+        switch (kind)
+        {
+            case AggregateKind::DamageTaken: return "damage taken";
+            case AggregateKind::DamageDone:  return "damage done";
+            case AggregateKind::HealTaken:   return "healing taken";
+            case AggregateKind::MaxHealth:   return "max health";
+            case AggregateKind::EnemySpeed:  return "enemy speed";
+            case AggregateKind::Experience:  return "experience";
+            default:                         return "unknown";
+        }
+    }
 }

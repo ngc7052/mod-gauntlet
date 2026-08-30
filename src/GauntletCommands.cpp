@@ -4,6 +4,7 @@
  */
 
 #include "GauntletAddon.h"
+#include "GauntletAudit.h"
 #include "GauntletGenerator.h"
 #include "GauntletMechanic.h"
 #include "GauntletMgr.h"
@@ -282,24 +283,6 @@ namespace Gauntlet
         // GAUNTLET_EXPORT_END
         // =============================================================
 
-        // AggregateKind has no name function in GauntletNames.cpp, which the
-        // switchover owns and this step may not touch, so the six labels live
-        // here. They are printed and nothing else -- no stored string reads
-        // them -- so a later move into GauntletNames.cpp costs nothing.
-        char const* AggregateKindName(AggregateKind kind)
-        {
-            switch (kind)
-            {
-                case AggregateKind::DamageTaken: return "damage taken";
-                case AggregateKind::DamageDone:  return "damage done";
-                case AggregateKind::HealTaken:   return "healing taken";
-                case AggregateKind::MaxHealth:   return "max health";
-                case AggregateKind::EnemySpeed:  return "enemy speed";
-                case AggregateKind::Experience:  return "experience";
-                default:                         return "unknown";
-            }
-        }
-
         // Plan section 2.5: `.gauntlet status` prints the current products, so
         // a player can read the ceiling they are against rather than infer it
         // from six affix descriptions. Deliberately not numbered: the addon's
@@ -545,6 +528,72 @@ namespace Gauntlet
             return slot;
         }
 
+        // The audit's own attach and detach, and deliberately not AttachCheat
+        // above.
+        //
+        // AttachCheat persists the affix to `gauntlet_affix` and writes a line
+        // to the server log, both of which are right for a game master handing
+        // themselves a curse to play with. `.gauntlet debug leaks` attaches
+        // sixty-nine affixes and detaches every one of them before the command
+        // returns: a hundred and thirty-eight rows and log lines describing a
+        // state that never outlived the message would leave the cheat log
+        // useless for the one thing it exists for, which is telling a run that
+        // was edited from a run that was played.
+        //
+        // Everything else is the same, in the same order -- Attach, then
+        // SyncTimedAffixCount, then OnAttach -- because that order is what
+        // makes the scheduler's budget right before a mechanic arms anything,
+        // and an audit that attached differently from the real path would be
+        // auditing a path nothing takes.
+        AffixInstance* AuditAttach(Player* p, RunState* st, MechanicDef const& def, uint32 rank)
+        {
+            uint8 const slot = LowestFreeSlot(*st);
+            if (slot == 0)
+                return nullptr;
+
+            AffixInstance instance;
+            instance.mechanic   = def.id;
+            instance.rank       = static_cast<uint8>(rank);
+
+            // Always, not a rolled condition: a gated affix whose condition is
+            // false does nothing on attach and would be indistinguishable from
+            // a mechanic that leaks nothing. The audit wants the affix awake.
+            instance.condition  = Gauntlet::Condition::Always;
+            instance.boon       = Boon::None;
+            instance.boonMag    = 0;
+            instance.slot       = slot;
+            instance.genVersion = GeneratorVersion;
+
+            AffixInstance& stored = st->Attach(instance);
+            sGauntlet->SyncTimedAffixCount(p);
+
+            if (stored.impl)
+            {
+                Ctx ctx = sGauntlet->MakeCtx(p, st, &stored);
+                stored.impl->OnAttach(ctx);
+            }
+
+            // Re-read rather than returning the reference: OnAttach may have
+            // attached something else -- a Bargain's rematch does -- and the
+            // vector would have moved under it.
+            return st->AtSlot(slot);
+        }
+
+        void AuditDetach(Player* p, RunState* st, uint8 slot)
+        {
+            AffixInstance* a = st->AtSlot(slot);
+            if (!a)
+                return;
+
+            if (a->impl)
+            {
+                Ctx ctx = sGauntlet->MakeCtx(p, st, a);
+                a->impl->OnDetach(ctx);
+            }
+            st->DetachSlot(slot);
+            sGauntlet->SyncTimedAffixCount(p);
+        }
+
         // Who did it, for the cheat log. The account id is the part that
         // matters when two game masters share a character.
 
@@ -581,6 +630,9 @@ public:
             // logged-in game master to audit the offer text would mean the
             // check could only be run by someone already playing.
             { "cards",        HandleDebugCards,       SEC_GAMEMASTER, Console::Yes },
+            // Console::No, unlike cards above: this one needs a character,
+            // because what it measures is what an affix does *to* one.
+            { "leaks",        HandleDebugLeaks,       SEC_GAMEMASTER, Console::No },
             { "dump",         HandleDebugDump,        SEC_GAMEMASTER, Console::No },
             { "offers",       HandleDebugOffers,      SEC_GAMEMASTER, Console::No },
             { "seed",         HandleDebugSeed,        SEC_GAMEMASTER, Console::No },
@@ -1192,6 +1244,271 @@ public:
         handler->PSendSysMessage(
             "|cffff2020[Gauntlet debug]|r {} mechanic(s), {} dead rank(s), {} unsplittable word(s).",
             shown, dead, wide);
+        return true;
+    }
+
+    // The audit auditing itself, and the reason it exists is phase 9's own
+    // closing note: verify a new audit fails before trusting it.
+    //
+    // The pure half is covered -- tests/AuditTest.cpp moves each field and
+    // checks Diff reports it. Capture is the half no test can reach, because it
+    // needs a character, and its failure mode is silent and total: a Capture
+    // wired to the wrong getter returns an empty footprint, an empty footprint
+    // compares equal to another empty footprint, and the command cheerfully
+    // reports sixty-nine mechanics clean.
+    //
+    // So this asks whether the live half can see anything at all. It applies
+    // nothing to the character. Everything below is a read of what is already
+    // there, except one scheduler entry, which is the only dimension that can
+    // be moved and put back leaving nothing behind.
+    static bool AuditSelfTest(ChatHandler* handler, Player* p, RunState* st)
+    {
+        uint32 failed = 0;
+        auto check = [&](bool ok, char const* what)
+        {
+            handler->PSendSysMessage("  {} {}", ok ? "|cff60c060ok  |r" : "|cffff2020FAIL|r", what);
+            if (!ok)
+                ++failed;
+        };
+
+        Footprint const at_rest = Capture(p, st);
+
+        check(Diff(at_rest, at_rest).empty(), "a reading compares equal to itself");
+        check(at_rest.auras.size() == p->GetAppliedAuras().size(),
+              "the aura list is as long as the character's");
+        check(std::is_sorted(at_rest.auras.begin(), at_rest.auras.end()),
+              "the aura list is sorted, which Diff's multiset walk requires");
+        check(at_rest.cooldowns.size() == p->GetSpellCooldownMap().size(),
+              "the cooldown list is as long as the character's");
+        check(std::is_sorted(at_rest.cooldowns.begin(), at_rest.cooldowns.end()),
+              "the cooldown list is sorted");
+        check(at_rest.maxHealth == p->GetMaxHealth() && at_rest.maxHealth != 0,
+              "max health is the character's and is not zero");
+        check(at_rest.carried == st->affixes.size(), "the carried count is the run's");
+
+        // If arming an event is not visible here, the audit is blind to every
+        // Timed mechanic in the module -- which is most of the Spawn and Tempo
+        // families -- and would report all of them clean.
+        Scheduler* clock = sGauntlet->ClockFor(p);
+        if (!clock)
+        {
+            check(false, "this run has a clock to arm");
+        }
+        else
+        {
+            // Mechanic 0 is the sentinel no mechanic uses, so this cannot
+            // collide with something a carried affix has queued and the Cancel
+            // below cannot take anything real with it.
+            //
+            // Qualified: the core has a MECHANIC_NONE of its own in
+            // SharedDefines.h and the using-directive at the top of this file
+            // makes the bare name ambiguous. Both are zero, so the compiler
+            // catching it is the only thing that would have.
+            clock->Arm(Gauntlet::MECHANIC_NONE, 1u, 600000, 0);
+            Footprint const armed = Capture(p, st);
+            check(!Diff(at_rest, armed).empty(), "arming an event is visible to the audit");
+
+            clock->Cancel(Gauntlet::MECHANIC_NONE);
+            Footprint const back = Capture(p, st);
+            check(Diff(at_rest, back).empty(), "cancelling it puts the reading back");
+        }
+
+        if (failed == 0)
+            handler->PSendSysMessage(
+                "|cffff2020[Gauntlet debug]|r self-test passed: the audit can see this character. "
+                "A clean report from .gauntlet debug leaks means something.");
+        else
+            handler->PSendSysMessage(
+                "|cffff2020[Gauntlet debug]|r self-test FAILED {} check(s). Until these pass, "
+                "|cffff2020ignore every verdict .gauntlet debug leaks gives|r -- a blind audit "
+                "reports everything clean.", failed);
+        return true;
+    }
+
+    // Attach every affix, detach it again, and say what did not come back.
+    //
+    //   .gauntlet debug leaks self            check the audit can see anything
+    //   .gauntlet debug leaks                 every mechanic, at its top rank
+    //   .gauntlet debug leaks class           one family
+    //   .gauntlet debug leaks shade 2         one mechanic, at a rank you name
+    //
+    // The bug class this exists for is the one nothing else in the repo can
+    // reach. `OnAttach` and `OnDetach` were written by hand sixty-nine times;
+    // the unit tests cannot call either, because both take a Player and the
+    // harness has no world; and reading them is what phase 9 did, which is why
+    // phase 9's own report says an audit that has never failed is a claim
+    // rather than a check.
+    //
+    // What it cannot do is decide whether an effect is *correct*. It only
+    // answers "is the character the way it was found", which is a smaller
+    // question with a machine-checkable answer -- and the whole of
+    // docs/checklists.md is the bigger one.
+    static bool HandleDebugLeaks(ChatHandler* handler, Optional<std::string_view> whatArg,
+                                 Optional<uint32> rankArg)
+    {
+        if (!DebugAllowed(handler))
+            return false;
+
+        Player* p = handler->GetPlayer();
+        RunState* st = MutableRun(handler, p);
+        if (!st)
+            return false;
+
+        // `leaks self` audits the audit rather than the module. It is the
+        // first thing to run and the answer decides whether anything below is
+        // worth reading.
+        if (whatArg && StringEqualI(*whatArg, "self"))
+            return AuditSelfTest(handler, p, st);
+
+        // What to audit. A key wins over a family name, so `leaks class` is the
+        // family and `leaks c13_cold_trail` is the one mechanic; no registry
+        // key collides with a family name.
+        bool everyFamily = true;
+        Family wanted = Family::Class;
+        MechanicDef const* onlyOne = nullptr;
+
+        if (whatArg && !whatArg->empty() && !StringEqualI(*whatArg, "all"))
+        {
+            for (uint8 f = 0; f < static_cast<uint8>(Family::MAX); ++f)
+                if (StringEqualI(FamilyName(static_cast<Family>(f)), *whatArg))
+                {
+                    wanted = static_cast<Family>(f);
+                    everyFamily = false;
+                    break;
+                }
+
+            if (everyFamily)
+            {
+                onlyOne = LookupMechanic(*whatArg);
+                if (!onlyOne)
+                {
+                    handler->SendErrorMessage(
+                        "|cffff2020[Gauntlet debug]|r \"{}\" is neither a family nor a mechanic. Give a "
+                        "registry key, one of spawn, enemy, tempo, attrition, rules, bargain, class, "
+                        "all -- or self, to check the audit itself.", *whatArg);
+                    return false;
+                }
+            }
+        }
+
+        // The top rank by default: a leak that only exists at rank IV is still
+        // a leak, and the ranks below it are the ones a hand-read is most
+        // likely to have got right.
+        uint32 const askedRank = rankArg ? *rankArg : uint32(MAX_RANK);
+        if (askedRank < 1 || askedRank > MAX_RANK)
+        {
+            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Rank {} is out of range: 1 to {}.",
+                                      askedRank, static_cast<uint32>(MAX_RANK));
+            return false;
+        }
+
+        uint32 audited = 0, leaked = 0, clean = 0, inert = 0, skipped = 0;
+
+        for (MechanicDef const& def : AllMechanics())
+        {
+            if (onlyOne)
+            {
+                if (def.id != onlyOne->id)
+                    continue;
+            }
+            else if (!everyFamily && def.family != wanted)
+                continue;
+
+            // Already carried: attaching a second copy is not a state this
+            // module can reach, so auditing it would be auditing a fiction.
+            if (st->Find(def.id))
+            {
+                ++skipped;
+                continue;
+            }
+
+            uint32 const rank = std::min<uint32>(askedRank, std::min<uint8>(def.maxRank, MAX_RANK));
+
+            Footprint const before = Capture(p, st);
+
+            AffixInstance* attached = AuditAttach(p, st, def, rank);
+            if (!attached)
+            {
+                handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Ran out of affix slots.");
+                break;
+            }
+
+            uint8 const slot = attached->slot;
+            Footprint const held = Capture(p, st);
+            AuditDetach(p, st, slot);
+            Footprint const after = Capture(p, st);
+
+            ++audited;
+
+            std::vector<std::string> const lines = Diff(before, after);
+            std::vector<std::string> const did   = Diff(before, held);
+
+            if (!lines.empty())
+            {
+                ++leaked;
+                handler->PSendSysMessage("|cffff2020LEAK|r {} (rank {})", def.name, rank);
+                for (std::string const& line : lines)
+                    handler->PSendSysMessage("    {}", line);
+            }
+            else if (did.empty())
+            {
+                // Nothing measurable changed at attach, so there was nothing to
+                // put back and "clean" would be flattering. Most of these are
+                // mechanics that act on a hook rather than on attach, and the
+                // rest are class curses for a class this character is not --
+                // both are absences of evidence, not evidence.
+                ++inert;
+            }
+            else
+            {
+                ++clean;
+            }
+
+            if (onlyOne)
+            {
+                handler->PSendSysMessage("  what it changed at attach ({}):",
+                                         did.empty() ? "nothing" : "below");
+                for (std::string const& line : did)
+                    handler->PSendSysMessage("    {}", line);
+            }
+
+            // After the verdict, never before it: cleaning up first would erase
+            // the evidence and report every mechanic clean.
+            //
+            // Only these two are cleaned. A queued event would fire later with
+            // nothing carried to blame it on, and a summon with no affix behind
+            // it is the orphan-stalker failure -- both are the audit's own mess
+            // and both are worse than the leak they came from. An aura or a
+            // cooldown is left exactly as found: it is on the game master's own
+            // character, a relog clears it, and stripping it here would make
+            // the audit unable to tell a leak from its own cleanup on a second
+            // run.
+            if (Scheduler* clock = sGauntlet->ClockFor(p))
+                clock->Cancel(def.id);
+            sGauntletSummons->DespawnFor(p, def.id);
+        }
+
+        if (audited == 0)
+        {
+            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Nothing to audit: {} already carried.",
+                                      skipped);
+            return false;
+        }
+
+        handler->PSendSysMessage(
+            "|cffff2020[Gauntlet debug]|r attach/detach audit at rank {}: {} audited, "
+            "|cffff2020{} leaked|r, {} clean, {} inert{}.",
+            askedRank, audited, leaked, clean, inert,
+            skipped ? Acore::StringFormat(", {} skipped as already carried", skipped) : "");
+
+        if (leaked == 0)
+            handler->PSendSysMessage("  Every one of them put back what it took.");
+
+        handler->PSendSysMessage(
+            "  \"inert\" means nothing measurable changed at attach -- a hook-driven mechanic, or a "
+            "class curse for another class. It is not a pass.");
+        handler->PSendSysMessage(
+            "  Queued events and summons were cleaned up; any leaked aura or cooldown is still on you.");
         return true;
     }
 
