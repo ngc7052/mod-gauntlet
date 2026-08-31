@@ -575,11 +575,82 @@ namespace
           MF_RewardShaped, "", Boon::None, 0, 0,
           "Healing is held while something you have wounded lives. A kill hands it back." },
 
+        // ---------------------------------------------------------------
+        // The commons (docs/rarity-plan.md section 2): one small trade each,
+        // a single axis, no state, readable in one line. Every row from here
+        // on is backed by the same class -- SimpleTrade, in
+        // src/mechanics/common/ -- reading its own line of the table in
+        // src/GauntletTrades.h, which is where the curse's shape, the noun a
+        // refusal names and the boon's magnitude live. A common is a table
+        // row, not a file, and adding one is a row here and a line there.
+        //
+        // Filed by lever, as every row is: a denial is a Rule -- "a
+        // restriction on what you're allowed to do rather than a number" --
+        // and a coefficient trade is Attrition. Spread over two families on
+        // purpose: the offer builder still wants three distinct families in a
+        // set, and a family holding every common could put only one in it.
+        //
+        // No exclusive key. The Rules rows' "rule" is the design's one-rule-
+        // per-run cap and these are not that kind of rule; whether the
+        // commons want a cap of their own is the plan's open question 7.1.
+        //
+        // maxRank 1: a common has no ladder. The boon column is a promise the
+        // trade line pays; BoonTable reads the magnitude from that line so the
+        // offer card and the payout cannot disagree.
+        //
+        // Class masks on the two weapon denials are the classes that can hold
+        // the weapon at all in 3.3.5 -- a mage denied axes has lost nothing --
+        // and the generator's relevance discount halves their boon, because
+        // within the mask a shaman who fights with maces has lost nothing
+        // either.
+        // ---------------------------------------------------------------
+        { 75, "bareheaded", "Bareheaded", Family::Rules, 0, 1, 80, 1, Rarity::Common,
+          MF_None, "", Boon::BonusMaxHealth, 0, 0,
+          "You cannot wear a helm." },
+
+        { 76, "cloakless", "Cloakless", Family::Rules, 0, 1, 80, 1, Rarity::Common,
+          MF_None, "", Boon::BonusMoveSpeed, 0, 0,
+          "You cannot wear a cloak." },
+
+        { 77, "ringless", "Ringless", Family::Rules, 0, 1, 80, 1, Rarity::Common,
+          MF_None, "", Boon::BonusExperience, 0, 0,
+          "You cannot wear rings." },
+
+        { 78, "charmless", "Charmless", Family::Rules, 0, 1, 80, 1, Rarity::Common,
+          MF_None, "", Boon::BonusDamage, 0, 0,
+          "You cannot carry a trinket." },
+
+        { 79, "bare_necked", "Bare-necked", Family::Rules, 0, 1, 80, 1, Rarity::Common,
+          MF_None, "", Boon::BonusHealing, 0, 0,
+          "You cannot wear anything at your neck." },
+
+        { 80, "axeless", "Axeless", Family::Rules,
+          CM_WARRIOR | CM_PALADIN | CM_HUNTER | CM_SHAMAN | CM_DEATH_KNIGHT, 1, 80, 1, Rarity::Common,
+          MF_None, "", Boon::BonusDamage, 0, 0,
+          "You cannot wield an axe." },
+
+        { 81, "swordless", "Swordless", Family::Rules,
+          CM_WARRIOR | CM_PALADIN | CM_HUNTER | CM_ROGUE | CM_MAGE | CM_WARLOCK | CM_DEATH_KNIGHT, 1, 80, 1, Rarity::Common,
+          MF_None, "", Boon::BonusDamage, 0, 0,
+          "You cannot wield a sword." },
+
+        { 82, "glass", "Glass", Family::Attrition, 0, 1, 80, 1, Rarity::Common,
+          MF_None, "", Boon::BonusDamage, 0, 0,
+          "You take 10% more damage." },
+
+        { 83, "frail", "Frail", Family::Attrition, 0, 1, 80, 1, Rarity::Common,
+          MF_None, "", Boon::BonusExperience, 0, 0,
+          "You have 10% less health." },
+
+        { 84, "thin_blood", "Thin Blood", Family::Attrition, 0, 1, 80, 1, Rarity::Common,
+          MF_None, "", Boon::BonusDamage, 0, 0,
+          "Healing on you is 15% weaker." },
+
         };
     }
 
     // The table and its two indices, built once on first use. FindMechanic by
-    // id sits on the damage path, so neither lookup scans the 73 rows.
+    // id sits on the damage path, so neither lookup scans the rows.
     struct Registry
     {
         std::vector<MechanicDef>                                 table;

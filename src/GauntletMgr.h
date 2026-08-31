@@ -171,6 +171,11 @@ namespace Gauntlet
         // second affix would be noise.
         void OnRepair(Player* player, float& discountMod);
         bool Allows(Player* player, Restricted what);
+
+        // The equipment veto, from PlayerScript::OnPlayerCanEquipItem. False
+        // the moment any carried card refuses the template, for Allows()'s
+        // reason: one refusal is the answer.
+        bool CanEquip(Player* player, ItemTemplate const* proto);
         void OnMaxHealth(Player* player, float& value);
         void OnGiveXP(Player* player, uint32& amount, Unit* victim);
         void OnLootMoney(Player* player, Loot* loot);

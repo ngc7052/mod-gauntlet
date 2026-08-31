@@ -1680,6 +1680,25 @@ namespace Gauntlet
         return allowed;
     }
 
+    bool Mgr::CanEquip(Player* player, ItemTemplate const* proto)
+    {
+        if (!_enabled || !proto || !IsEligible(player))
+            return true;
+
+        RunState* st = Get(player);
+        if (!st)
+            return true;
+
+        bool allowed = true;
+        ForEachMechanic(player, st, [&allowed, proto](Ctx& ctx, AffixInstance& a)
+        {
+            if (allowed && !a.impl->CanEquip(ctx, proto))
+                allowed = false;
+        });
+
+        return allowed;
+    }
+
     bool Mgr::AnyWillBuyDeath(Player* player)
     {
         if (!_enabled || !IsEligible(player))

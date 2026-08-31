@@ -12,6 +12,7 @@
 
 #include "GauntletRegistry.h"
 #include "GauntletGenerator.h"
+#include "GauntletTrades.h"
 
 #include <gtest/gtest.h>
 
@@ -25,12 +26,13 @@ namespace
 {
     using namespace Gauntlet;
 
-    // Sixty-nine rows carrying ids 1..74 with five holes in them. Phase 2
+    // Seventy-nine rows carrying ids 1..84 with five holes in them. Phase 2
     // deleted Exposed (21), Feeble (22), Withering (72) and Forgetful (73) --
     // the four flat scalars -- and Phase 6 deleted Unspent (69). An id is never
-    // reused, so the holes stay. The count is unchanged because Killing Floor
-    // (74) took Unspent's place in the table and not its number.
-    constexpr size_t TABLE_SIZE = 69;
+    // reused, so the holes stay. Killing Floor (74) took Unspent's place in the
+    // table and not its number, and 75-84 are the first ten commons of
+    // docs/rarity-plan.md step 2.
+    constexpr size_t TABLE_SIZE = 79;
     // A tier is a level now, not five of them. Every registry window was
     // multiplied by five with the axis, so the *level* each affix unlocks at
     // is exactly what it was; only the number naming it changed.
@@ -56,7 +58,7 @@ namespace
     // rather than as a count: a row that gains the flag by accident, or loses
     // it before its dispatch is wired, is an affix offered to a live hardcore
     // character that silently does nothing.
-    constexpr std::array<uint16, 69> OFFERABLE = {
+    constexpr std::array<uint16, 79> OFFERABLE = {
         1, 2, 3, 4, 5,           // S1 Shade, S2 Echo, S3 Carrion, S4 Reinforcements, S5 Ambush
         6, 7, 8, 9, 10, 11, 12, 13,  // E1 Champions .. E8 Keen-nosed
         14, 15, 16, 17, 18,      // T1 Falling Sky .. T5 Hubris
@@ -84,7 +86,12 @@ namespace
         54, 55,                  // C27 Elemental Overload, C28 Spirit Debt
         57, 59,                  // C30 Fickle Sheep, C32 Arcane Frailty
         61, 62, 63,              // C34 Affliction, C35 Shard Economy, C36 Shared Blood
-        65, 66, 67               // C38 Nature's Toll, C39 Commitment of Roots, C40 Two Faces
+        65, 66, 67,              // C38 Nature's Toll, C39 Commitment of Roots, C40 Two Faces
+
+        // The commons: seven denials filed as Rules, three coefficient trades
+        // filed as Attrition. Every one is a line in src/GauntletTrades.h.
+        75, 76, 77, 78, 79, 80, 81,
+        82, 83, 84
     };
 
     // CONTRACT.md section 8's id ranges, which are fixed forever. The Attrition
@@ -97,22 +104,26 @@ namespace
         size_t count;
     };
 
-    constexpr std::array<Range, 8> RANGES = { {
+    constexpr std::array<Range, 10> RANGES = { {
         {  1,  5, Family::Spawn,      5 },
         {  6, 13, Family::Enemy,      8 },
         { 14, 18, Family::Tempo,      5 },
-        { 19, 22, Family::Attrition,  3 },   // 21 and 22 deleted; 19, 20 and 74 remain
-        { 23, 25, Family::Rules,      3 },
+        { 19, 22, Family::Attrition,  6 },   // 21 and 22 deleted; 19, 20, 74 and three commons remain
+        { 23, 25, Family::Rules,     10 },   // three rules and seven common denials
         { 26, 27, Family::Bargain,    2 },
         { 28, 71, Family::Class,     43 },   // 69 deleted with Unspent
         // A5 Killing Floor, outside its family's original band because 21 and
         // 22 are spent and the next free id was 74. The band describes how the
         // table was first laid out; the no-reuse rule outranks it.
-        { 74, 74, Family::Attrition,  3 }
+        { 74, 74, Family::Attrition,  6 },
+        // The commons, appended in id order as every row after 74 is: the
+        // denials are Rules, the coefficient trades Attrition.
+        { 75, 81, Family::Rules,     10 },
+        { 82, 84, Family::Attrition,  6 }
     } };
 }
 
-TEST(Registry, HoldsSixtyNineEntriesInAscendingIdOrder)
+TEST(Registry, HoldsEveryEntryInAscendingIdOrder)
 {
     auto const& all = AllMechanics();
     ASSERT_EQ(all.size(), TABLE_SIZE);
@@ -126,7 +137,7 @@ TEST(Registry, HoldsSixtyNineEntriesInAscendingIdOrder)
             << " (id " << all[i - 1].id << ") in ascending order";
 
     EXPECT_EQ(all.front().id, 1u);
-    EXPECT_EQ(all.back().id, 74u) << "the table must end at A5 Killing Floor, id 74";
+    EXPECT_EQ(all.back().id, 84u) << "the table must end at the last common, Thin Blood, id 84";
 }
 
 TEST(Registry, TheDeletedScalarIdsAreGoneAndStayGone)
@@ -191,20 +202,30 @@ TEST(Registry, RarityIsInsideTheEnum)
             << "id " << def.id << " carries a rarity Data.lua cannot name";
 }
 
-// Step 1 of docs/rarity-plan.md: the column, the roll and the display land
-// with every existing card marked Rare and nothing else about the table
-// changed. This is that promise, asserted, and it is the one test in this
-// file that is meant to be rewritten: the plan's section 7.4 is a single pass
-// over the whole list deciding which cards are epics, and when that pass is
-// made this becomes a list of ids rather than a blanket. Until then a row
-// that is not Rare is a card promoted on its own, which is exactly what the
-// plan says not to do.
-TEST(Registry, EveryCardIsRareUntilTheEpicPass)
+// docs/rarity-plan.md, steps 1 and 2. The sixty-nine cards that existed when
+// rarity landed are all Rare, and stay Rare until the plan's section 7.4 --
+// one pass over the whole list deciding which are epics -- rewrites this into
+// a list; a row promoted on its own before then is exactly what the plan says
+// not to do. Everything after them is a common, and a common is a line in the
+// trade table, which is what makes it a table row rather than a file.
+TEST(Registry, TheOriginalCardsAreRareAndEverythingAfterIsACommonWithALine)
 {
+    constexpr uint16 LAST_ORIGINAL = 74;   // A5 Killing Floor
     for (MechanicDef const& def : AllMechanics())
-        EXPECT_EQ(def.rarity, Rarity::Rare)
-            << "id " << def.id << " (" << def.key << ") is " << RarityName(def.rarity)
-            << "; rarities are assigned in one pass over the whole table, not per row";
+    {
+        if (def.id <= LAST_ORIGINAL)
+            EXPECT_EQ(def.rarity, Rarity::Rare)
+                << "id " << def.id << " (" << def.key << ") is " << RarityName(def.rarity)
+                << "; the epic pass is one decision over the whole table, not per row";
+        else
+        {
+            EXPECT_EQ(def.rarity, Rarity::Common)
+                << "id " << def.id << " (" << def.key << ") is " << RarityName(def.rarity)
+                << "; rows after " << LAST_ORIGINAL << " are commons until the plan says otherwise";
+            EXPECT_NE(FindTrade(def.id), nullptr)
+                << "id " << def.id << " (" << def.key << ") is a common with no trade line";
+        }
+    }
 }
 
 TEST(Registry, FamiliesAreInRangeAndMatchTheIdRanges)
@@ -298,10 +319,10 @@ TEST(Registry, LookupsAgreeWithTheTable)
     // one of these is the normal answer for a run migrated from a registry
     // this build has never seen, so nullptr is the contract, not a crash.
     EXPECT_EQ(FindMechanic(static_cast<uint16>(MECHANIC_NONE)), nullptr);
-    // 75, one past the highest id the table carries. Not TABLE_SIZE + 1: the
+    // 85, one past the highest id the table carries. Not TABLE_SIZE + 1: the
     // ids are no longer contiguous, so the count and the highest id are
     // different numbers and only the second one bounds a lookup.
-    EXPECT_EQ(FindMechanic(static_cast<uint16>(75)), nullptr);
+    EXPECT_EQ(FindMechanic(static_cast<uint16>(85)), nullptr);
     EXPECT_EQ(FindMechanic(static_cast<uint16>(72)), nullptr);
     EXPECT_EQ(FindMechanic(static_cast<uint16>(0xFFFF)), nullptr);
     EXPECT_EQ(FindMechanic(std::string_view("")), nullptr);

@@ -12,6 +12,8 @@
 #include "GauntletSummons.h"
 
 #include "Creature.h"
+#include "ItemTemplate.h"
+#include "ObjectMgr.h"
 #include "Player.h"
 #include "TemporarySummon.h"
 #include "Unit.h"
@@ -232,6 +234,23 @@ namespace Gauntlet
         NoteIf(out, !sGauntlet->Allows(player, Restricted::AuctionBid), "auction refused");
 
         NoteIf(out, sGauntlet->AnyWillBuyDeath(player), "will buy death");
+
+        // The equipment veto. Nothing per card, as with everything else here:
+        // every item template the world knows is offered to the carried set,
+        // and the first one refused is the answer. A card that denies a slot
+        // or a weapon class is reached by this and by nothing else, because a
+        // denial changes no number until someone tries to put the thing on --
+        // and asserting the refusal is asserting the thing the card is for.
+        //
+        // Forty thousand templates and one virtual call each, once per card;
+        // the whole scan is milliseconds and the container is the core's own.
+        if (ItemTemplateContainer const* store = sObjectMgr->GetItemTemplateStore())
+            for (auto const& [entry, proto] : *store)
+                if (!sGauntlet->CanEquip(player, &proto))
+                {
+                    out.reached.emplace_back("equipping " + proto.Name1 + " refused");
+                    break;
+                }
 
         // The six aggregate products. A card whose entire effect is a
         // coefficient answers here and nowhere else, which is most of the

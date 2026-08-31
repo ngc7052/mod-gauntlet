@@ -6,6 +6,7 @@
 #include "GauntletGenerator.h"
 #include "GauntletRegistry.h"
 #include "GauntletRules.h"
+#include "GauntletTrades.h"
 
 #include <algorithm>
 #include <array>
@@ -30,9 +31,16 @@ namespace
     // shape here is: the three families that carry the run's identity
     // (Enemy, Tempo, and the class curses) are the common draw; Spawn and
     // Attrition sit just below because a run wants one or two of each, not
-    // four; Rules are three one-rank entries that all disappear by tier 6, so
+    // four; Rules were three one-rank entries that all disappear by tier 6, so
     // they are rare; Bargain is reached mostly through slot C's own bargain
     // roll and does not need a large share of the family roll as well.
+    //
+    // The rarity plan's commons changed what Rules holds without changing this
+    // number, and that is deliberate for now: seven of the first ten commons
+    // are denials filed as Rules and three are trades filed as Attrition, so
+    // at tier 1 a Common slot draws Attrition's three about three times as
+    // often as Rules' seven. Measured, not tuned -- `build/sweep --rarity`
+    // shows the mix -- and the plan's step 5 is where the weights get argued.
     constexpr std::array<uint32, FAMILY_COUNT> FAMILY_WEIGHT = {
         3,   // Spawn        TODO(design)
         4,   // Enemy        TODO(design)
@@ -109,6 +117,12 @@ namespace
     // for the rows that will want to override it.
     uint32 BoonTable(uint16 mechanic, Boon boon, uint8 rank)
     {
+        // A common's magnitude is its trade line's, read from the same header
+        // the mechanic reads, so the card and the payout cannot disagree.
+        // Before the rank ladder because a common has no rank to ladder by.
+        if (TradeDef const* trade = FindTrade(mechanic))
+            return trade->boon == boon ? trade->boonPct : 0u;
+
         uint8 const step = std::clamp<uint8>(rank, 1, MAX_RANK);
 
         // Two rows state their own boon on the card, so they do not take the

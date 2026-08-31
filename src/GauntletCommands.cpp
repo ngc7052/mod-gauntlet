@@ -679,7 +679,14 @@ namespace Gauntlet
             return fired;
         }
 
-        void AuditDetach(Player* p, RunState* st, uint8 slot)
+        // `diagAfter`, when given, receives the mechanic's Diagnose() read
+        // *after* OnDetach and before the instance is destroyed. The leak audit
+        // used to read it before detaching -- the only moment the instance was
+        // both alive and reachable from outside -- and printed the result as
+        // "its own counters at detach", which for a card whose work happens in
+        // OnDetach was a lie: the commons' "put back 0" read as the return
+        // failing while the footprint showed the item back on.
+        void AuditDetach(Player* p, RunState* st, uint8 slot, std::string* diagAfter = nullptr)
         {
             AffixInstance* a = st->AtSlot(slot);
             if (!a)
@@ -689,6 +696,8 @@ namespace Gauntlet
             {
                 Ctx ctx = sGauntlet->MakeCtx(p, st, a);
                 a->impl->OnDetach(ctx);
+                if (diagAfter)
+                    *diagAfter = a->impl->Diagnose(ctx);
             }
             st->DetachSlot(slot);
             sGauntlet->SyncTimedAffixCount(p);
@@ -1673,7 +1682,10 @@ public:
                 return false;
             }
 
-            AuditDetach(p, st, slot);
+            // The same counters again once OnDetach has run, for the cards
+            // whose work is the detach -- a common putting a helm back on.
+            std::string diagAfter;
+            AuditDetach(p, st, slot, onlyOne ? &diagAfter : nullptr);
             Footprint const after = Capture(p, st);
 
             ++audited;
@@ -1723,7 +1735,9 @@ public:
 
                 if (!diag.empty())
                     handler->PSendSysMessage("  its own counters {}: {}",
-                                             exercise ? "after the soak" : "at detach", diag);
+                                             exercise ? "after the soak" : "before detach", diag);
+                if (!diagAfter.empty() && diagAfter != diag)
+                    handler->PSendSysMessage("  its own counters after detach: {}", diagAfter);
             }
 
             // After the verdict, never before it: cleaning up first would erase
@@ -1925,7 +1939,21 @@ public:
             }
 
             uint8 const slot = attached->slot;
-            ProbeResult const probe = Probe(p, st, slot, def.id, def.requiresSpell);
+
+            // What attaching alone changed. Probe's baseline is read *after*
+            // attach, so a card whose whole effect lands in OnAttach -- a
+            // standing aura, a helm put into the bags -- was invisible to the
+            // bench's verdict and could read "reached by nothing" while
+            // working; docs/handoff.md listed it as the harness's first blind
+            // spot. The carried count moves on every attach and is not a
+            // finding, so it is put back before the two readings are compared.
+            Footprint attachedMark = Capture(p, st);
+            attachedMark.carried = before.carried;
+            std::vector<std::string> const onAttach = Diff(before, attachedMark);
+
+            ProbeResult probe = Probe(p, st, slot, def.id, def.requiresSpell);
+            for (std::string const& line : onAttach)
+                probe.reached.emplace_back("on attach: " + line);
 
             if (st->dead || !p->IsAlive())
             {

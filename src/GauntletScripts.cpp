@@ -428,6 +428,26 @@ public:
         return sGauntlet->Allows(player, Restricted::AuctionBid);
     }
 
+    // The equipment veto (PlayerScript.h:589), which the commons' denials hang
+    // on. The core asks this first thing in Player::CanEquipItem
+    // (PlayerStorage.cpp:1912), before it has worked out a destination, and
+    // turns a refusal into EQUIP_ERR_CANT_DO_RIGHT_NOW -- a generic client
+    // error, which is why the mechanic that refuses owes the chat line, as
+    // with the three vetoes above.
+    //
+    // not_loading is false while the loader is putting a character's saved
+    // inventory back on at login, which happens before any run is attached --
+    // so no mechanic could answer then anyway, and none is asked: a character
+    // must never be undressed by the loader on a card's behalf. What is worn
+    // and denied is dealt with by the card's own OnAttach, which can say so.
+    bool OnPlayerCanEquipItem(Player* player, uint8 /*slot*/, uint16& /*dest*/, Item* pItem,
+                              bool /*swap*/, bool not_loading) override
+    {
+        if (!not_loading || !pItem)
+            return true;
+        return sGauntlet->CanEquip(player, pItem->GetTemplate());
+    }
+
     // Iron Purse. discountMod arrives as the reputation price discount and the
     // core spends it as a multiplier on the bill (NPCHandler.cpp:780-782,
     // Player.cpp:4955), so a mechanic makes repairs dearer by raising it.
@@ -844,6 +864,21 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_SelfFound();          // 23
     void AddSC_gauntlet_mechanic_LoneWolf();           // 24
     void AddSC_gauntlet_mechanic_IronPurse();          // 25
+
+    // The commons, all in src/mechanics/common/SimpleTrade.cpp. One anchor
+    // per registry id because the anchor audit reads registrations by text;
+    // any one of them would keep the file linked, and all of them keep the
+    // audit honest.
+    void AddSC_gauntlet_mechanic_TradeBareheaded();    // 75
+    void AddSC_gauntlet_mechanic_TradeCloakless();     // 76
+    void AddSC_gauntlet_mechanic_TradeRingless();      // 77
+    void AddSC_gauntlet_mechanic_TradeCharmless();     // 78
+    void AddSC_gauntlet_mechanic_TradeBareNecked();    // 79
+    void AddSC_gauntlet_mechanic_TradeAxeless();       // 80
+    void AddSC_gauntlet_mechanic_TradeSwordless();     // 81
+    void AddSC_gauntlet_mechanic_TradeGlass();         // 82
+    void AddSC_gauntlet_mechanic_TradeFrail();         // 83
+    void AddSC_gauntlet_mechanic_TradeThinBlood();     // 84
 }
 
 static void AnchorMechanics()
@@ -920,6 +955,17 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_IronPurse();
     AddSC_gauntlet_mechanic_SelfFound();
     AddSC_gauntlet_mechanic_LoneWolf();
+
+    AddSC_gauntlet_mechanic_TradeBareheaded();
+    AddSC_gauntlet_mechanic_TradeCloakless();
+    AddSC_gauntlet_mechanic_TradeRingless();
+    AddSC_gauntlet_mechanic_TradeCharmless();
+    AddSC_gauntlet_mechanic_TradeBareNecked();
+    AddSC_gauntlet_mechanic_TradeAxeless();
+    AddSC_gauntlet_mechanic_TradeSwordless();
+    AddSC_gauntlet_mechanic_TradeGlass();
+    AddSC_gauntlet_mechanic_TradeFrail();
+    AddSC_gauntlet_mechanic_TradeThinBlood();
 }
 
 void Addmod_gauntletScripts()

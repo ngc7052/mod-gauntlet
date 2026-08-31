@@ -27,6 +27,7 @@ class Aura;
 class AuraApplication;
 class ObjectGuid;
 struct Loot;
+struct ItemTemplate;
 
 namespace Gauntlet
 {
@@ -224,6 +225,18 @@ namespace Gauntlet
         // other way to find out, because the core's own refusal for these is
         // silent or generic.
         virtual bool  Allows(Ctx&, Restricted) { return true; }
+
+        // The equipment veto: may this be equipped while the card is carried?
+        // Asked from PlayerScript::OnPlayerCanEquipItem, which the core
+        // consults first thing in Player::CanEquipItem (PlayerStorage.cpp:1912)
+        // and turns a false into EQUIP_ERR_CANT_DO_RIGHT_NOW -- the client's
+        // generic "You can't do that right now", which names nothing. So the
+        // mechanic that refuses owes the line, as with Allows() above.
+        //
+        // The template rather than the Item, because the bench has no Item to
+        // offer: it walks the world's templates and asks each one, which is
+        // how a denial is reached with nothing written per card.
+        virtual bool  CanEquip(Ctx&, ItemTemplate const*) { return true; }
 
         virtual bool  IsRelevant(Player*) const { return true; }   // beyond the classMask
 

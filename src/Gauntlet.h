@@ -199,6 +199,10 @@ namespace Gauntlet
     // that moves a mechanic id is exactly the change that must invalidate the
     // addon's table.
     //
+    // 14 is step 2 of docs/rarity-plan.md: the first ten commons, ids 75-84,
+    // join the table. Ten new rows move every offer set that could draw them
+    // -- which at tier 1 is all of them -- and Data.lua grows the rows.
+    //
     // 13 is step 1 of docs/rarity-plan.md: every offer slot rolls a rarity
     // before it rolls a family, which moves every offer set in the game; the
     // OFFER frame grows a rarity field and Data.lua grows a rarity per row and
@@ -249,7 +253,7 @@ namespace Gauntlet
     // with one test froze an affix taken near the end of its window at whatever
     // rank it happened to get. Every offer set that could contain a rank-up of
     // an out-of-window mechanic moves.
-    constexpr uint16 GeneratorVersion = 13;
+    constexpr uint16 GeneratorVersion = 14;
 
     constexpr uint8 MAX_RANK = 4;
 

@@ -674,10 +674,21 @@ TEST_F(FullTableSweep, RelaxationRatesAreWhereTheyWereMeasured)
     //    8.7%  Phase 6, from MAX_RANK 3 -> 4: a rank-up of something
     //          reward-shaped already carried satisfies the guarantee too, and
     //          a fourth rank is one more tier at which it can.
+    //   15.2%  The rarity plan's step 2: ten commons. None is reward-shaped --
+    //          the design's own definition (section 4.4.5) is "tagged as in
+    //          section 3, family B", a card whose payout is the point, and a
+    //          common's boon is small by design -- and none can rank up. So a
+    //          carried set that fills with them past the cap holds fewer
+    //          reward-shaped rank-ups to pay the guarantee with, and the rate
+    //          climbs at tiers 40-60 while the empty-slot count falls to zero.
+    //          The mechanism that carries the guarantee late is rank-ups, and
+    //          step 4 of the plan removes them; what replaces it is that
+    //          step's question, and question 7.1 -- does rarity gate the
+    //          carry cap -- is the one this number is asking.
     //
-    // 12% leaves room for the table to move without leaving room for the
+    // 18% leaves room for the table to move without leaving room for the
     // guarantee to quietly stop being kept.
-    EXPECT_LE(noRewardRate, 12.0)
+    EXPECT_LE(noRewardRate, 18.0)
         << noRewardRate << "% of all sets have no reward-shaped offer; the guarantee has stopped "
            "being kept rather than merely running out of table";
 
