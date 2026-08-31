@@ -101,8 +101,15 @@ own window says.
 
 At tiers 20, 40 and 60, one of your three offers is a **swap**: take it, and
 discard an affix you already carry instead of stacking it on top of everything
-else. It is the game's way of letting you undo a pick you have grown to regret,
-without a reroll button.
+else. It is the game's way of letting you undo a pick you have grown to regret.
+
+And every tier can be **rerolled or skipped**. A reroll rebuilds the three
+offers on the table for one charge — deterministically, so relogging shows you
+the set the charge bought. A skip declines the tier outright: no affix, no
+offer, and a reroll charge banked for a later tier, which is what makes
+skipping a choice rather than a trap. A run starts with two charges;
+`.gauntlet reroll` and `.gauntlet skip` in chat, or the two buttons on the
+addon's chooser.
 
 ## What is implemented
 
@@ -312,7 +319,8 @@ score, not just a loss.
 `World of Warcraft/Interface/AddOns/` and it gives you:
 
 - **A chooser** — affix offers as clickable buttons with full descriptions,
-  instead of chat text.
+  instead of chat text, with reroll and skip buttons under the cards and the
+  charge count on the reroll button.
 - **A HUD** — live state for the mechanics that have any: Frenzy's stacks, Deep
   Wounds' wound, Champions' fight counter, Ambush's countdown, the stalker
   light. None of these are visible in the default UI, because no mechanic in
@@ -338,13 +346,16 @@ in its own description.
 | Command | Description |
 |---|---|
 | `.gauntlet pick <n>` | Commit to one of the offered affixes |
+| `.gauntlet reroll` | Rebuild the three offers on the table (costs a charge) |
+| `.gauntlet skip` | Decline the tier and bank a reroll charge |
 | `.gauntlet status` | Your seed, tier, aggregate totals and every affix you carry |
 | `.gauntlet top` | The ten furthest runs on the server |
 
 With `Gauntlet.Debug.Enable = 1`, a gamemaster-only `.gauntlet debug` subtree is
 available for testing and tuning affixes without waiting on a real run:
 `give`, `give-class`, `remove`, `rank`, `dump`, `offers`, `seed`, `fire`, `set`,
-`events`, `hurt` and `export-addon`. All three audits, and `offers <tier> [name]`,
+`events`, `hurt` and `export-addon`. All three audits, `offers <tier> [name]`,
+and `reroll [name]` / `skip [name]`
 take a character name, so they can be run from the server console against anyone
 online. The commands are restricted to gamemasters
 whether the setting is on or off; the setting decides whether they answer at all.

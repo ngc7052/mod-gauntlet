@@ -10,8 +10,8 @@ and §4 before trusting any test.
 `mod-gauntlet`, an AzerothCore (WotLK 3.3.5a) module: a procedurally generated
 hardcore affix challenge. A run offers three "affix" cards per tier, the player
 picks one, and the curses accumulate. 79 mechanics, all implemented: 69 rares
-and the first ten commons. Steps 1 and 2 of `docs/rarity-plan.md` have landed
-and step 3 is next.
+and the first ten commons, with reroll and skip live on every tier. Steps 1-3
+of `docs/rarity-plan.md` have landed and step 4 -- the rank removal -- is next.
 
 Working directory `/home/nero/projects/mod-gauntlet`, on **`master`**, clean,
 level with `origin/master`.
@@ -39,7 +39,7 @@ level with `origin/master`.
 ```bash
 ./tests/compile-check.sh --anchors   # anchors + ladder audit, seconds, no Docker
 ./tests/compile-check.sh             # full compile + link in the build container
-./tests/run-tests.sh                 # 198 unit tests
+./tests/run-tests.sh                 # 200 unit tests
 ./sync-to-server.sh                  # rsync the module into the core tree
 docker compose -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.yml \
   -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.override.yml \
@@ -48,7 +48,7 @@ docker compose -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.yml \
 ```
 
 Gate before every commit: anchors, ladders, compile, link, tests. All green
-today — 79 anchors, 83 ladders, 64 objects, 198 tests.
+today — 79 anchors, 83 ladders, 64 objects, 200 tests.
 
 ## 4. The testing rig, and what it cannot see
 
@@ -153,7 +153,7 @@ card.
 judgement. The two most likely to be wrong are named at the end of
 `docs/tempo-redesign.md`.
 
-## 7. The rarity plan: steps 1 and 2 landed, step 3 next
+## 7. The rarity plan: steps 1-3 landed, step 4 next
 
 `docs/rarity-plan.md` is decided, not a proposal. Ranks are being removed and
 replaced with a rarity ladder (common → legendary), plus reroll and skip.
@@ -255,12 +255,46 @@ The answer is ~90 new cards to reach ~160, of which **only ~30 are C++ work** �
   **Not seen on a screen:** the chat lines a real player gets, and the addon
   drawing a Common (white) card.
 
-### Step 3
+### What step 3 put in place (2026-09-01)
 
-Reroll and skip — §4 of the plan. Independent of ranks; needs a counter folded
-into the seed, two addon buttons, and a wire field for the charge count. Then
-step 4 (rank removal) and 5 (the remaining cards). §8 has the order and §5b
-what rank removal actually touches.
+- **Reroll** rebuilds the pending tier's offers with a counter folded into the
+  stream seed (bits 16–23; zero folds to nothing, so unrerolled sets are
+  byte-identical to version 14's). **Skip** declines the tier outright — the
+  tier advances as a pick advances it — and banks a charge.
+- The purse and the per-tier reroll count live in the run's **state store**
+  under `RunKeys` (`run.reroll_charges`, `run.rerolls`, `run.reroll_tier`), not
+  in new `gauntlet_run` columns. Two decisions worth knowing:
+  1. The purse has **no initialiser anywhere**: `Mgr::RerollCharges` reads it
+     with `Rules::REROLL_STARTING_CHARGES` as the `Get` fallback, so a key
+     never written *is* the starting purse — and every run from before rerolls
+     existed gets its charges retroactively, the user's included.
+  2. The per-tier count is persisted (`run.rerolls` + `run.reroll_tier`)
+     because pending offers are rebuilt from the seed at login: without it a
+     relog would show the pre-reroll set and the charge would have bought
+     nothing. A stale pair from an older tier is ignored by the tier compare.
+- Numbers: start 2, skip banks 1, saturate at 250 (`GauntletRules.h`,
+  `TODO(design)` — §7.5 of the plan says these have no evidence at all).
+- Surfaces: `.gauntlet reroll` / `.gauntlet skip` (players), `REROLL`/`SKIP`
+  wire verbs, two chooser buttons (reroll shows the count and greys at zero),
+  the purse on the **RUN** frame's fifth field, `debug reroll [name]` /
+  `debug skip [name]` for the console, charges in `dump`, and the offer chat
+  hint line. The chat-fallback chooser closes on the "Tier N declined" line.
+- The affix log's ENUM gains `skip` and `reroll` (rows with mechanic 0), via
+  `data/sql/db-characters/updates/2026_09_01_00_gauntlet_reroll_log.sql` —
+  guarded like every update, and **applied by hand to `gt-db`** since the test
+  realm runs with `Updates.EnableDatabases = 0`. The base file and the
+  repeated definition in `2026_08_28_00_gauntlet.sql` moved with it, kept
+  byte-identical.
+- GeneratorVersion 14 → 15. The bump moved tier 30's live-view relaxation
+  ceiling (8 → 10): the version is in the stream, a bump reshuffles which
+  seeds land badly, and tier 30 sits on the bargain family's opening edge.
+
+### Step 4
+
+Rank removal — §5b of the plan is the inventory of what it touches, and it is
+the largest single edit in the plan. With rarity carrying the run and reroll/
+skip live, it is a deletion with a green gate around it. Then step 5, the
+remaining cards, commons first.
 
 Things step 2 left for a later pass, deliberately:
 - The **stat-grant primitive** (§3, "grant a stat" — expertise, ratings) is not

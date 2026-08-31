@@ -4,11 +4,13 @@
 reasoning is kept because the numbers behind it are worth re-reading when the
 tuning is wrong, not because the direction is still open.
 
-**Status.** Steps 1 and 2 of §8 landed on 2026-08-31. Rarity is a registry
-column, rolled per slot and displayed; `SimpleTrade` and the first ten commons
-(ids 75–84) are in the table, proven with the bench; every older card is rare;
-ranks untouched. §7 of `docs/handoff.md` lists what each step put where and the
-decisions taken that this document did not spell out. Step 3 is next.
+**Status.** Steps 1 and 2 of §8 landed on 2026-08-31, step 3 on 2026-09-01.
+Rarity is a registry column, rolled per slot and displayed; `SimpleTrade` and
+the first ten commons (ids 75–84) are in the table, proven with the bench;
+reroll and skip are live, with skipping banking a charge; every older card is
+rare; ranks untouched. §7 of `docs/handoff.md` lists what each step put where
+and the decisions taken that this document did not spell out. Step 4 — the
+rank removal — is next.
 
 - **The rank system is removed.** `MAX_RANK`, the rank ladders in 56 mechanics,
   rank-up offers, and the rank numerals in every card and chat line all go.
@@ -160,6 +162,14 @@ earns more by declining.
 Both need the addon's chooser to grow two buttons and the `OFFER` frame to carry
 the remaining charge count.
 
+**Built in step 3**, with the counter in bits 16–23 of the stream seed and the
+per-tier count persisted in the run's state store (`RunKeys` in `Gauntlet.h`),
+so a relog rebuilds the set the charge bought rather than the one it replaced.
+The purse starts at two and a skip banks one (`Rules::REROLL_STARTING_CHARGES`,
+`SKIP_EARNS_CHARGES` — §7.5's numbers, still without evidence); the charge
+count rides the `RUN` frame rather than `OFFER`, because it is run state and
+the panel wants it with no offer on the table.
+
 ## 5. Cards do not scale with level
 
 This was the open question, and the answer after looking at it is **no — rarity
@@ -250,7 +260,10 @@ The direction is settled. These are not.
    rankable and a full set of them has fewer rank-ups to pay the guarantee
    with. That is §7.1's question arriving early; step 4 changes the late run's
    whole payer anyway.
-3. Reroll and skip, which are independent of both and immediately playable.
+3. ~~Reroll and skip, which are independent of both and immediately
+   playable.~~ **Done, 2026-09-01.** `.gauntlet reroll` / `.gauntlet skip`,
+   two chooser buttons, `REROLL`/`SKIP` on the wire, and `skip`/`reroll` rows
+   in the affix log so the run's story records them.
 4. Rank removal, once rarity is carrying enough of the run to make it survivable.
 5. The remaining cards, in rarity order, commons first.
 
