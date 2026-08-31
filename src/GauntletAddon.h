@@ -102,9 +102,9 @@ namespace Gauntlet
         // replaces rather than merges on AFFIX_END.
         void SendAffixes(Player* player);
 
-        // OFFER i id rank cond boon boonMag kind swapSlot, then OFFER_END.
-        // Sends nothing at all when no offer is on the table, because
-        // OFFER_END is what makes the addon raise its chooser.
+        // OFFER i id rank cond boon boonMag kind swapSlot rarity, then
+        // OFFER_END. Sends nothing at all when no offer is on the table,
+        // because OFFER_END is what makes the addon raise its chooser.
         void SendOffers(Player* player);
 
         // RUN, the affix list and any pending offers: what login and SYNC

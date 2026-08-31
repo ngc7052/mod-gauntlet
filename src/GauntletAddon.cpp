@@ -385,6 +385,12 @@ namespace Gauntlet
             f.Num(o.boonMag);
             f.Text(WireKind(o.kind), 16);
             f.Num(o.swapSlot);
+            // Last, so an addon that predates the field reads every other
+            // one where it always did. Data.lua carries the card's rarity too;
+            // this is here so the chooser can colour an offer whose id a stale
+            // Data.lua cannot resolve, and so the wire mirrors Offer field for
+            // field as it always has.
+            f.Num(static_cast<int64>(o.rarity));
             Emit(player, f.Str());
 
             // The mechanic's own sentence, at the rank this offer is

@@ -136,15 +136,16 @@ namespace
 
 int main()
 {
-    std::printf("| # | Affix | Family | Who | Levels | Ranks | What it does to you | What it pays |\n");
-    std::printf("|---|---|---|---|---|---|---|---|\n");
+    std::printf("| # | Affix | Family | Rarity | Who | Levels | Ranks | What it does to you | What it pays |\n");
+    std::printf("|---|---|---|---|---|---|---|---|---|\n");
 
     for (MechanicDef const& def : AllMechanics())
     {
-        std::printf("| %u | **%s** | %s | %s | %u&ndash;%u | %u | %s | %s |\n",
+        std::printf("| %u | **%s** | %s | %s | %s | %u&ndash;%u | %u | %s | %s |\n",
                     unsigned(def.id),
                     Cell(def.name).c_str(),
                     Cell(FamilyName(def.family)).c_str(),
+                    Cell(RarityName(def.rarity)).c_str(),
                     Cell(ClassesOf(def.classMask)).c_str(),
                     unsigned(def.minTier), unsigned(def.maxTier),
                     unsigned(std::min<uint8>(def.maxRank, MAX_RANK)),

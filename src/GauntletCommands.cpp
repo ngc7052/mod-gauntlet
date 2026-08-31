@@ -751,7 +751,11 @@ public:
             // new test code. See the note on the handler.
             { "bench",        HandleDebugBench,       SEC_GAMEMASTER, Console::Yes },
             { "dump",         HandleDebugDump,        SEC_GAMEMASTER, Console::No },
-            { "offers",       HandleDebugOffers,      SEC_GAMEMASTER, Console::No },
+            // Console::Yes for the audits' reason: it is the one command that
+            // shows what the builder would put in front of a character, and
+            // on the test realm the character is a playerbot with no client.
+            // The name comes *after* the tier -- see the handler.
+            { "offers",       HandleDebugOffers,      SEC_GAMEMASTER, Console::Yes },
             { "seed",         HandleDebugSeed,        SEC_GAMEMASTER, Console::No },
             // Console::Yes: this one reads the registry and writes a file. It
             // needs no player, and requiring a logged-in game master to
@@ -1304,7 +1308,8 @@ public:
                 continue;
 
             uint8 const top = std::min<uint8>(def.maxRank, MAX_RANK);
-            handler->PSendSysMessage("|cffff2020[{}]|r {} - ranks 1..{}", def.key, def.name, top);
+            handler->PSendSysMessage("|cffff2020[{}]|r {} - {}, ranks 1..{}", def.key, def.name,
+                                     RarityName(def.rarity), top);
 
             std::string previous;
             for (uint8 rank = 1; rank <= top; ++rank)
@@ -2063,10 +2068,11 @@ public:
         for (AffixInstance const& a : st->affixes)
         {
             MechanicDef const* def = FindMechanic(a.mechanic);
-            handler->PSendSysMessage("    slot {} | id {} {} | rank {} | cond {} ({}) | boon {} ({}) mag {}",
+            handler->PSendSysMessage("    slot {} | id {} {} | rank {} | {} | cond {} ({}) | boon {} ({}) mag {}",
                                      static_cast<uint32>(a.slot), static_cast<uint32>(a.mechanic),
                                      def ? def->key : "<not in this registry>",
-                                     static_cast<uint32>(a.rank), static_cast<uint32>(a.condition),
+                                     static_cast<uint32>(a.rank), def ? RarityName(def->rarity) : std::string("?"),
+                                     static_cast<uint32>(a.condition),
                                      ConditionName(a.condition), static_cast<uint32>(a.boon),
                                      BoonName(a.boon), static_cast<uint32>(a.boonMag));
             handler->PSendSysMessage("           generator {} | impl {} | offerable {}",
@@ -2091,12 +2097,26 @@ public:
         return true;
     }
 
-    static bool HandleDebugOffers(ChatHandler* handler, uint32 tierArg)
+    // .gauntlet debug offers <tier> [name]
+    //
+    // Tier first and the name second, the other way round from the audits,
+    // because the tier is required: a leading Optional<PlayerIdentifier>
+    // would try "45" as a character name first, and the core's parser backs
+    // off from that only for an argument that can be *omitted*.
+    static bool HandleDebugOffers(ChatHandler* handler, uint32 tierArg, Optional<PlayerIdentifier> whoArg)
     {
         if (!DebugAllowed(handler))
             return false;
 
-        Player* p = handler->GetPlayer();
+        Player* p = whoArg ? whoArg->GetConnectedPlayer() : handler->GetPlayer();
+        if (!p)
+        {
+            handler->SendErrorMessage(
+                "|cffff2020[Gauntlet debug]|r No character to build offers for. From the console or SOAP, "
+                "name one who is online: .gauntlet debug offers <tier> <name>");
+            return false;
+        }
+
         RunState* st = ReadableRun(handler, p);
         if (!st)
             return false;
@@ -2118,9 +2138,9 @@ public:
                                          sGauntlet->Choices(), sGauntlet->OfferView(),
                                          sGauntlet->MaxAffixes());
 
-        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r would offer at tier {} - seed {}, class {}, level {}, "
+        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r would offer {} at tier {} - seed {}, class {}, level {}, "
                                  "{} carried (nothing is committed):",
-                                 tierArg, st->seed, static_cast<uint32>(p->getClass()),
+                                 p->GetName(), tierArg, st->seed, static_cast<uint32>(p->getClass()),
                                  static_cast<uint32>(p->GetLevel()), static_cast<uint32>(st->affixes.size()));
 
         for (uint32 i = 0; i < set.offers.size(); ++i)
@@ -2150,9 +2170,9 @@ public:
             handler->PSendSysMessage("  [{}] {} - {}", i + 1,
                                      sGauntlet->NameOf(o.mechanic, o.condition, o.boon),
                                      sGauntlet->DescribeOf(preview));
-            handler->PSendSysMessage("     id {} | rank {} | {} | boon mag {}{}",
+            handler->PSendSysMessage("     id {} | rank {} | {} | {} | boon mag {}{}",
                                      static_cast<uint32>(o.mechanic), static_cast<uint32>(o.rank),
-                                     OfferKindName(o.kind), static_cast<uint32>(o.boonMag),
+                                     RarityName(o.rarity), OfferKindName(o.kind), static_cast<uint32>(o.boonMag),
                                      o.kind == OfferKind::Swap
                                          ? Acore::StringFormat(" | swaps out slot {}",
                                                                static_cast<uint32>(o.swapSlot))

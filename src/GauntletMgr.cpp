@@ -828,7 +828,12 @@ namespace Gauntlet
             std::unique_ptr<IMechanic> const impl(MakeMechanic(o.mechanic));
             preview.impl = impl.get();
 
-            ch.PSendSysMessage("  |cffffff00{}.|r {} - {}", i + 1,
+            // The name in the card's rarity colour: the client's own quality
+            // palette, so blue reads as rare with no legend, in the one UI
+            // every player has. The addon's chat fallback strips colour codes
+            // before it scrapes this line (Panel.lua's Strip), so the colour
+            // costs it nothing.
+            ch.PSendSysMessage("  |cffffff00{}.|r |cff{}{}|r - {}", i + 1, RarityColor(o.rarity),
                                NameOf(o.mechanic, o.condition, o.boon), DescribeOf(preview));
         }
         ch.PSendSysMessage("Use |cff00ff00.gauntlet pick <number>|r to commit. It cannot be undone.");
@@ -1019,8 +1024,10 @@ namespace Gauntlet
         std::string const describe = carried ? DescribeOf(*carried) : std::string();
         std::string const name     = NameOf(chosen.mechanic, chosen.condition, chosen.boon);
 
+        // Rarity colour rather than the module's yellow, for the offer line's
+        // reason: what was just taken is the thing to say most about it.
         ChatHandler(player->GetSession()).PSendSysMessage(
-            "|cffff2020[Gauntlet]|r You bear |cffffff00{}|r. {}", name, describe);
+            "|cffff2020[Gauntlet]|r You bear |cff{}{}|r. {}", RarityColor(chosen.rarity), name, describe);
 
         if (_announce)
             sWorldSessionMgr->SendServerMessage(SERVER_MSG_STRING,

@@ -112,6 +112,41 @@ local function FamilyColor(family)
     return FAMILY_COLOR[family] or { 0.7, 0.7, 0.7, "" }
 end
 
+-- Rarity (Gauntlet::Rarity, src/Gauntlet.h): how much of the run a card
+-- changes. Names and colours come from Data.lua's `rarities`, because the
+-- server paints its chat lines from the same table and a card has to be the
+-- same blue in both places. The fallback is the client's own quality palette
+-- one step up -- the same numbers -- for a Data.lua too old to carry them.
+local RARITY_FALLBACK = {
+    [0] = { name = "Common",    color = "ffffff" },
+    [1] = { name = "Uncommon",  color = "1eff00" },
+    [2] = { name = "Rare",      color = "0070dd" },
+    [3] = { name = "Epic",      color = "a335ee" },
+    [4] = { name = "Legendary", color = "ff8000" },
+}
+local function RarityInfo(rarity)
+    rarity = tonumber(rarity)
+    if rarity == nil then return nil end
+    local t = DataUsable() and GauntletData.rarities and GauntletData.rarities[rarity]
+    return t or RARITY_FALLBACK[rarity]
+end
+
+-- The three channels, for the calls that want numbers rather than a code.
+local function RarityRGB(info)
+    local hex = info and info.color or "ffffff"
+    return tonumber(hex:sub(1, 2), 16) / 255,
+           tonumber(hex:sub(3, 4), 16) / 255,
+           tonumber(hex:sub(5, 6), 16) / 255
+end
+
+-- "|cff0070ddRare|r", or nil for an affix that has no rarity to show -- a
+-- chat-scraped one in fallback mode.
+local function RarityTag(rarity, upper)
+    local info = RarityInfo(rarity)
+    if not info then return nil end
+    return "|cff" .. info.color .. (upper and info.name:upper() or info.name) .. "|r"
+end
+
 -- TODO(design): kind-badge colours and labels - likewise not specified.
 local KIND_COLOR = {
     new     = { 0.35, 0.80, 0.35, "NEW"     },
@@ -398,6 +433,16 @@ for i = 1, VISIBLE do
     r.icon:SetPoint("LEFT", r, "LEFT", 5, 0)
     r.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
 
+    -- A three-pixel strip in the card's rarity colour down the left edge: the
+    -- bag-slot idiom, read without a word and without width -- which a
+    -- 62-pixel family tag has none of to spare for "Legendary".
+    r.rarity = r:CreateTexture(nil, "ARTWORK")
+    r.rarity:SetTexture("Interface\\Buttons\\WHITE8X8")
+    r.rarity:SetWidth(3)
+    r.rarity:SetPoint("TOPLEFT", r, "TOPLEFT", 0, -3)
+    r.rarity:SetPoint("BOTTOMLEFT", r, "BOTTOMLEFT", 0, 3)
+    r.rarity:Hide()
+
     r.name = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     r.name:SetPoint("LEFT", r.icon, "RIGHT", 8, 0)
     r.name:SetJustifyH("LEFT")
@@ -423,10 +468,17 @@ for i = 1, VISIBLE do
         if not d then return end
 
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText(d.name .. (d.rank and ("  " .. (RANK_PIP[d.rank] or "")) or ""), 1, 0.82, 0)
+
+        -- The title in the rarity colour, the way an item tooltip is, and the
+        -- word beside the family for anyone the colour alone does not reach.
+        local ri = RarityInfo(d.rarity)
+        local tr, tg, tb = 1, 0.82, 0
+        if ri then tr, tg, tb = RarityRGB(ri) end
+        GameTooltip:SetText(d.name .. (d.rank and ("  " .. (RANK_PIP[d.rank] or "")) or ""), tr, tg, tb)
 
         local s = RowColor(d)
-        GameTooltip:AddLine(s[4] .. " family", s[1], s[2], s[3])
+        local tag = RarityTag(d.rarity)
+        GameTooltip:AddLine((tag and (tag .. "  ") or "") .. s[4] .. " family", s[1], s[2], s[3])
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine("What it does", 1, 1, 1)
         GameTooltip:AddLine(Body(d.desc), 0.85, 0.85, 0.85, true)
@@ -498,6 +550,14 @@ local function RefreshMain()
                 a.name, a.rank and ("  " .. (RANK_PIP[a.rank] or "")) or ""))
             r.name:SetTextColor(s[1], s[2], s[3])
             r.tag:SetText(("|cff606060%s|r"):format(s[4]))
+
+            local ri = RarityInfo(a.rarity)
+            if ri then
+                r.rarity:SetVertexColor(RarityRGB(ri))
+                r.rarity:Show()
+            else
+                r.rarity:Hide()
+            end
 
             local boon = BoonText(a.boon, a.boonMag)
             r.pays:SetText(boon and ("|cff40e060+" .. boon .. "|r") or "")
@@ -604,14 +664,18 @@ for i = 1, 3 do
 
     AddGlow(b)
     b.index = i
+    -- The border is the card's rarity: dim at rest, full on hover, the way a
+    -- bag slot frames an item. Without a rarity -- a chat-scraped offer -- it
+    -- falls back to what it always did: grey at rest, the family colour on
+    -- hover.
     b:SetScript("OnEnter", function(self)
         self.glow:Show()
-        local s = self.sev or { 1, 0.82, 0 }
+        local s = self.borderHover or self.sev or { 1, 0.82, 0 }
         self:SetBackdropBorderColor(s[1], s[2], s[3], 1)
     end)
     b:SetScript("OnLeave", function(self)
         self.glow:Hide()
-        self:SetBackdropBorderColor(unpack(BORDER))
+        self:SetBackdropBorderColor(unpack(self.borderRest or BORDER))
     end)
     b:SetScript("OnClick", function(self)
         PlaySound("igMainMenuOptionCheckBoxOn")
@@ -634,6 +698,14 @@ local function ShowChooser()
         if o then
             local s = RowColor(o)
             cards[i].sev = s
+            local ri = RarityInfo(o.rarity)
+            if ri then
+                local rr, rg, rb = RarityRGB(ri)
+                cards[i].borderRest  = { rr, rg, rb, 0.75 }
+                cards[i].borderHover = { rr, rg, rb, 1 }
+            else
+                cards[i].borderRest, cards[i].borderHover = nil, nil
+            end
             cards[i].icon:SetTexture(RowIcon(o))
             cards[i].name:SetText(o.rank and o.rank > 1
                                   and (o.name .. "  |cff808080" .. (RANK_PIP[o.rank] or "") .. "|r")
@@ -674,15 +746,22 @@ local function ShowChooser()
             -- nil. The arithmetic below is what breaks, several lines away
             -- from the cause.
             cards[i].descH = tonumber(cards[i].desc:GetStringHeight()) or 0
+            -- "RARE  NEW": what it is, then what the slot is asking. The
+            -- rarity carries its own colour code; the badge's colour is the
+            -- kind's.
+            local rtag = RarityTag(o.rarity, true)
             if o.kind then
                 local k = KIND_COLOR[o.kind] or { 0.7, 0.7, 0.7, o.kind:upper() }
-                cards[i].badge:SetText(k[4])
+                cards[i].badge:SetText((rtag and (rtag .. "  ") or "") .. k[4])
                 cards[i].badge:SetTextColor(k[1], k[2], k[3])
+                cards[i].badge:Show()
+            elseif rtag then
+                cards[i].badge:SetText(rtag)
                 cards[i].badge:Show()
             else
                 cards[i].badge:Hide()
             end
-            cards[i]:SetBackdropBorderColor(unpack(BORDER))
+            cards[i]:SetBackdropBorderColor(unpack(cards[i].borderRest or BORDER))
             cards[i]:Show(); n = n + 1
         else
             cards[i]:Hide()
@@ -808,6 +887,7 @@ GauntletProtocol.On("AFFIX", function(slot, id, rank, cond, boon, boonMag)
     local info = MechInfo(id)
     local rec = {
         name = info.name, desc = info.desc, icon = info.icon, family = info.family,
+        rarity = info.rarity,
         rank = tonumber(rank), cond = tonumber(cond), boon = tonumber(boon),
         boonMag = tonumber(boonMag), slot = tonumber(slot), id = tonumber(id),
     }
@@ -844,7 +924,7 @@ GauntletProtocol.On("AFFIX_END", function()
 end)
 
 local pendingOffers = {}
-GauntletProtocol.On("OFFER", function(i, id, rank, cond, boon, boonMag, kind, swapSlot)
+GauntletProtocol.On("OFFER", function(i, id, rank, cond, boon, boonMag, kind, swapSlot, rarity)
     local info = MechInfo(id)
     local swapName
     if kind == "swap" then
@@ -853,6 +933,12 @@ GauntletProtocol.On("OFFER", function(i, id, rank, cond, boon, boonMag, kind, sw
     end
     pendingOffers[tonumber(i)] = {
         name = info.name, desc = info.desc, icon = info.icon, family = info.family,
+        id = tonumber(id),
+        -- The wire's word first: it is the server's, for this offer, and it
+        -- reaches a chooser whose Data.lua cannot resolve the id. An empty
+        -- slot -- mechanic 0, which the server prints as "Nothing" -- has no
+        -- rarity at all, and must not borrow the field's default.
+        rarity = (tonumber(id) or 0) ~= 0 and (tonumber(rarity) or info.rarity) or nil,
         rank = tonumber(rank), cond = tonumber(cond), boon = tonumber(boon),
         boonMag = tonumber(boonMag), kind = kind, swapName = swapName,
     }
