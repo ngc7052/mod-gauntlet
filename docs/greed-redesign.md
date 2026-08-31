@@ -2,8 +2,12 @@
 
 **Direction decided; every number is judgement.** The brief, in the words it
 was given: *hardcore is hard by design, but offers should give fun, and make you
-faster while putting you at risk.* This document turns that into a test, runs
-the whole table through it, and writes the redesigns for the cards that fail.
+faster while putting you at risk* — and, on reading the first draft, *not enough
+new offers; some should actually offer loot.* This document turns that into a
+test, runs the whole table through it, writes the redesigns for the cards that
+fail (§3), and adds **seventeen new offers** (§7), twelve of them about loot —
+the greed axis the table barely touches: of seventy-nine cards, exactly one,
+Cursed Hoard, has anything to say about what drops.
 
 It is the third pass of its kind. `docs/tempo-redesign.md` turned six taxes into
 decisions ("a moment and a verb"). `docs/rarity-plan.md` replaced the rank ladder
@@ -401,15 +405,215 @@ difficulty, and a redesign that made a card easier would have failed it.
 1. **Blood for Bread, and Iron Purse retired.** Smallest, most literal, no
    ladder to collapse (Rules rows are single-rank already). It can land before
    the rank removal.
-2. **Craven and Grudge** — the two brakes felt on every single kill.
-3. **Falter and Cunning** — the role taxes.
-4. **Ambush.**
-5. **The three sharpenings** (Nimble, Call to Arms, Blood Magic).
-6. **The class pass**, one class at a time, with the kit open.
+2. **The loot boon and the four loot trades** (§7.2). Plumbing first, then
+   rows: the trades are table lines, and `Boon::BonusLoot` is what every later
+   loot card's boon column names.
+3. **Craven and Grudge** — the two brakes felt on every single kill.
+4. **Falter and Cunning** — the role taxes.
+5. **Ambush.**
+6. **The three sharpenings** (Nimble, Call to Arms, Blood Magic).
+7. **The loot cards** (§7.3), in the order given there: Elite Tithe and Fresh
+   Kill first, because they are the two the brief named.
+8. **The class pass**, one class at a time, with the kit open.
 
-Steps 2–5 want to land **after** the rarity plan's step 4 (rank removal): every
+Steps 3–6 want to land **after** the rarity plan's step 4 (rank removal): every
 one of those cards carries a ladder today, and writing a new single value beside
 an old ladder only to delete the ladder a step later is the same card touched
-twice. Step 1 has no such dependency and is where this starts. The rarity
-column above feeds the plan's §7.4 pass directly — the cards with a greed loop
-inside them are the epic candidates, and Blood for Bread arrives as one.
+twice. Steps 1, 2 and 7 have no such dependency — new rows are born rank-free —
+and are where this starts. The rarity column above and in §7 feeds the plan's
+§7.4 pass directly: the cards with a greed loop inside them are the epic
+candidates, and Blood for Bread, The Tenth Corpse, Dragon's Hoard and Reliquary
+arrive as ones.
+
+---
+
+## 7. New offers: the loot cards
+
+Loot is the one greed that WoW already knows how to pay. Every kill in the game
+is followed by the same small hope, and the module has never once touched it.
+These cards do, and they are written against what the core actually lets a
+module do to loot without a client patch — checked, not assumed.
+
+### 7.1 The seams
+
+| What a card wants | How the core lets it | Where |
+|---|---|---|
+| **Force a drop** | `GlobalScript::OnItemRoll` hands the module every candidate item's chance by reference, one item per roll; setting it to 100 is a guarantee. Carrion already uses it. The module's adapter drops the `LootStoreItem` on the way to `IMechanic::OnItemRoll`; the cards below need the item id (for its quality), so the adapter grows a parameter. | `GlobalScript.h:68`, `GauntletScripts.cpp:665` |
+| **Roll a table twice** | `Loot::FillLoot` calls `LootTemplate::Process`, which *appends* through `Loot::AddItem`. Calling it a second time on a corpse's `Loot` with the creature's own `lootid` is exactly "it drops twice". The corpse's `Loot*` is handed to the module by `OnPlayerBeforeSendLoot` before the window opens. | `LootMgr.h:377`, `LootMgr.cpp` (`tab->Process`), `PlayerScript.h:293` |
+| **Empty a corpse** | `Loot::clear()`, or clearing `Loot::items` alone so `quest_items` survive — a card may take your greens, never your quest. | `LootMgr.h:343` |
+| **Spawn a real chest** | `WorldObject::SummonGameObject(entry, x, y, z, ang, rot…, respawnTime)`. The world database already holds level-banded treasure chests with hundreds of loot rows each and existing display ids: Battered Chest 2849 (loot 2280, 712 rows), Solid Chest 2850, Large Iron Bound Chest 74447, Solid Chest 153451 (the sixties), Fel Iron Chest 181798, Bound Adamantite Chest 184936, Ancient Drakkari Chest 190552, Dark Runed Chest 190663. A chest for the player's level is a lookup, and **no new database rows are needed at all.** | `Object.h:641`; `acore_world.gameobject_template`, type 3 |
+| **Tell an elite from a trash mob** | `Creature::isElite()`, `isWorldBoss()`, `IsDungeonBoss()`, and `CreatureTemplate::rank` for the silver-dragon rares `isElite()` excludes. 7,457 templates are elite or rare-elite. Champions already reads all three. | `Creature.h:115-132` |
+| **Hand over an item** | `Player::AddItem(itemId, count)`; the potion ladder is existing items: Minor 118 → Lesser 858 → Healing 929 → Greater 1710 → Superior 3928 → Major 13446 → Super 22829 → Runic 33447, and the mana potions 2455 → 33448 beside them. | `Player.h:1429` |
+| **Refuse a purchase or a use** | `OnPlayerCanUseItem` (the equipment veto's twin) and `OnPlayerBeforeBuyItemFromVendor`, which hands the item id by reference. | `PlayerScript.h:593`, `:466` |
+| **Charge per item looted** | `OnPlayerStoreNewItem`. | `PlayerScript.h:439` |
+| **Pay a reroll charge** | `RunKeys::RerollCharges` in the state store, as Skip does. Loot that pays in the offer economy's own currency is the link between step 3 and this document. | `Gauntlet.h`, `Mgr::Skip` |
+
+Two honest limits. **Quality cannot be invented**: a card can make an elite drop
+the blue in its table, it cannot put a blue in a table that has none; a chest's
+contents are the zone's, which is greens and greys at level and the occasional
+blue. And **loot is shared**: a second roll on a corpse in a group is the
+group's, which is generous and acceptable, but a card that *empties* a corpse
+must apply only to a corpse the player killed alone — one player's curse may
+never be the group's (design §2.9, "role-exclusive burden").
+
+### 7.2 A boon that pays in loot
+
+The generic boons are damage, healing, speed, experience, health. **None of
+them is loot**, and loot is the accelerant WoW's own players chase hardest.
+
+`Boon::BonusLoot` — appended to the enum, as the enum's rule requires; named
+*Lucky*; clause "In exchange, things drop N% more often"; paid once, generically,
+in `Mgr::OnItemRoll` by multiplying every candidate's chance by the carried
+magnitudes. One delivery for every card that names it, the way `BoonSpeed::Sync`
+pays movement speed. Four trades name it on arrival; every loot card below can.
+
+| Card | Rarity | Family | The trade | Seam |
+|---|---|---|---|---|
+| **Magpie** | Common | Rules | You cannot wear a belt. Things drop 15% more often. | a `TradeDef` line: deny `INVTYPE_WAIST`, `Boon::BonusLoot` |
+| **Butterfingers** | Common | Attrition | You deal 8% less damage. Things drop 20% more often. | a `TradeDef` line: coefficient on DamageDone |
+| **Night Owl** | Uncommon | Attrition | By night you take 10% more damage, and things drop 25% more often. | `Condition::AtNight` — the condition axis has been kept idle since Phase 2 exactly for the uncommon tier's "a trade with a condition" |
+| **Scavenger's Eye** | Uncommon | Enemy | Enemies notice you from five yards further. A fight in which you are never hit rolls its loot twice. | Keen-nosed's radius seam; `OnDamageTaken` dirties the fight, `OnLoot` rolls again when it is clean |
+
+Two commons, two uncommons — the first uncommons in the table, and the shape
+the rarity plan's §2 gave that tier.
+
+### 7.3 The loot cards
+
+| Card | Rarity | Family | Was never | Becomes | The greed | The risk |
+|---|---|---|---|---|---|---|
+| **Elite Tithe** | Rare | Enemy | — | Elites always drop everything uncommon or better in their pockets. Elites hit you 25% harder. | the elite's blue is yours | the elite |
+| **Fresh Kill** | Rare | Rules | — | A corpse looted within 8 seconds of the kill rolls its loot twice. After that it holds nothing but the quest. | double on every kill | you loot mid-pull |
+| **The Tenth Corpse** | Epic | Rules | — | Corpses hold nothing until the tenth. The tenth holds everything the nine before it carried. | nine loot windows you never open — the run is faster | die before the tenth and it is all gone; nothing drops to save you on the way |
+| **Tribute** | Rare | Spawn | — | Every 25th kill, a treasure chest appears at the corpse. Opening it draws two scavengers. | a chest | Carrion's scavengers, chosen |
+| **Wanted** | Rare | Enemy | — | Every fourth fight, the biggest thing in it is Wanted. Kill it within 30 seconds and it drops a guaranteed uncommon or better and **banks a reroll charge**. Let the 30 seconds pass and it heals to full and hits half again as hard until it dies. | loot, and the offer economy's own currency | a clock with teeth |
+| **Quartermaster** | Rare | Rules | — | Every 20 kills, a supply crate: a healing potion, a mana potion and food of your level. You may buy none of the three. | no vendor trips — the run is faster | supplies are rationed by kills |
+| **Mimic** | Rare | Spawn | — | Every third treasure chest you open is a Mimic. It fights. It drops what it was pretending to hold, twice. | double chest | the chest fights back |
+| **Blood Price** | Rare | Attrition | — | Opening a corpse costs 3% of your health. A corpse opened below half health rolls its loot twice. | loot low, loot double | looting is the dangerous act |
+| **Trophy Hunter** | Uncommon | Enemy | — | While a rare creature is alive within a hundred yards you take 15% more damage. Killing one drops a treasure chest and banks a reroll charge. | the silver dragon is a payday | it is a silver dragon |
+| **Dragon's Hoard** | Epic | Bargain | — | Every elite you kill leaves a treasure chest. Every chest you open makes every elite 10% stronger, for the rest of the run. | chests feed danger feeds chests | you author the escalation, and it never comes down |
+| **Reliquary** | Epic | Bargain | — | Dungeon bosses drop one extra roll of their loot for every four affixes you carry. You take 25% more damage from dungeon bosses. | the run pays itself back | boss fights |
+| **The Vault** | Legendary | Bargain | — | Nothing you kill drops anything. At every tenth tier a Vault appears holding ten rolls of everything the run has killed since the last one. | the biggest chest in the game, eight times a run | ten levels at a time with no drops at all — no upgrades, no potions, no luck |
+
+#### Card by card
+
+**Elite Tithe** — the brief's own example. `OnItemRoll` with the item id: for a
+corpse whose source is `isElite()`, every candidate of `ITEM_QUALITY_UNCOMMON`
+or better goes to 100%. `DamageTakenMult` pays the 25% when the attacker is an
+elite. Bench: the target is the module's Ambusher — the bench needs a second,
+elite target entry for this card, or a probe that promotes its target the way
+Champions does. Boon: none; the card is its own.
+
+**Fresh Kill** — `OnKill` records (guid, time). `OnLoot` within the window
+calls `FillLoot` again with the creature's `lootid`; outside it, clears `items`
+and leaves `quest_items`. Solo corpses only, per §7.1's rule. It chains with
+the Grudge redesign — both say *loot fast* — and Frenzy's chain is what a
+mid-pull loot costs you. Boon: **movement speed**. Bench: the kill probe
+followed by a loot-window probe on the real corpse, which the bench does not
+yet have (§7.4).
+
+**The Tenth Corpse** — the same two hooks, with a counter in the state store
+and a `CTR` on the HUD. Nine corpses are cleared (quest items kept) and their
+`lootid`s recorded; the tenth is filled ten times. Exclusive with Fresh Kill
+through a new key, `loot-rhythm`: two cards that rewrite when a corpse pays are
+one card twice. It is an epic because it changes how the whole run loots, and
+it is the card in this document most likely to be *too* good: nine skipped
+loot windows is real speed, and the risk lands only on death. Boon: none.
+
+**Tribute** — `OnKill` counts; the 25th summons the chest for the player's
+level at the corpse with a two-minute despawn. `OnLoot` with a game-object guid
+the card owns summons two of Carrion's scavengers at the chest — Carrion's
+spawn path, reused, not copied. Boon: **movement speed**, Carrion's, for the
+same reason.
+
+**Wanted** — `OnEnterCombat` counts fights; on the fourth, the attacker with the
+most maximum health is marked (`EVT` countdown, `SUMMON`-style light on the
+HUD naming it). `OnKill` of the marked guid inside the window: `OnItemRoll`
+guarantees the best-quality candidate and `RunKeys::RerollCharges` goes up by
+one. Timeout: `SetHealth(GetMaxHealth())` and a `DamageDoneMult`-side buff read
+from the guid. The card ties the loot axis to the reroll economy — the same
+currency skipping pays in — which is what makes it more than a bounty.
+Boon: **damage**.
+
+**Quartermaster** — `OnKill` counts; the 20th calls `Player::AddItem` for the
+potion pair of the player's level and a food item of the same band.
+`OnPlayerBeforeBuyItemFromVendor` refuses the same three classes of item by
+zeroing the id — the idiom to confirm at implementation. Boon: none; the crate
+is the boon. It chains with Blood for Bread, which forbids the food it hands
+you — a real anti-synergy the builder prices, not one to soften.
+
+**Mimic** — `OnLoot` with a chest guid counts chests. On the third: the chest
+is despawned before the window fills, a hostile creature stands in its place
+— the module's own Ambusher entry with a mimic's name, since a creature cannot
+wear a game object's display — and its corpse's `Loot` is filled twice from
+the chest's `lootid` out of `LootTemplates_Gameobject`. The one card here whose
+first version may fail in a way only a client shows: whether an emptied,
+despawned chest leaves a stray loot window open. Boon: **damage**.
+
+**Blood Price** — `OnLoot`: cost 3% (never lethal — floored at 1 health, the way
+Blood Magic's cost is), and if the player is under half, `FillLoot` again.
+`OnPlayerStoreNewItem` is the alternative seam, per item rather than per
+window, and is rejected: a window is one decision, an item is not. Boon: none.
+
+**Trophy Hunter** — the uncommon: a trade with a condition. `CreatureTemplate::
+rank` of `CREATURE_ELITE_RARE` or `RAREELITE` within a hundred yards is the
+condition, read on the tick the way Keen-nosed reads its grid; `OnKill` of one
+summons the chest and banks the charge. Boon: none.
+
+**Dragon's Hoard** — the Gungeon curse, made explicit: "greed spawns a
+stalker", here greed spawns a stronger world. `OnKill` of an elite summons a
+chest; `OnLoot` of one the card owns increments `hoard.opened` in the state
+store — persisted, because "for the rest of the run" has to survive a logout;
+`DamageTakenMult` from elites and `DamageDoneMult` against them read it. The
+escalation is *chosen per chest*, which is the whole of rule 5, and it never
+comes down, which is the whole of the risk. Bargain, so tier 30 and up, which
+is right: it needs a run worth escalating. Boon: none.
+
+**Reliquary** — `OnLoot` on a corpse whose source `IsDungeonBoss()`: one extra
+`FillLoot` per four carried affixes. `DamageTakenMult` from a boss pays the
+25%. The design first had the boss's health scale with the run and dropped it:
+a boss made harder by one player's affix is harder for the whole group, which
+is §2.9's role burden exactly. The price stays personal. Boon: none.
+
+**The Vault** — the legendary, and the maddest thing here on purpose: every
+corpse is emptied (quest items kept, solo corpses only), and every `lootid` is
+tallied — a count per id, not a list, so a run cannot fill memory — until
+the tier crosses a multiple of ten, when a chest for the level is summoned and,
+the first time it is opened, filled from the tally: ten rolls of every table
+the run has killed, capped at the loot window's own `MAX_NR_LOOT_ITEMS`. The
+fill goes through `OnLoot` on a chest the card owns, which is the same seam
+Tribute uses, so nothing about the game object itself changes. Ten levels
+without a single drop is a run with no upgrades and no potions from the world
+for a tenth of the game at a time; the Vault is what makes it a choice
+instead of a punishment. One per run, as the plan says a legendary is.
+
+### 7.4 What the harness needs for these
+
+Two probes, both generic, both missing today:
+
+- **A loot-window probe.** After the bench's real kill, call
+  `Mgr::OnLootWindow(player, corpse->GetGUID(), &corpse->loot)` and report
+  whether the loot moved (item count before and after). It reaches Fresh Kill,
+  The Tenth Corpse, Blood Price, Reliquary, The Vault — and Carrion, which the
+  handoff's §8 already lists as a card the bench reports "spawned nothing" for,
+  very likely because nothing ever opens the corpse.
+- **A chest probe.** Summon a chest of the player's level, open it through the
+  same hook with the game object's guid, and read the footprint: Tribute,
+  Mimic, Dragon's Hoard, The Vault.
+
+And the shape tests for `GauntletRules.h`: *Fresh Kill's window is longer than
+Grudge's* (or the two cards, carried together, contradict); *a Wanted mark
+always pays more than an ordinary kill*; *Dragon's Hoard's escalation is
+bounded by the aggregate caps, not by itself* — which the caps already do, and
+the test says so; *The Vault's fill never exceeds the window*.
+
+### 7.5 What this does to the table
+
+Seventeen new offers: two commons, three uncommons, seven rares, four epics
+and one legendary, against the rarity plan's targets of sixty, thirty, forty,
+fifteen and eight. The Bargain family gains three — Dragon's Hoard, Reliquary,
+The Vault — against a cap of two per run (`CAP_BARGAIN`), which the plan's §1
+already called a dead end at two rows; **the cap should move to three with
+them**, and the family weight (2) is worth re-measuring in the sweep once they
+exist. Every card above is a real mechanic, so the "only ~30 are C++ work"
+estimate of the rarity plan's §6 gains twelve of those thirty here — with the
+four trades and Blood for Bread on the table-row side.

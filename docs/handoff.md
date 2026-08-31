@@ -299,15 +299,22 @@ remaining cards, commons first.
 ### Queued behind it: the greed redesign
 
 `docs/greed-redesign.md` (2026-09-01) is the plan for the cards that only slow
-the run down. The brief it answers: hardcore is hard by design, but an offer
-must tempt — make you faster or richer while it endangers you. It runs the
-whole table through a three-question test, names five brakes (Craven, Grudge,
-Falter, Cunning, Ambush) and one dead letter (Iron Purse, replaced by **Blood
-for Bread**: no eating or drinking, kills restore you), gives each a redesign on
-an existing seam with the bench probe it needs, and sharpens three boons to
-accelerants. Its step 1 (Blood for Bread) has no ladder and can land any time;
-steps 2–5 want the rank removal done first so each card is touched once. Its
-rarity column feeds the plan's §7.4 epic pass.
+the run down, and for the loot cards the table never had. The brief it answers:
+hardcore is hard by design, but an offer must tempt — make you faster or richer
+while it endangers you. It runs the whole table through a three-question test,
+names five brakes (Craven, Grudge, Falter, Cunning, Ambush) and one dead letter
+(Iron Purse, replaced by **Blood for Bread**: no eating or drinking, kills
+restore you), gives each a redesign on an existing seam with the bench probe it
+needs, sharpens three boons to accelerants — and adds **seventeen new offers**
+(§7): a `Boon::BonusLoot` paid generically in `Mgr::OnItemRoll`, four loot
+trades (the first two uncommons), and twelve loot mechanics from Elite Tithe
+("elites always drop their blue") through Fresh Kill, The Tenth Corpse, Wanted
+(loot that banks a reroll charge), Mimic and Dragon's Hoard to a legendary, The
+Vault. Every seam is verified against the core and the world database (§7.1:
+`FillLoot` appends, `SummonGameObject` of the world's own level-banded chests
+needs no new rows). Steps 1, 2 and 7 of its order (Blood for Bread, the loot
+boon and trades, the loot cards) are born rank-free and can land any time; the
+redesigns of existing cards want the rank removal done first.
 
 Things step 2 left for a later pass, deliberately:
 - The **stat-grant primitive** (§3, "grant a stat" — expertise, ratings) is not
