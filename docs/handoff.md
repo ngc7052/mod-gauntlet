@@ -296,6 +296,19 @@ the largest single edit in the plan. With rarity carrying the run and reroll/
 skip live, it is a deletion with a green gate around it. Then step 5, the
 remaining cards, commons first.
 
+### Queued behind it: the greed redesign
+
+`docs/greed-redesign.md` (2026-09-01) is the plan for the cards that only slow
+the run down. The brief it answers: hardcore is hard by design, but an offer
+must tempt — make you faster or richer while it endangers you. It runs the
+whole table through a three-question test, names five brakes (Craven, Grudge,
+Falter, Cunning, Ambush) and one dead letter (Iron Purse, replaced by **Blood
+for Bread**: no eating or drinking, kills restore you), gives each a redesign on
+an existing seam with the bench probe it needs, and sharpens three boons to
+accelerants. Its step 1 (Blood for Bread) has no ladder and can land any time;
+steps 2–5 want the rank removal done first so each card is touched once. Its
+rarity column feeds the plan's §7.4 epic pass.
+
 Things step 2 left for a later pass, deliberately:
 - The **stat-grant primitive** (§3, "grant a stat" — expertise, ratings) is not
   built; the first ten pay through the existing Boon plumbing. It needs a
