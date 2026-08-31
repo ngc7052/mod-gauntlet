@@ -88,10 +88,11 @@ nothing, and it is the seam to use if a gold boon is ever wanted again.
 ## 4. State
 
 All six are in, with the rewards, across three commits. None of it has been
-played yet — the numbers in every ladder are judgement, not measurement, and the
-first thing worth doing is finding out which of them is wrong.
+played yet — the numbers are judgement, not measurement, and the first thing
+worth doing is finding out which of them is wrong.
 
-The two most likely to need tuning: Falling Sky's `STILL_MS` at rank IV (three
-seconds is very little for a caster) and Killing Floor's `LEAVE_LOSS_PCT` at
-rank IV (losing half the bank may make breaking off never worth it, which would
-put the card back where it started).
+*(2026-09-01: the ranks went with step 4 of `docs/rarity-plan.md`. Each ladder
+below collapsed to its rank II value — Falling Sky arms after six seconds
+still, Killing Floor's break-off loses a quarter of the bank — so the two
+rank-IV worries this section used to name are moot, and the tuning question is
+one number per card.)

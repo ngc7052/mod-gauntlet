@@ -95,7 +95,7 @@ docker exec gt-db mysql -uroot -ppassword -N -B acore_characters -e \
 ```
 
 Then, for each name: `.gauntlet debug leaks <name> self` once, then
-`.gauntlet debug leaks <name> all 4`, then `.gauntlet debug soak <name> all 4`.
+`.gauntlet debug leaks <name> all`, then `.gauntlet debug soak <name> all`.
 
 Strip the colours before reading the log, and mind that the count is welded to
 its colour code — `|cffff20201 leaked` — so a lazy `s/|cff[0-9a-f]*//g` eats the

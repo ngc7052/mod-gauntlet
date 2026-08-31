@@ -4,13 +4,15 @@
 reasoning is kept because the numbers behind it are worth re-reading when the
 tuning is wrong, not because the direction is still open.
 
-**Status.** Steps 1 and 2 of §8 landed on 2026-08-31, step 3 on 2026-09-01.
-Rarity is a registry column, rolled per slot and displayed; `SimpleTrade` and
-the first ten commons (ids 75–84) are in the table, proven with the bench;
-reroll and skip are live, with skipping banking a charge; every older card is
-rare; ranks untouched. §7 of `docs/handoff.md` lists what each step put where
-and the decisions taken that this document did not spell out. Step 4 — the
-rank removal — is next.
+**Status.** Steps 1 and 2 of §8 landed on 2026-08-31, steps 3 and 4 on
+2026-09-01. Rarity is a registry column, rolled per slot and displayed;
+`SimpleTrade` and the first ten commons (ids 75–84) are in the table, proven
+with the bench; reroll and skip are live, with skipping banking a charge; every
+older card is rare; **the rank system is gone** — a card is one value, the one
+its blurb states. §7 of `docs/handoff.md` lists what each step put where and
+the decisions taken that this document did not spell out, including what the
+rank removal did to the late run (§7.1 is now the loudest open number). Step 5
+— the remaining cards — is next.
 
 - **The rank system is removed.** `MAX_RANK`, the rank ladders in 56 mechanics,
   rank-up offers, and the rank numerals in every card and chat line all go.
@@ -208,6 +210,13 @@ The audit and the tests are the reason step 4 in §8 comes after the rest: with
 rarity already carrying the run, rank removal is a deletion with a green gate
 around it rather than a rewrite in the dark.
 
+**Landed 2026-09-01.** The table above was right about everything except the
+size of "no migration": the column needed no change, but `Mgr::Load` now takes
+rarity from the registry row and ignores the stored value, and a guarded update
+normalises old rows for offline readers. The collapse rule was *the value the
+blurb states, else rank II*. What the table did not predict is under step 4 in
+§8.
+
 ## 6. What it costs to build
 
 | Piece | Work | Notes |
@@ -264,10 +273,19 @@ The direction is settled. These are not.
    playable.~~ **Done, 2026-09-01.** `.gauntlet reroll` / `.gauntlet skip`,
    two chooser buttons, `REROLL`/`SKIP` on the wire, and `skip`/`reroll` rows
    in the affix log so the run's story records them.
-4. Rank removal, once rarity is carrying enough of the run to make it survivable.
+4. ~~Rank removal, once rarity is carrying enough of the run to make it
+   survivable.~~ **Done, 2026-09-01.** 79 ladders collapsed to one value each,
+   `RankUp` gone, every offer a card the run does not hold. Measured: with no
+   rank-ups to spend tiers on, the 16-card cap fills by tier 17–20 instead of
+   ~49, so sixty of eighty tiers are three swaps; the reward-shaped guarantee
+   is now paid by a swap of a reward-shaped card (without that, 42% of
+   full-set offers had none; with it, 21%). §7.1 — the carry cap by rarity —
+   went from an open question to the loudest one, and the loot cards of
+   `docs/greed-redesign.md` §7 are the fastest way to refill the late run.
 5. The remaining cards, in rarity order, commons first.
 
-Steps 1–3 are all reversible and all playable on their own, which is why they
-come before the deletion. Ranks are going either way; landing rarity first means
-step 4 is a deletion with a green gate around it rather than a rewrite with
-nothing holding the run up.
+Steps 1–3 were all reversible and all playable on their own, which is why they
+came before the deletion. Landing rarity first meant step 4 was a deletion with
+a green gate around it rather than a rewrite with nothing holding the run up —
+and so it was: the gate caught the guarantee's payer going missing, and
+nothing else.

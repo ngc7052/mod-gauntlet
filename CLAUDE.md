@@ -38,7 +38,7 @@ things in three places, and all three must exist or it silently does nothing:
 
 | Piece | Where | What it is |
 |---|---|---|
-| **The row** | `src/GauntletRegistry.cpp` | one line in the table — id, key, name, family, class mask, tier window, rank, flags, boon, gates, and the one-sentence blurb |
+| **The row** | `src/GauntletRegistry.cpp` | one line in the table — id, key, name, family, class mask, tier window, rarity, flags, boon, gates, and the one-sentence blurb |
 | **The mechanic** | `src/mechanics/<family>/<Name>.cpp` | a class implementing `IMechanic`, registered with `GAUNTLET_MECHANIC(id, Type)` |
 | **The anchor** | `AnchorMechanics()` in `src/GauntletScripts.cpp` | `AddSC_gauntlet_mechanic_<Type>();` |
 
@@ -49,14 +49,14 @@ this and will fail the build; do not work around it.
 
 Row order matters: ids must ascend. Add new rows at the end of the table.
 
-Tuning ladders and any arithmetic worth testing go in **`src/GauntletRules.h`**,
+Tuning values and any arithmetic worth testing go in **`src/GauntletRules.h`**,
 not in the mechanic — see the testing rule for why.
 
 ## Adding a common
 
 A common is a table row, not a file. Three places, all data:
 
-1. A registry row at the end of the table, `Rarity::Common`, `maxRank` 1.
+1. A registry row at the end of the table, `Rarity::Common`.
 2. A line in `src/GauntletTrades.h` with the same id: the curse (a denial mask
    or a coefficient), the boon -- which must be the row's -- and its magnitude.
 3. One factory and one `GAUNTLET_MECHANIC_FN` in
@@ -74,7 +74,7 @@ strip of a worn item by "on attach: ...". Read `build/sweep --rarity` after.
    ascending. Field order is `MechanicDef` in `src/GauntletRegistry.h`:
 
    ```cpp
-   { 70, "my_card", "My Card", Family::Tempo, 0, 20, 80, 4, Rarity::Rare,
+   { 70, "my_card", "My Card", Family::Tempo, 0, 20, 80, Rarity::Rare,
      MF_Timed, "", Boon::BonusDamage, 0, 0,
      "One sentence, present tense, what the player experiences." },
    ```
@@ -105,7 +105,7 @@ strip of a worn item by "on attach: ...". Read `build/sweep --rarity` after.
 3. **The anchor.** Add `AddSC_gauntlet_mechanic_MyCard();` to
    `AnchorMechanics()`, in the family's group.
 
-4. **Ladders into `GauntletRules.h`** if the card has any, with the pure
+4. **Numbers into `GauntletRules.h`** if the card has any, with the pure
    arithmetic as `constexpr` functions the mechanic calls. The mechanic must
    *call* them — a test against a copy of the numbers proves nothing.
 
@@ -146,9 +146,9 @@ the server console on an isolated realm built from a *copy* of the DB volume:
 
 ```
 .gauntlet debug leaks self          # first, always: can the audit see anything
-.gauntlet debug leaks <name> <key> <rank>    # attach → detach, what did not come back
-.gauntlet debug soak  <name> <key> <rank>    # the same, card ticked and fired first
-.gauntlet debug bench <name> <key> <rank>    # every hook driven; what no probe reached
+.gauntlet debug leaks <name> <key>           # attach → detach, what did not come back
+.gauntlet debug soak  <name> <key>           # the same, card ticked and fired first
+.gauntlet debug bench <name> <key>           # every hook driven; what no probe reached
 .gauntlet debug offers <tier> <name>         # what the builder would offer them, rarity included
 ```
 
@@ -161,15 +161,15 @@ other, and this rule exists because each has already let a broken card through.
 
 The mechanics all include `Player.h`, which puts them outside the Player-free
 build `run-tests.sh` uses — so anything left inside a mechanic is unreachable by
-any test. Put the ladders and the arithmetic in `GauntletRules.h`, have the
+any test. Put the values and the arithmetic in `GauntletRules.h`, have the
 mechanic call them, and test that.
 
-Test **shape, not values**. "Rank III multiplies by 0.65" restates the table and
+Test **shape, not values**. "Hubris multiplies by 0.75" restates the constant and
 fails only when someone edits it on purpose. "The duel is always a shelter and
-the rest of the pull is always an exposure, at every rank" is a claim about the
+the rest of the pull is always an exposure" is a claim about the
 card being the card, and it fails on a transposed digit — which is the fault
 that actually happens. That style caught a real one on its first run: Killing
-Floor's two ladders were complements, so breaking off paid exactly what winning
+Floor's two ladders (the ranks were still in) were complements, so breaking off paid exactly what winning
 paid and the card's whole decision did not exist.
 
 **2. An end-to-end check** with `bench` on a playerbot, and the assertion must

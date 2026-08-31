@@ -63,18 +63,18 @@ the coordinator's real build as the final word.
 
 ### What the invariant sweep asserts about `relaxations`
 
-`OfferInvariantsTest.cpp` runs 1,600,000 offer sets over the whole 73-entry
-table. The hard invariants — exactly three offers, tier windows, class
-relevance, rank range, rank-up shape, exclusive keys, the swap in slot C at
-tiers 4/8/12, and never `Always`/`InCombat`/`VersusElites` on a Scalar — are
-zero at every tier with no exceptions.
+`OfferInvariantsTest.cpp` runs 1,600,000 offer sets over the whole table. The
+hard invariants — exactly three offers, tier windows, class relevance, never a
+carried mechanic offered again, exclusive keys, the swap in slot C at tiers
+4/8/12, and never `Always`/`InCombat`/`VersusElites` on a Scalar — are zero at
+every tier with no exceptions.
 
-Relaxations are *not* asserted to be `GR_None`. Measured: tiers 1, 2 and 8
-never relax, tiers 3–14 relax between 0.87% and 6.47%, tier 15 relaxes 28.8%
-and tier 16 relaxes 46.1%. That is structural rather than a fault — only 21 of
-the 73 mechanics have a tier window reaching 15, and a run that far in is
-carrying most of them, so the "new mechanic" pools genuinely empty. Design
-§4.6 expects rank-ups to dominate at those tiers.
+Relaxations are *not* asserted to be `GR_None`; they are held under per-tier
+ceilings the test lists with the reason each one moved. The shape today: tiers
+1–2 never relax, tiers 3–4 a few percent, and the late run relaxes freely
+because every tier is a fresh card and the 16-card cap fills by tier 17–20 —
+after which every slot is a swap and the "new mechanic" pools are simply
+empty. That is structural, and measured, not a fault.
 
 What *is* asserted exactly, at every tier, is that the relaxation word
 describes the set it came back with: `GR_RepeatedFamily` iff a family repeats,

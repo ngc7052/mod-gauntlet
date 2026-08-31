@@ -309,7 +309,7 @@ rest clock is spent.*
   `SetPower`; a visible existing self-heal for the moment is the same
   "existing spell, overwritten amount" technique `FallingSky::Reward` documents.
 - **Numbers.** Footsteps 4 s, restore 100%. The stillness window stays at the
-  card's 30 s.
+  card's 20 s (its one value since the ranks went).
 - **Boon.** Stays +max health — the curse is about rest, not danger.
 - **Rarity.** Rare.
 

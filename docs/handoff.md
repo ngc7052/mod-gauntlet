@@ -10,8 +10,9 @@ and §4 before trusting any test.
 `mod-gauntlet`, an AzerothCore (WotLK 3.3.5a) module: a procedurally generated
 hardcore affix challenge. A run offers three "affix" cards per tier, the player
 picks one, and the curses accumulate. 79 mechanics, all implemented: 69 rares
-and the first ten commons, with reroll and skip live on every tier. Steps 1-3
-of `docs/rarity-plan.md` have landed and step 4 -- the rank removal -- is next.
+and the first ten commons, with reroll and skip live on every tier. Steps 1-4
+of `docs/rarity-plan.md` have landed -- the rank system is gone, a card is one
+value and rarity is its only tier -- and step 5, the remaining cards, is next.
 
 Working directory `/home/nero/projects/mod-gauntlet`, on **`master`**, clean,
 level with `origin/master`.
@@ -39,7 +40,7 @@ level with `origin/master`.
 ```bash
 ./tests/compile-check.sh --anchors   # anchors + ladder audit, seconds, no Docker
 ./tests/compile-check.sh             # full compile + link in the build container
-./tests/run-tests.sh                 # 200 unit tests
+./tests/run-tests.sh                 # 194 unit tests
 ./sync-to-server.sh                  # rsync the module into the core tree
 docker compose -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.yml \
   -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.override.yml \
@@ -48,7 +49,7 @@ docker compose -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.yml \
 ```
 
 Gate before every commit: anchors, ladders, compile, link, tests. All green
-today — 79 anchors, 83 ladders, 64 objects, 200 tests.
+today — 79 anchors, 4 ladders, 64 objects, 194 tests.
 
 ## 4. The testing rig, and what it cannot see
 
@@ -63,7 +64,7 @@ character name so they can be driven from the server console:
 
 | Command | What it does |
 |---|---|
-| `.gauntlet debug leaks [name] [what] [rank]` | attach → detach, report what did not come back; for one card, its own counters both before and after `OnDetach` |
+| `.gauntlet debug leaks [name] [what]` | attach → detach, report what did not come back; for one card, its own counters both before and after `OnDetach` |
 | `.gauntlet debug soak` | the same, with the card ticked and its own events fired first |
 | `.gauntlet debug bench` | every hook driven at every card, plus what attaching alone changed and whether any item in the world is refused; ends with the list of cards **no probe reached** |
 | `.gauntlet debug offers <tier> [name]` | what the builder would put in front of that character at that tier, rarity and kind per line; the only way to watch the roll without a client. Name *after* the tier. |
@@ -105,6 +106,34 @@ distrust a green result:
 - **A leak can consume the condition that reveals it.** Berserker's Bargain
   appeared on the first pass and not the second. Run twice, against a bot that
   has been fighting.
+
+### Measured 2026-09-01, while checking step 4
+
+- **The leak audit blames the first denial for a core behaviour.** Unequipping
+  *any* item runs `Player::_ApplyItemMods` → `ApplyItemDependentAuras(item,
+  false)` → `RemoveItemDependentAurasAndCasts` (Player.cpp:6770, 7267, 12875),
+  which removes every self-cast aura whose `EquippedItemClass` requirement is
+  unmet -- passives included. A troll with no bow and no thrown weapon carries
+  Bow and Throwing Specialization (26290, 20558) only because the learn path
+  casts with the full trigger mask; the first card to strip anything loses them,
+  and `EquipItem` re-adds only what fits. So `leaks <troll> all` reports
+  Bareheaded (id 75, the first denial in id order) leaking two racials, once per
+  login, and a re-run is clean. It is what the player does by hand when they
+  take a helm off; nothing for a card to fix. The audit could skip passive
+  item-dependent auras that do not fit -- not done yet, §8.
+- **`bench` cannot reach four of the five Spawn cards, and where the bot stands
+  decides the fifth.** The Shade and Ambush refuse cities and taverns
+  (`REST_FLAG_IN_CITY`, Shade.cpp:221, Ambush.cpp:105) and idle bots sit in
+  Orgrimmar and Dalaran; on a bot out in Borean Tundra the Shade spawned.
+  Reinforcements spawns only for a player something is *attacking*
+  (`getAttackers()`, Reinforcements.cpp:155) and the bench's World Trigger
+  never fights back. Echo needs 25 kills and the probe makes one. Ambush needs
+  20 s of the bot standing still. Carrion needs loot. `Spawned nothing: shade,
+  echo, carrion, reinforcements, ambush` is therefore the bench's normal output
+  on an idle bot -- reproduced on the step-3 image, so not a step-4 regression
+  -- and the bench cannot currently tell a broken Spawn card from a well-guarded
+  one. Bench a Spawn card on a bot out in the world, or make the probe fight
+  back; §8 has the job.
 
 ## 5. Bug patterns that recurred — check these first
 
@@ -153,14 +182,14 @@ card.
 judgement. The two most likely to be wrong are named at the end of
 `docs/tempo-redesign.md`.
 
-## 7. The rarity plan: steps 1-3 landed, step 4 next
+## 7. The rarity plan: steps 1-4 landed, step 5 next
 
-`docs/rarity-plan.md` is decided, not a proposal. Ranks are being removed and
+`docs/rarity-plan.md` is decided, not a proposal. Ranks have been removed and
 replaced with a rarity ladder (common → legendary), plus reroll and skip.
 
 The measured problem it solves: a tier is a level, so a run to 80 sees **80
 offers**, and no character can be offered more than **29.6 of the 69** mechanics.
-Ranks are what hide that gap.
+Ranks were what hid that gap.
 
 The answer is ~90 new cards to reach ~160, of which **only ~30 are C++ work** —
 `GAUNTLET_MECHANIC_FN` already lets one class back many registry ids, so a
@@ -168,8 +197,8 @@ The answer is ~90 new cards to reach ~160, of which **only ~30 are C++ work** �
 
 ### What step 1 put in place (2026-08-31)
 
-- `Rarity` in `Gauntlet.h`, `MechanicDef::rarity` beside `maxRank` (which it
-  will replace), every row `Rarity::Rare`.
+- `Rarity` in `Gauntlet.h`, `MechanicDef::rarity` beside `maxRank` (which step 4
+  removed), every row `Rarity::Rare`.
   `Registry.EveryCardIsRareUntilTheEpicPass` holds that and is *meant* to be
   rewritten into a list of ids the day the first non-rare row lands.
 - The tier weights of §2 in `GauntletRules.h` as `Rules::RarityWeight`, one
@@ -289,12 +318,65 @@ The answer is ~90 new cards to reach ~160, of which **only ~30 are C++ work** �
   ceiling (8 → 10): the version is in the stream, a bump reshuffles which
   seeds land badly, and tier 30 sits on the bargain family's opening edge.
 
-### Step 4
+### What step 4 put in place (2026-09-01)
 
-Rank removal — §5b of the plan is the inventory of what it touches, and it is
-the largest single edit in the plan. With rarity carrying the run and reroll/
-skip live, it is a deletion with a green gate around it. Then step 5, the
-remaining cards, commons first.
+The rank system is gone. What the deletion actually was, and the decisions
+§5b of the plan did not spell out:
+
+- `MAX_RANK`, `MechanicDef::maxRank`, `OfferKind::RankUp`, `RankFloor`,
+  `RankNumeral`, `.gauntlet debug rank` and the `<rank>` argument on
+  give/give-class/leaks/soak/bench all went. `AffixInstance::rank` became
+  `rarity`, still written to the `rank` column -- but **`Mgr::Load` ignores
+  the stored value** and takes rarity from the registry row, because a card's
+  rarity is a fact about its row, not about the run.
+  `2026_09_01_01_gauntlet_rank_is_rarity.sql` normalises the stored column for
+  anyone reading the table offline; the server never needed it.
+- **Every ladder collapsed to one value: the one the registry blurb states,
+  else rank II** (index 1). Seventeen took index 0 because the blurb said so
+  (Champions' health multiplier, Deep Wounds, Killing Floor's close, Last
+  Rites, Cursed Hoard, the class cards' costs and cooldowns, Faint). Two cards
+  lost a rank-gated branch outright: One Ward no longer denies Lichborne (that
+  was rank III's addition) and No Sanctuary no longer breaks a bubble on
+  creature damage (rank III again). The Shade is always a nemesis; Penance no
+  longer exempts Renew.
+- `GauntletRules.h` lost `Index()` and every `uint8 rank` parameter; the six
+  tempo functions take only what the card knows at the moment it fires.
+  `RulesTest.cpp` was rewritten to single-value shape claims ("winning pays
+  more than walking away", "a wound opens more than a kill closes").
+- **Generator:** `Eligible` refuses any mechanic the run carries, for every
+  offer kind; `Mgr::Pick` refuses the same at the door. `BoonTable(mechanic,
+  boon)` is the category base plus Frenzy's override. On a full set every slot
+  is a swap, and **a swap of a reward-shaped card now pays the reward-shaped
+  guarantee** -- it had to: rank-ups of carried reward-shaped cards were what
+  paid it before, and without a payer the full-set noReward rate was 42%.
+  With it, 21%.
+- **The structural consequence, measured in `OfferInvariantsTest.cpp`'s
+  comments:** every tier is a fresh pick, so the 16-card cap fills by tier
+  17-20 where it used to fill around 49. Sixty of eighty tiers are three
+  swaps. Tiers 3-4 lost their exact-zero relaxation (now 3.1% / 7.0%: an early
+  set used to have rank-ups to fall back on). Every ceiling that moved has its
+  reason in the test. **This makes §7.1 of the plan -- the carry cap by
+  rarity -- the loudest open number**, and the greed redesign's loot cards,
+  reward-shaped by construction, the fastest way to bring noReward back down.
+- Addon: `PROTOCOL_VERSION` 16, rank pip and rank-up wire gone, AFFIX/OFFER
+  carry rarity in the third field. GeneratorVersion 15 → 16.
+- Checked end to end on `gt-world` (rank-free image, `2026_09_01_01` applied by
+  hand because the test realm has `Updates.EnableDatabases = 0`): `leaks all`
+  and `soak all` on a level-57 warrior -- 38 audited, soak 0 leaked; the one
+  `leaks` LEAK (Bareheaded, auras 20558/26290) is the core dropping a troll's
+  unfitting weapon-spec racials on *any* unequip, see §4. `offers 1/20/30` on
+  him and `offers 60` on a paladin print rarity and kind with no rank anywhere,
+  a Swap only at the swap tiers; `cards` is one line per card; `export-addon`
+  is byte-identical to the committed Data.lua; `bench all` -- 38 answered, 0
+  leaked, and the five Spawn cards "summoned nothing", which the step-3 image
+  reproduces on a third bot: not a regression but the harness's reach (§4).
+  `give`/`dump` are `Console::No`, so "a carried card is never offered again"
+  rests on the 1.6M-set invariant and `Pick`'s refusal, not on a live run.
+
+### Step 5
+
+The remaining cards, in rarity order, commons first -- and the seventeen
+offers of `docs/greed-redesign.md` §7, none of which waits on anything now.
 
 ### Queued behind it: the greed redesign
 
@@ -314,7 +396,8 @@ Vault. Every seam is verified against the core and the world database (§7.1:
 `FillLoot` appends, `SummonGameObject` of the world's own level-banded chests
 needs no new rows). Steps 1, 2 and 7 of its order (Blood for Bread, the loot
 boon and trades, the loot cards) are born rank-free and can land any time; the
-redesigns of existing cards want the rank removal done first.
+redesigns of existing cards waited for the rank removal, which has landed --
+nothing blocks any of it now.
 
 Things step 2 left for a later pass, deliberately:
 - The **stat-grant primitive** (§3, "grant a stat" — expertise, ratings) is not
@@ -322,8 +405,8 @@ Things step 2 left for a later pass, deliberately:
   class-neutral carrier spell per aura type read out of Spell.dbc.
 - `FAMILY_WEIGHT` still gives Rules 1 against Attrition 3, so at tier 1 the
   three coefficient trades are drawn about three times as often as any one of
-  the seven denials. Left as measured; the comment on the weights still
-  describes Rules as "three one-rank entries", which is no longer true.
+  the seven denials. Left as measured; the comment on the weights
+  still reasons from a Rules family of three, which is no longer true.
 - Whether commons stack too freely (+8% damage four times over) is §7.1.
 
 ## 8. Known-open, not assigned
@@ -331,9 +414,22 @@ Things step 2 left for a later pass, deliberately:
 - `docs/checklists.md` — 672 lines of in-game checks, still mostly undone.
 - `.gauntlet debug remove all` does not exist, so undoing `give-class` means
   removing ~30 affixes one slot at a time.
-- `bench` reports `Spawned nothing: carrion` — a Spawn card that summons nothing
-  even with a real kill and a corpse in the probe. Not chased; may be the same
-  shape as the Reinforcements bug.
+- `bench` reports `Spawned nothing` for all five Spawn cards on an idle bot,
+  for the reasons §4 measures. The job: have the bench's target attack the
+  player (`target->Attack(player, true)` puts it in `getAttackers()`), kill
+  enough XP-worthy targets to reach Echo's 25, hold the bot still for Ambush's
+  20 s, loot a corpse for Carrion, and refuse to bench a Spawn card on a bot in
+  a city rather than report it. Until then a Spawn card's spawn is proven only
+  by a bot out in the field, and Reinforcements, Echo, Ambush and Carrion not
+  at all.
+- The leak audit's false positive on unfitting item-dependent passives (§4):
+  skip auras the core itself removes on any unequip, and prove it on a troll
+  bot before trusting it.
+- `offers` at a swap tier for a run carrying nothing shows a Swap that "swaps
+  out slot 0": the generator only picks a slot when the set is non-empty and
+  `Pick` falls through to a plain add, so it is cosmetic -- but reachable live
+  by skipping every tier to 20. The fix is one clause in `BuildOffers`
+  (`swapTier && !carried.empty()`) with a generator test.
 - `CAP_CLASS` is still 3 and still `TODO(design)`, eight phases on.
 - Cold Trail's Vanish lockout and Dead Weight's Feign Death lockout deliberately
   survive detach. Design question, not a leak.
