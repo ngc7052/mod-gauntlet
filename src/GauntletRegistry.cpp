@@ -306,8 +306,14 @@ namespace
         // free and long", which is a bespoke upside to named abilities and is
         // exactly what Boon::BonusAbility is for; BonusRegen would have had the
         // offer promise a regeneration percentage the mechanic never pays.
+        // requiresSpell is Battle Shout, and it is a truthful gate rather than a
+        // convenience: a warrior who has trained no shout cannot trigger this
+        // card at all, so offering it to them is offering a blank. It is also
+        // what lets `.gauntlet debug bench` drive the card -- the bench casts
+        // whatever spell a row declares, and a row declaring none is a row no
+        // probe can reach.
         { 31, "c04_deafening_roar", "Deafening Roar", Family::Class, CM_WARRIOR, 20, 80, 4,
-          MF_None, "", Boon::BonusAbility, 0, 0,
+          MF_None, "", Boon::BonusAbility, 6673, 0,
           "Your shouts wake every enemy within thirty yards." },
 
         // Paladin

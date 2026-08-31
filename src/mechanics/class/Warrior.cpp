@@ -423,13 +423,17 @@ namespace Gauntlet
 
             std::string Diagnose(Ctx&) const override
             {
-                return "deafening roar: " + std::to_string(_shouts) + " shout(s), "
-                     + std::to_string(_woken) + " enemy/enemies woken";
+                return "deafening roar: " + std::to_string(_shouts) + " shout(s) heard, "
+                     + std::to_string(_woken) + " enemy/enemies woken"
+                     + (_shouts == 0 ? " -- NO SHOUT HAS REACHED THIS CARD" : "");
             }
 
         private:
             uint32 _shouts = 0;
             uint32 _woken  = 0;
+
+            // Whether the "nothing heard you" line has been said this attach.
+            bool   _taughtQuiet = false;
         };
 
         void DeafeningRoar::OnSpellCast(Ctx& ctx, Spell* spell)
@@ -448,6 +452,31 @@ namespace Gauntlet
                 return;
 
             ++_shouts;
+
+            // Free, by pre-payment, and unconditionally -- whether the shout
+            // wakes anything or not, which is what the card says.
+            //
+            // The comment that used to sit on the refund said the power was
+            // already gone by the time any hook here runs. It is not:
+            // OnPlayerSpellCast fires at Spell.cpp:3776 and TakePower runs at
+            // :3883, so the cost has not been taken yet. Crediting it here and
+            // letting the core take it a moment later nets exactly zero.
+            //
+            // The old refund lived in OnAuraApplied and was wrong twice over.
+            // It gave back info->ManaCost, and rage is stored at ten times its
+            // displayed value, so it returned a tenth of what the shout cost --
+            // which is why it read as "still costs rage". And OnAuraApplied
+            // only fires for a shout whose aura lands on the *player*:
+            // Demoralizing and Intimidating Shout put theirs on the enemy, so
+            // those two were never refunded at all.
+            if (info->PowerType == POWER_RAGE)
+            {
+                int32 const cost = info->CalcPowerCost(player, info->GetSchoolMask(), spell);
+                if (cost > 0)
+                    player->SetPower(POWER_RAGE,
+                                     std::min<int32>(int32(player->GetMaxPower(POWER_RAGE)),
+                                                     player->GetPower(POWER_RAGE) + cost));
+            }
 
             float const range = ROAR_YARDS[RankIndexOf(ctx.self)];
             uint32      woke  = 0;
@@ -475,7 +504,28 @@ namespace Gauntlet
             _woken += woke;
 
             if (woke == 0)
+            {
+                // Silence here is what makes the card look broken.
+                //
+                // It was reported from play as not working, and it works: the
+                // bench drives a shout and its own counters read "1 shout(s), 4
+                // enemy/enemies woken". What it did not do was say anything
+                // when a shout found nothing to wake -- no idle enemy in range,
+                // or only elites, or only things already fighting -- and from
+                // the player's side that is indistinguishable from a dead
+                // mechanic.
+                //
+                // Said once per attach, because the point is to establish that
+                // the card is listening, not to narrate every shout.
+                if (!_taughtQuiet && player->GetSession())
+                {
+                    _taughtQuiet = true;
+                    ChatHandler(player->GetSession()).PSendSysMessage(
+                        "|cffff2020[Gauntlet]|r Your shout carries {} yards, but nothing ordinary and "
+                        "idle was in range to hear it.", uint32(range));
+                }
                 return;
+            }
 
             AddonFor(ctx)->SendEvent(player, KeyOf(MECHANIC_ROAR, "c04_deafening_roar"), 0,
                                      "Deafening Roar");
@@ -502,10 +552,9 @@ namespace Gauntlet
             // number for exactly this reason.
             AuraDurationEdit::Edit(aura, SHOUT_DURATION_MS);
 
-            // Free, by refund. The power is already gone by the time any hook
-            // here runs.
-            if (info->ManaCost != 0 || info->ManaCostPercentage != 0)
-                player->SetPower(POWER_RAGE, player->GetPower(POWER_RAGE) + int32(info->ManaCost));
+            // The rage half of the boon is paid in OnSpellCast, not here. This
+            // hook only fires for a shout whose aura lands on the player, which
+            // is two of the four.
         }
 
         // ==================================================================
