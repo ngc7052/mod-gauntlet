@@ -4,6 +4,11 @@
 reasoning is kept because the numbers behind it are worth re-reading when the
 tuning is wrong, not because the direction is still open.
 
+**Status.** Step 1 of §8 landed on 2026-08-31: rarity is a registry column,
+rolled per slot and displayed, every card rare, ranks untouched. §7 of
+`docs/handoff.md` lists what it put where and the three roll decisions it took
+that this document did not spell out. Step 2 is next.
+
 - **The rank system is removed.** `MAX_RANK`, the rank ladders in 56 mechanics,
   rank-up offers, and the rank numerals in every card and chat line all go.
 - **Rarity replaces it**: common, uncommon, rare, epic, legendary, rolled per
@@ -220,8 +225,10 @@ The direction is settled. These are not.
 
 ## 8. Order of work
 
-1. Rarity as a field, rolled and displayed, with every existing card marked rare.
-   Nothing else changes; the ladder still works. This is reversible and provable.
+1. ~~Rarity as a field, rolled and displayed, with every existing card marked
+   rare. Nothing else changes; the ladder still works. This is reversible and
+   provable.~~ **Done, 2026-08-31.** `build/sweep --rarity` is the proof: 100%
+   Rare at every tier, beside the weights §2 asks for.
 2. `SimpleTrade` and the first ten commons. Prove the table-driven path with the
    bench before writing sixty rows.
 3. Reroll and skip, which are independent of both and immediately playable.

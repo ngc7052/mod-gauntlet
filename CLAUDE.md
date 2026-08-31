@@ -2,8 +2,9 @@
 
 AzerothCore (WotLK 3.3.5a) module: a procedurally generated hardcore affix
 challenge. A run offers three affix cards per tier, the player picks one, and
-the curses accumulate. 69 mechanics today; `docs/rarity-plan.md` takes it to
-~160.
+the curses accumulate. 69 mechanics today, every one of them rare;
+`docs/rarity-plan.md` takes it to ~160 and its step 1 -- rarity as a field,
+rolled and displayed -- has landed.
 
 **Read `docs/handoff.md` before starting.** It carries the current state, the
 recurring bug patterns, and where the test harness is blind. This file is the
@@ -58,13 +59,23 @@ not in the mechanic — see the testing rule for why.
    ascending. Field order is `MechanicDef` in `src/GauntletRegistry.h`:
 
    ```cpp
-   { 70, "my_card", "My Card", Family::Tempo, 0, 20, 80, 4,
+   { 70, "my_card", "My Card", Family::Tempo, 0, 20, 80, 4, Rarity::Rare,
      MF_Timed, "", Boon::BonusDamage, 0, 0,
      "One sentence, present tense, what the player experiences." },
    ```
 
    - `classMask` `0` means every class. A classless card is worth **ten times**
      a class card for coverage — see `docs/rarity-plan.md` §1.
+   - `rarity` is how much of the run the card changes, not how big its numbers
+     are — `docs/rarity-plan.md` §2 has the ladder. The offer builder rolls
+     which rarity to draw from per slot, weighted by tier
+     (`Rules::RarityWeight`), so a card's rarity decides *when* it shows up.
+     Every row is `Rare` today and `Registry.EveryCardIsRareUntilTheEpicPass`
+     holds that; the first row that is honestly something else turns that test
+     into a list of ids, which is intended — what it forbids is promoting one
+     existing card on its own instead of in §7.4's single pass. Check
+     `build/sweep --rarity` after adding cards: it prints the delivered mix per
+     tier beside the weights.
    - `requiresSpell` is a truthful relevance gate **and** what lets the bench
      drive the card. A card gated on casting something must declare it, or no
      probe can reach it.
@@ -123,6 +134,7 @@ the server console on an isolated realm built from a *copy* of the DB volume:
 .gauntlet debug leaks <name> <key> <rank>    # attach → detach, what did not come back
 .gauntlet debug soak  <name> <key> <rank>    # the same, card ticked and fired first
 .gauntlet debug bench <name> <key> <rank>    # every hook driven; what no probe reached
+.gauntlet debug offers <tier> <name>         # what the builder would offer them, rarity included
 ```
 
 ## The testing rule

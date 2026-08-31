@@ -9,7 +9,8 @@ and §4 before trusting any test.
 
 `mod-gauntlet`, an AzerothCore (WotLK 3.3.5a) module: a procedurally generated
 hardcore affix challenge. A run offers three "affix" cards per tier, the player
-picks one, and the curses accumulate. 69 mechanics, all implemented.
+picks one, and the curses accumulate. 69 mechanics, all implemented, all
+marked rare: step 1 of `docs/rarity-plan.md` has landed and step 2 is next.
 
 Working directory `/home/nero/projects/mod-gauntlet`, on **`master`**, clean,
 level with `origin/master`.
@@ -37,7 +38,7 @@ level with `origin/master`.
 ```bash
 ./tests/compile-check.sh --anchors   # anchors + ladder audit, seconds, no Docker
 ./tests/compile-check.sh             # full compile + link in the build container
-./tests/run-tests.sh                 # 173 unit tests
+./tests/run-tests.sh                 # 189 unit tests
 ./sync-to-server.sh                  # rsync the module into the core tree
 docker compose -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.yml \
   -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.override.yml \
@@ -46,7 +47,7 @@ docker compose -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.yml \
 ```
 
 Gate before every commit: anchors, ladders, compile, link, tests. All green
-today — 69 anchors, 79 ladders, 63 objects, 173 tests.
+today — 69 anchors, 83 ladders, 63 objects, 189 tests.
 
 ## 4. The testing rig, and what it cannot see
 
@@ -56,14 +57,15 @@ console commands run in the world thread so probes are atomic, and an isolated
 realm runs on a *copy* of the DB volume with client data mounted read-only.
 Containers are named `gt-*`; the live `ac-*` ones are never touched.
 
-Three audit commands, all `Console::Yes` and all taking an optional character
-name so they can be driven from the server console:
+Three audit commands and the offer preview, all `Console::Yes` and all taking a
+character name so they can be driven from the server console:
 
 | Command | What it does |
 |---|---|
 | `.gauntlet debug leaks [name] [what] [rank]` | attach → detach, report what did not come back |
 | `.gauntlet debug soak` | the same, with the card ticked and its own events fired first |
 | `.gauntlet debug bench` | every hook driven at every card; ends with the list of cards **no probe reached** |
+| `.gauntlet debug offers <tier> [name]` | what the builder would put in front of that character at that tier, rarity and kind per line; the only way to watch the roll without a client. Name *after* the tier. |
 
 **Run `.gauntlet debug leaks self` first.** It checks the audit can see the
 character at all; a blind audit reports everything clean.
@@ -135,7 +137,7 @@ card.
 judgement. The two most likely to be wrong are named at the end of
 `docs/tempo-redesign.md`.
 
-## 7. Next: the rarity plan
+## 7. The rarity plan: step 1 landed, step 2 next
 
 `docs/rarity-plan.md` is decided, not a proposal. Ranks are being removed and
 replaced with a rarity ladder (common → legendary), plus reroll and skip.
@@ -148,10 +150,56 @@ The answer is ~90 new cards to reach ~160, of which **only ~30 are C++ work** �
 `GAUNTLET_MECHANIC_FN` already lets one class back many registry ids, so a
 "common" is a table row rather than a file.
 
-**Step 1 is: rarity as a field, rolled and displayed, every existing card marked
-rare, nothing else changed.** Reversible, provable, and it does not need ranks
-gone first. §8 of that doc has the rest of the order and §5b has what rank
-removal actually touches.
+### What step 1 put in place (2026-08-31)
+
+- `Rarity` in `Gauntlet.h`, `MechanicDef::rarity` beside `maxRank` (which it
+  will replace), every row `Rarity::Rare`.
+  `Registry.EveryCardIsRareUntilTheEpicPass` holds that and is *meant* to be
+  rewritten into a list of ids the day the first non-rare row lands.
+- The tier weights of §2 in `GauntletRules.h` as `Rules::RarityWeight`, one
+  column per rarity so the ladder audit checks "commons fall, rarer rises";
+  the uncommon column humps on purpose and carries `LADDER-SENTINEL`.
+- `BuildOffers` rolls a rarity per slot **before** the family, over the
+  rarities that actually have an eligible card, weights renormalised. Three
+  decisions were taken here that the plan did not spell out:
+  1. **Renormalise over what is available** rather than roll-then-fall-back to
+     a neighbour. It is the pattern `Draw` already used for families, and it
+     makes the all-Rare table draw exactly as before.
+  2. **Every available rarity weighing zero goes uniform**, not empty: the
+     weights shape the mix, they do not veto a card the registry made eligible
+     at that tier.
+  3. **Rarity outranks family** in roll order, because rarity is now the axis
+     the run escalates along; distinct families are still a rule.
+- `Offer::rarity` is the *card's* rarity (never the rolled target), asserted
+  as a hard invariant in the 1.5M-set sweep. `RollRarity` is public and tested
+  directly, because with every card Rare the sweep cannot show the weights
+  doing anything.
+- `build/sweep --rarity` prints the delivered mix per tier beside the weights
+  — 100% Rare everywhere today. That column is the tuning instrument §7.6 asks
+  for; watch it as commons land.
+- Display: rarity colour on the offer and "You bear" chat lines, a trailing
+  field on the OFFER frame, `rarities` and per-row `rarity` in Data.lua, the
+  chooser border and badge, a strip and tooltip line in the carried list, and
+  `offers`/`dump`/`cards` print it. GeneratorVersion 12 → 13.
+- Checked end to end on `gt-world` (which now runs the rarity build):
+  `leaks self` passes, `export-addon` on the server produces a Data.lua
+  byte-identical to the repo's, and `offers <tier> <bot>` for a warrior, a
+  mage and a druid at tiers 5, 45 and 75 reports every card Rare with no
+  relaxation. **What no harness has seen:** the addon panel itself. Panel.lua
+  parses (`luac -p`) and the wire field is last, but the border, the badge and
+  the strip have not been looked at on a screen.
+- The `acore/ac-wotlk-worldserver:master` image was rebuilt with this code for
+  the test realm and is **not deployed**: the live `ac-worldserver` is still on
+  the previous image until someone runs `up -d`, which kicks the user offline.
+
+### Step 2
+
+`SimpleTrade` and the first ten commons — prove the table-driven path with the
+bench before writing sixty rows. §3 of the plan has the three primitives, all
+verified to exist. Expect to: add `Rarity::Common` rows via
+`GAUNTLET_MECHANIC_FN`, rewrite `EveryCardIsRareUntilTheEpicPass` into a list,
+and read `--rarity` at tiers 1–20 to see the common share move off zero. §8
+has the rest of the order and §5b what rank removal actually touches.
 
 ## 8. Known-open, not assigned
 
@@ -165,3 +213,6 @@ removal actually touches.
 - Cold Trail's Vanish lockout and Dead Weight's Feign Death lockout deliberately
   survive detach. Design question, not a leak.
 - `IsShout` covers four shouts; Challenging Shout and Piercing Howl are not in it.
+- The server-wide announce ("X reached tier N and took Y") does not name the
+  rarity. Left out on purpose while every card is rare; worth revisiting when
+  an epic is worth announcing.
