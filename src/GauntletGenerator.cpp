@@ -5,6 +5,7 @@
 
 #include "GauntletGenerator.h"
 #include "GauntletRegistry.h"
+#include "GauntletRules.h"
 
 #include <algorithm>
 #include <array>
@@ -319,8 +320,9 @@ namespace
     // Pool construction.
     //
     // Nothing here consumes the stream: a slot builds every pool it is allowed
-    // to draw from, empty families drop out, and exactly one weighted roll and
-    // one uniform roll follow. That is a deliberate departure from the plan's
+    // to draw from, empty families drop out, and exactly three rolls follow --
+    // a weighted one for the rarity, a weighted one for the family, a uniform
+    // one inside it. That is a deliberate departure from the plan's
     // "if pool empty: try next family" retry, which would make the number of
     // rolls a slot consumes depend on the shape of the table -- and the whole
     // point of the stream is that the same inputs consume the same rolls in
@@ -463,23 +465,62 @@ namespace
         return false;
     }
 
-    // One weighted roll over the families that have a pool, then one uniform
-    // roll inside it.
-    MechanicDef const* Draw(uint64& state, Pools const& pools)
+    // Every rarity with at least one candidate anywhere in the pools, as the
+    // mask RollRarity takes.
+    uint8 AvailableRarities(Pools const& pools)
     {
+        uint8 mask = 0;
+        for (auto const& pool : pools)
+            for (MechanicDef const* def : pool)
+                mask |= RarityBit(def->rarity);
+        return mask;
+    }
+
+    // Rarity first, then family, then the card: one weighted roll for the
+    // rarity over the rarities that have a candidate, one weighted roll over
+    // the families that hold a card of that rarity, then one uniform roll
+    // inside that family among its cards of that rarity.
+    //
+    // Rarity outranks family on purpose. Design section 2.4 says "roll three
+    // families first", and until the rarity plan that was the first roll; but
+    // rarity is now the axis a run escalates along (docs/rarity-plan.md section
+    // 2), and a roll that picked a family first would let the family's
+    // contents skew the mix the tier weights are there to set. Distinct
+    // families are still a rule -- familyUsed and the relaxation ladder hold
+    // it -- so nothing about the set's shape is given up; only the order the
+    // dice fall in.
+    //
+    // With every card in the table Rare, the rarity roll has one candidate and
+    // the draw is what it was before the roll existed, bar the stream having
+    // advanced once. That is the property step 1 of the plan is built on.
+    MechanicDef const* Draw(uint64& state, Pools const& pools, uint8 tier)
+    {
+        uint8 const available = AvailableRarities(pools);
+        if (available == 0)
+            return nullptr;
+
+        Rarity const rarity = RollRarity(state, tier, available);
+
+        // The family weights, over the families holding a card of that rarity.
+        std::array<uint32, FAMILY_COUNT> ofRarity = {};
         uint32 total = 0;
         for (size_t f = 0; f < FAMILY_COUNT; ++f)
-            if (!pools[f].empty())
+        {
+            for (MechanicDef const* def : pools[f])
+                if (def->rarity == rarity)
+                    ofRarity[f]++;
+            if (ofRarity[f] != 0)
                 total += FAMILY_WEIGHT[f];
+        }
 
         if (total == 0)
-            return nullptr;
+            return nullptr;   // unreachable: the rarity was drawn from these pools
 
         uint32 roll = RollIn(state, 0, total - 1);
         size_t chosen = FAMILY_COUNT;
         for (size_t f = 0; f < FAMILY_COUNT; ++f)
         {
-            if (pools[f].empty())
+            if (ofRarity[f] == 0)
                 continue;
             if (roll < FAMILY_WEIGHT[f])
             {
@@ -492,8 +533,14 @@ namespace
         if (chosen == FAMILY_COUNT)
             return nullptr;   // unreachable while the weights are all non-zero
 
-        auto const& pool = pools[chosen];
-        return pool[RollIn(state, 0, static_cast<uint32>(pool.size()) - 1)];
+        // Uniform among the chosen family's cards of the chosen rarity, in
+        // table order, which is id order on every platform.
+        uint32 index = RollIn(state, 0, ofRarity[chosen] - 1);
+        for (MechanicDef const* def : pools[chosen])
+            if (def->rarity == rarity && index-- == 0)
+                return def;
+
+        return nullptr;   // unreachable: ofRarity counted these
     }
 
     Offer MakeOffer(uint64& state, MechanicDef const& def, SlotContext const& ctx, OfferKind kind)
@@ -504,10 +551,18 @@ namespace
         // Every mechanic's boon is named by its registry row and delivered by
         // the mechanic itself; the condition axis is unused since the scalars
         // were deleted. Neither consumes the stream any more, so an offer's
-        // roll order is family, mechanic, rank floor, and -- for a swap -- the
-        // slot it replaces.
+        // roll order is rarity, family, mechanic and -- for a swap -- the slot
+        // it replaces.
         offer.condition = Condition::Always;
         offer.boon      = def.boon;
+
+        // The card's own rarity, not the one the slot rolled. The roll decides
+        // which rarity to draw *from*, and RollRarity only ever answers with
+        // one that has a candidate, so the two agree whenever the roll was
+        // honoured; when it could not be -- nothing of that rarity eligible --
+        // the card that was drawn is still what the player is being offered,
+        // and that is what the card must say.
+        offer.rarity    = def.rarity;
 
         AffixInstance const* held = ctx.carried->Find(def.id);
         if (kind == OfferKind::RankUp && held)
@@ -590,6 +645,46 @@ namespace Gauntlet
     uint32 BoonMagnitude(uint16 mechanic, Boon boon, uint8 rank)
     {
         return BoonTable(mechanic, boon, rank);
+    }
+
+    Rarity RollRarity(uint64& state, uint8 tier, uint8 availableMask)
+    {
+        uint32 total = 0;
+        for (size_t r = 0; r < Rules::RARITY_COUNT; ++r)
+            if (availableMask & RarityBit(static_cast<Rarity>(r)))
+                total += Rules::RarityWeight(tier, static_cast<Rarity>(r));
+
+        // Every available rarity weighs zero in this band -- a tier-5 slot
+        // whose only eligible cards are epics, say. The weights shape the mix;
+        // they do not veto a card the registry made eligible at this tier, so
+        // the roll goes uniform over what is there rather than emptying the
+        // slot. Still one draw from the stream, so the roll count of a slot
+        // does not depend on the table.
+        bool const uniform = total == 0;
+        if (uniform)
+            for (size_t r = 0; r < Rules::RARITY_COUNT; ++r)
+                if (availableMask & RarityBit(static_cast<Rarity>(r)))
+                    ++total;
+
+        if (total == 0)
+            return Rarity::Common;   // nothing available; Draw never asks this
+
+        uint32 roll = RollIn(state, 0, total - 1);
+        for (size_t r = 0; r < Rules::RARITY_COUNT; ++r)
+        {
+            Rarity const rarity = static_cast<Rarity>(r);
+            if (!(availableMask & RarityBit(rarity)))
+                continue;
+
+            // A zero weight never satisfies roll < 0, so a rarity the band
+            // gives nothing to is skipped here without a special case.
+            uint32 const weight = uniform ? 1u : Rules::RarityWeight(tier, rarity);
+            if (roll < weight)
+                return rarity;
+            roll -= weight;
+        }
+
+        return Rarity::Common;   // unreachable: the weights sum to `total`
     }
 
     OfferSet BuildOffers(uint32 seed, uint8 tier, IPlayerView const& view,
@@ -760,7 +855,7 @@ namespace Gauntlet
                 }
             }
 
-            MechanicDef const* def = step != RELAX_COUNT ? Draw(state, pools) : nullptr;
+            MechanicDef const* def = step != RELAX_COUNT ? Draw(state, pools, tier) : nullptr;
 
             if (!def)
             {
@@ -856,7 +951,7 @@ namespace Gauntlet
 
             if (AnyPool(pools))
             {
-                if (MechanicDef const* def = Draw(state, pools))
+                if (MechanicDef const* def = Draw(state, pools, tier))
                     result.offers[1] = MakeOffer(state, *def, replace, kind);
             }
             else

@@ -94,6 +94,16 @@ namespace Gauntlet
         return static_cast<uint8>(1u << static_cast<uint8>(f));
     }
 
+    // The same shape for rarities: one bit each in Rarity order. This is how
+    // Draw tells RollRarity which rarities have a candidate in front of it.
+    constexpr uint8 RarityBit(Rarity r)
+    {
+        return static_cast<uint8>(1u << static_cast<uint8>(r));
+    }
+
+    constexpr uint8 RARITY_MASK_ALL =
+        static_cast<uint8>((1u << static_cast<uint8>(Rarity::MAX)) - 1u);
+
     // A view of the registry the offer builder may draw from. The live one
     // hides MF_NotImplemented entries; the tests use one that does not, so the
     // invariants exercise the whole 73-entry table rather than the four
@@ -184,6 +194,20 @@ namespace Gauntlet
     //
     // Pure: no stream, no state, and calling it does not consume a roll.
     uint32 BoonMagnitude(uint16 mechanic, Boon boon, uint8 rank);
+
+    // The rarity roll of one offer slot: exactly one draw from the stream,
+    // weighted by Rules::RarityWeight at this tier over the rarities whose
+    // bit is set in `availableMask`. A rarity with no candidate is never
+    // returned, however heavy its weight, and when every available rarity
+    // weighs zero at this tier the roll is uniform over what is there -- the
+    // weights shape the mix, they do not veto a card the registry made
+    // eligible. A mask of zero returns Common and consumes nothing; Draw
+    // never asks with one.
+    //
+    // Public for the same reason BoonMagnitude is: it is the one piece of the
+    // roll whose shape can be tested directly, and with every card in the
+    // table Rare the sweep cannot yet show the weights doing anything.
+    Rarity RollRarity(uint64& state, uint8 tier, uint8 availableMask);
 
     // Deterministic in (seed, tier, view, carried, count, reg,
     // GeneratorVersion) and in nothing else: no clock, no rand(), no pointer

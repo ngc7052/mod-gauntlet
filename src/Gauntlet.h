@@ -122,6 +122,24 @@ namespace Gauntlet
     // "three distinct families per offer" rule.
     enum class Family : uint8 { Spawn, Enemy, Tempo, Attrition, Rules, Bargain, Class, MAX };
 
+    // How much of the run a card changes -- docs/rarity-plan.md section 2. Not
+    // "the same card, bigger": that is the rank ladder, which rarity replaces.
+    // A common is one small trade, an uncommon a trade with a condition, a rare
+    // a verb the player reacts to, an epic changes how a whole system plays,
+    // and a legendary defines the run.
+    //
+    // It is a property of the registry row, and the offer builder rolls
+    // *which rarity to draw from* per slot, weighted by tier
+    // (Rules::RarityWeight) -- so the escalation of a run lives here now rather
+    // than in a rank numeral. Offer carries a copy of the drawn card's rarity
+    // so the chat line and the wire do not have to look it up; nothing stores
+    // it yet. When the ranks go (plan section 5b) AffixInstance::rank becomes
+    // this and takes its column.
+    //
+    // Append-only, for the reason Boon is: the values go into Data.lua and over
+    // the OFFER frame today, and into gauntlet_affix later.
+    enum class Rarity : uint8 { Common, Uncommon, Rare, Epic, Legendary, MAX };
+
     enum MechanicFlags : uint32
     {
         MF_None         = 0,
@@ -180,6 +198,12 @@ namespace Gauntlet
     // match it, because Data.lua is generated from the registry: the change
     // that moves a mechanic id is exactly the change that must invalidate the
     // addon's table.
+    //
+    // 13 is step 1 of docs/rarity-plan.md: every offer slot rolls a rarity
+    // before it rolls a family, which moves every offer set in the game; the
+    // OFFER frame grows a rarity field and Data.lua grows a rarity per row and
+    // a rarities table, so an addon that predates it would draw every card
+    // uncoloured and every offer's last field into the wrong slot.
     // 6 is the tier-axis change: one tier per level instead of one per five,
     // every registry window rescaled x5 so the *level* each affix unlocks at is
     // unchanged, RankFloor and the swap tiers rewritten on the new axis, and a
@@ -225,7 +249,7 @@ namespace Gauntlet
     // with one test froze an affix taken near the end of its window at whatever
     // rank it happened to get. Every offer set that could contain a rank-up of
     // an out-of-window mechanic moves.
-    constexpr uint16 GeneratorVersion = 12;
+    constexpr uint16 GeneratorVersion = 13;
 
     constexpr uint8 MAX_RANK = 4;
 
@@ -251,6 +275,7 @@ namespace Gauntlet
     {
         uint16    mechanic  = MECHANIC_NONE;
         uint8     rank      = 1;
+        Rarity    rarity    = Rarity::Common;   // the card's; see MakeOffer
         Condition condition = Condition::Always;
         Boon      boon      = Boon::None;
         uint8     boonMag   = 0;
@@ -481,6 +506,12 @@ namespace Gauntlet
 
     std::string FamilyName(Family f);
     std::string OfferKindName(OfferKind k);
+
+    // "Rare", and the six hex digits the client paints a rare item in. Both
+    // defined in GauntletNames.cpp; the colour is exported into Data.lua so the
+    // addon and the chat line cannot paint the same card two ways.
+    std::string RarityName(Rarity r);
+    char const* RarityColor(Rarity r);
 }
 
 #endif // MOD_GAUNTLET_H

@@ -30,7 +30,7 @@ g++ -std=c++2a -O2 -Wall -I src -I "$CORE/src/common" \
 
 ```
 build/sweep [--seeds N] [--tiers N] [--choices N] [--max-carried N]
-            [--family-mask 0xNN] [--full] [--summary]
+            [--family-mask 0xNN] [--full] [--summary] [--rarity]
 ```
 
 `--seeds 300` is 240,000 offer sets and takes about a second; the numbers are
@@ -42,6 +42,17 @@ Columns: `sets` simulated at that tier, `relaxed` (the share that had to relax
 any rule), `empty` (slots that came back as `MECHANIC_NONE`), `noReward` (the
 share of sets with no `MF_RewardShaped` offer), `carried` (mean carried-set
 size).
+
+## The rarity census
+
+`--rarity` swaps the relaxation table for the one `docs/rarity-plan.md` §7.6
+asks for: per tier, the share of filled offers at each rarity (`got`) beside the
+weight the tier asked for (`want`, from `Rules::RarityWeight` in
+`src/GauntletRules.h`). The roll is over the rarities that actually have an
+eligible card, so the two differ wherever the table has nothing of a rarity at
+that tier -- the gap is the table's, and closing it is what the new cards are
+for. With every row Rare, as it is after step 1 of the plan, `got` reads 100%
+Rare on every line; that is the number to watch as commons land.
 
 ## Knobs the command line cannot reach
 

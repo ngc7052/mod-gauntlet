@@ -281,6 +281,122 @@ namespace
         });
     }
 
+    // ------------------------------------------------------------------
+    // Rarity weights. The plan calls the numbers invented; what is held here
+    // is the shape they must keep whatever they are tuned to.
+    // ------------------------------------------------------------------
+
+    constexpr Rarity EVERY_RARITY[] = { Rarity::Common, Rarity::Uncommon, Rarity::Rare,
+                                        Rarity::Epic, Rarity::Legendary };
+    static_assert(std::size(EVERY_RARITY) == RARITY_COUNT, "a rarity is missing from the test");
+
+    // The first and last tier of each band, so a claim about a band is made at
+    // both of its edges rather than only where the table happens to be read.
+    template <typename Fn>
+    void ForEachBandEdge(Fn&& fn)
+    {
+        for (size_t band = 0; band < RARITY_BANDS; ++band)
+        {
+            uint8 const first = static_cast<uint8>(band * RARITY_BAND_TIERS + 1);
+            uint8 const last  = static_cast<uint8>((band + 1) * RARITY_BAND_TIERS);
+            fn(band, first);
+            fn(band, last);
+        }
+    }
+
+    TEST(Rules, RarityBandsCoverTheAxisAndClampPastIt)
+    {
+        ForEachBandEdge([](size_t band, uint8 tier)
+        {
+            EXPECT_EQ(RarityBand(tier), band) << "tier " << int(tier);
+        });
+
+        // A tier the axis does not have. Zero is below FIRST_TIER and 255 is
+        // past every window in the table; both must land inside the table.
+        EXPECT_EQ(RarityBand(0), 0u);
+        EXPECT_EQ(RarityBand(255), RARITY_BANDS - 1);
+        EXPECT_EQ(RarityBand(81), RARITY_BANDS - 1)
+            << "a realm with a longer axis gets the endgame mix, not a read past the end";
+    }
+
+    TEST(Rules, RarityWeightsAreASharePerBand)
+    {
+        // Each band is a distribution: the five shares are percentages of the
+        // slots at that tier and must add to a hundred. A band that added to
+        // ninety would silently under-weight whatever was listed last.
+        ForEachBandEdge([](size_t band, uint8 tier)
+        {
+            uint32 sum = 0;
+            for (Rarity r : EVERY_RARITY)
+                sum += RarityWeight(tier, r);
+            EXPECT_EQ(sum, 100u) << "band " << band << " at tier " << int(tier);
+        });
+    }
+
+    TEST(Rules, CommonsFadeAndRarerCardsRiseAcrossTheRun)
+    {
+        // The plan's whole claim about the ladder: "early tiers are nearly all
+        // commons, legendaries only appear late". Monotonic in each direction,
+        // band over band. Uncommon is left out on purpose -- it is the bridge
+        // between the two and is meant to hump; the sentinel on its table in
+        // GauntletRules.h says so.
+        for (size_t band = 1; band < RARITY_BANDS; ++band)
+        {
+            uint8 const now  = static_cast<uint8>(band * RARITY_BAND_TIERS + 1);
+            uint8 const then = static_cast<uint8>(band * RARITY_BAND_TIERS);
+
+            EXPECT_LT(RarityWeight(now, Rarity::Common), RarityWeight(then, Rarity::Common))
+                << "commons must thin out with every band";
+            EXPECT_GT(RarityWeight(now, Rarity::Rare), RarityWeight(then, Rarity::Rare));
+            EXPECT_GT(RarityWeight(now, Rarity::Epic), RarityWeight(then, Rarity::Epic));
+            EXPECT_GE(RarityWeight(now, Rarity::Legendary), RarityWeight(then, Rarity::Legendary));
+        }
+    }
+
+    TEST(Rules, TheOpeningIsCommonAndTheCloseIsNot)
+    {
+        // At both ends the shape has to be unmistakable, or the axis is not
+        // doing the job the ranks did. The first band is a common majority; the
+        // last is anything but.
+        EXPECT_GT(RarityWeight(1, Rarity::Common), 50u);
+        EXPECT_LT(RarityWeight(80, Rarity::Common), 25u);
+        EXPECT_GT(RarityWeight(80, Rarity::Rare) + RarityWeight(80, Rarity::Epic)
+                  + RarityWeight(80, Rarity::Legendary), 50u)
+            << "the endgame must be mostly rare or better";
+    }
+
+    TEST(Rules, NothingRunDefiningInTheFirstHalf)
+    {
+        // The plan's dashes. A legendary is "run-defining, one per run" and an
+        // epic "changes how a whole system plays"; neither belongs in front of
+        // a character still learning what the module does. Epics wait for the
+        // second band, legendaries for the third.
+        for (uint8 tier = 1; tier <= RARITY_BAND_TIERS; ++tier)
+        {
+            EXPECT_EQ(RarityWeight(tier, Rarity::Epic), 0u) << "tier " << int(tier);
+            EXPECT_EQ(RarityWeight(tier, Rarity::Legendary), 0u) << "tier " << int(tier);
+        }
+        for (uint8 tier = RARITY_BAND_TIERS + 1; tier <= 2 * RARITY_BAND_TIERS; ++tier)
+            EXPECT_EQ(RarityWeight(tier, Rarity::Legendary), 0u) << "tier " << int(tier);
+
+        // And both do arrive, or the top of the ladder is decoration.
+        EXPECT_GT(RarityWeight(80, Rarity::Epic), 0u);
+        EXPECT_GT(RarityWeight(80, Rarity::Legendary), 0u);
+    }
+
+    TEST(Rules, EveryRarityIsReachableSomewhere)
+    {
+        // A rarity with a zero weight in every band is a rarity the run never
+        // sees; the sixty cards written for it would be dead rows.
+        for (Rarity r : EVERY_RARITY)
+        {
+            uint32 anywhere = 0;
+            for (uint8 tier = 1; tier <= 80; ++tier)
+                anywhere += RarityWeight(tier, r);
+            EXPECT_GT(anywhere, 0u) << RarityName(r) << " is never rolled at any tier";
+        }
+    }
+
     TEST(Rules, KillingFloorDoesNotOverflowOnAHugeBank)
     {
         // The bank is a uint64 accumulated over a whole fight. The arithmetic

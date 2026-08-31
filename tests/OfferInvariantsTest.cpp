@@ -88,7 +88,7 @@ namespace
         I_CONDITION_RANGE, I_BOON_RANGE, I_RANK_RANGE, I_RANKUP_CARRIED,
         I_NEW_NOT_CARRIED, I_EXCLUSIVE_KEY, I_SWAP_IN_SLOT_C, I_SWAP_TARGET,
         I_FAMILY_BIT, I_MECHANIC_BIT, I_REWARD_BIT, I_SPURIOUS_BIT, I_UNKNOWN_BIT,
-        I_NOT_IMPLEMENTED,
+        I_NOT_IMPLEMENTED, I_ROW_RARITY,
         I_COUNT
     };
 
@@ -115,7 +115,8 @@ namespace
         "a set with no MF_RewardShaped offer did not record GR_NoRewardShaped",
         "GR_NoRewardShaped was recorded for a set that does have a reward-shaped offer",
         "relaxations carries a bit outside the four the enum declares",
-        "an MF_NotImplemented mechanic was offered on the live registry view"
+        "an MF_NotImplemented mechanic was offered on the live registry view",
+        "an offer's rarity is not its registry row's"
     };
 
     struct Query
@@ -152,6 +153,7 @@ namespace
             out << "\n      id=" << o.mechanic << " (" << (def ? def->key : "not in the table")
                 << ") family=" << (def ? unsigned(static_cast<uint8>(def->family)) : 99u)
                 << " rank=" << unsigned(o.rank)
+                << " rarity=" << unsigned(static_cast<uint8>(o.rarity))
                 << " cond=" << unsigned(static_cast<uint8>(o.condition))
                 << " boon=" << unsigned(static_cast<uint8>(o.boon))
                 << " boonMag=" << unsigned(o.boonMag)
@@ -346,6 +348,12 @@ namespace
             // is not its row's means something invented one.
             if (offer.boon != def->boon)
                 tally.Fail(I_ROW_BOON, q);
+
+            // Same rule for the rarity: the slot rolls which rarity to draw
+            // from, but what the offer *says* is the card's own, and the card's
+            // rarity is a registry column (docs/rarity-plan.md step 1).
+            if (offer.rarity != def->rarity)
+                tally.Fail(I_ROW_RARITY, q);
 
             uint8 const ceiling = def->maxRank < MAX_RANK ? def->maxRank : MAX_RANK;
             if (offer.rank < 1 || offer.rank > ceiling)
@@ -846,6 +854,10 @@ TEST(OfferInvariants, LiveRegistryView)
                         << "id " << offer.mechanic << " (" << def->key << ") was offered with a "
                         << "boon its registry row does not name; nothing rolls one any more\n  "
                         << Describe(q);
+                    ASSERT_EQ(offer.rarity, def->rarity)
+                        << "id " << offer.mechanic << " (" << def->key << ") was offered as "
+                        << RarityName(offer.rarity) << " and its row says "
+                        << RarityName(def->rarity) << "\n  " << Describe(q);
                     if (def->classMask != 0)
                     {
                         // Braced for the same reason as GeneratorTest.cpp's

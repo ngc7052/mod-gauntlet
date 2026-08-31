@@ -258,6 +258,16 @@ namespace Gauntlet
                 out += LuaIndexedLine(b, LuaQuote(BoonName(static_cast<Boon>(b))));
             out += "    },\n";
 
+            // Name and colour together, and the colour from the server rather
+            // than a table in the addon: the chat line and the panel must paint
+            // the same card the same blue, and two palettes is how they would
+            // not.
+            out += "    rarities = {\n";
+            for (uint8 r = 0; r < static_cast<uint8>(Rarity::MAX); ++r)
+                out += LuaIndexedLine(r, "{ name = " + LuaQuote(RarityName(static_cast<Rarity>(r)))
+                                         + ", color = " + LuaQuote(RarityColor(static_cast<Rarity>(r))) + " }");
+            out += "    },\n";
+
             out += "    mechanics = {\n";
             for (MechanicDef const& def : table)
             {
@@ -271,7 +281,8 @@ namespace Gauntlet
                 out += "        [" + std::to_string(static_cast<uint32>(def.id)) + "] = { name = "
                      + LuaQuote(def.name)
                      + ", key = " + LuaQuote(def.key)
-                     + ", family = " + std::to_string(static_cast<uint32>(def.family)) + ",\n"
+                     + ", family = " + std::to_string(static_cast<uint32>(def.family))
+                     + ", rarity = " + std::to_string(static_cast<uint32>(def.rarity)) + ",\n"
                      + "                 icon = " + LuaQuote(IconForMechanic(def))
                      + ", desc = " + LuaQuote(def.blurb) + " },\n";
             }

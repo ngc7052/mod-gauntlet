@@ -184,6 +184,29 @@ TEST(Registry, TierWindowsAndRanksAreInRange)
     }
 }
 
+TEST(Registry, RarityIsInsideTheEnum)
+{
+    for (MechanicDef const& def : AllMechanics())
+        EXPECT_LT(static_cast<uint8>(def.rarity), static_cast<uint8>(Rarity::MAX))
+            << "id " << def.id << " carries a rarity Data.lua cannot name";
+}
+
+// Step 1 of docs/rarity-plan.md: the column, the roll and the display land
+// with every existing card marked Rare and nothing else about the table
+// changed. This is that promise, asserted, and it is the one test in this
+// file that is meant to be rewritten: the plan's section 7.4 is a single pass
+// over the whole list deciding which cards are epics, and when that pass is
+// made this becomes a list of ids rather than a blanket. Until then a row
+// that is not Rare is a card promoted on its own, which is exactly what the
+// plan says not to do.
+TEST(Registry, EveryCardIsRareUntilTheEpicPass)
+{
+    for (MechanicDef const& def : AllMechanics())
+        EXPECT_EQ(def.rarity, Rarity::Rare)
+            << "id " << def.id << " (" << def.key << ") is " << RarityName(def.rarity)
+            << "; rarities are assigned in one pass over the whole table, not per row";
+}
+
 TEST(Registry, FamiliesAreInRangeAndMatchTheIdRanges)
 {
     for (MechanicDef const& def : AllMechanics())

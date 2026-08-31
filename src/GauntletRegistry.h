@@ -27,6 +27,10 @@ namespace Gauntlet
         uint32      classMask;      // 0 = every class
         uint8       minTier, maxTier;
         uint8       maxRank;
+        // docs/rarity-plan.md section 2: how much of the run this card
+        // changes. Beside maxRank because it is what maxRank becomes when the
+        // ranks go (section 5b) -- same width, same place in every row.
+        Rarity      rarity;
         uint32      flags;          // MF_*
         char const* exclusiveKeys;  // '|'-separated; no two active mechanics share one
         Boon        boon;

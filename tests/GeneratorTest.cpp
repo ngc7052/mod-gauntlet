@@ -15,6 +15,7 @@
 
 #include "GauntletGenerator.h"
 #include "GauntletRegistry.h"
+#include "GauntletRules.h"
 
 #include <gtest/gtest.h>
 
@@ -50,9 +51,9 @@ namespace
     {
         // Field by field rather than memcmp: Offer has padding, and padding
         // bytes are not part of the value this test is about.
-        return a.mechanic == b.mechanic && a.rank == b.rank && a.condition == b.condition
-            && a.boon == b.boon && a.boonMag == b.boonMag && a.kind == b.kind
-            && a.swapSlot == b.swapSlot;
+        return a.mechanic == b.mechanic && a.rank == b.rank && a.rarity == b.rarity
+            && a.condition == b.condition && a.boon == b.boon && a.boonMag == b.boonMag
+            && a.kind == b.kind && a.swapSlot == b.swapSlot;
     }
 
     bool SameSet(OfferSet const& a, OfferSet const& b)
@@ -71,6 +72,7 @@ namespace
         out << "relaxations=0x" << std::hex << set.relaxations << std::dec;
         for (Offer const& offer : set.offers)
             out << " | id=" << offer.mechanic << " rank=" << unsigned(offer.rank)
+                << " rarity=" << unsigned(static_cast<uint8>(offer.rarity))
                 << " cond=" << unsigned(static_cast<uint8>(offer.condition))
                 << " boon=" << unsigned(static_cast<uint8>(offer.boon))
                 << " boonMag=" << unsigned(offer.boonMag)
@@ -331,6 +333,173 @@ TEST(GeneratorDeterminism, CountIsHonoured)
     for (uint32 count = 1; count <= 5; ++count)
         EXPECT_EQ(BuildOffers(1, 5, view, empty, count, full).offers.size(), count)
             << "count=" << count;
+}
+
+// ---------------------------------------------------------------------------
+// Rarity. docs/rarity-plan.md step 1: every slot rolls a rarity to draw from,
+// weighted by tier, and the offer carries the rarity of the card it drew.
+//
+// With every card in the table Rare, the sweep cannot show the weights doing
+// anything -- one candidate rarity, one answer -- so what BuildOffers is held
+// to here is the part that does not depend on the table: an offer never says a
+// rarity its card does not have. The roll itself is tested through RollRarity,
+// which is public for exactly this reason.
+// ---------------------------------------------------------------------------
+
+TEST(GeneratorRarity, AnOfferCarriesItsCardsRarity)
+{
+    RegistryView full;
+    full.includeUnimplemented = true;
+
+    for (uint32 seed = 1; seed <= 100; ++seed)
+        for (size_t ci = 0; ci < CLASSES.size(); ++ci)
+        {
+            StubView const view(CLASSES[ci], static_cast<uint8>(1 + (ci % 3)));
+            for (uint8 tier = FIRST_TIER; tier <= 80; ++tier)
+            {
+                std::vector<AffixInstance> const carried = CarriedFor(seed, tier);
+                OfferSet const set = BuildOffers(seed, tier, view, carried, 3, full);
+                for (Offer const& o : set.offers)
+                {
+                    if (o.mechanic == MECHANIC_NONE)
+                        continue;
+                    MechanicDef const* def = FindMechanic(o.mechanic);
+                    ASSERT_NE(def, nullptr);
+                    EXPECT_EQ(o.rarity, def->rarity)
+                        << "seed=" << seed << " tier=" << unsigned(tier) << " id=" << o.mechanic
+                        << ": the offer says " << RarityName(o.rarity) << " and the card is "
+                        << RarityName(def->rarity);
+                }
+            }
+        }
+}
+
+namespace
+{
+    // The whole sample the distribution tests draw. Deterministic: the stream
+    // is splitmix64 from a fixed seed, so these are counts, not statistics,
+    // and cannot flake.
+    constexpr uint32 ROLLS = 100000;
+
+    std::array<uint32, Rules::RARITY_COUNT> CountRolls(uint8 tier, uint8 mask, uint64 seed = 0x5EED)
+    {
+        std::array<uint32, Rules::RARITY_COUNT> out = {};
+        uint64 state = seed;
+        for (uint32 i = 0; i < ROLLS; ++i)
+            out[static_cast<size_t>(RollRarity(state, tier, mask))]++;
+        return out;
+    }
+}
+
+TEST(GeneratorRarity, TheRollNeverAnswersWithSomethingUnavailable)
+{
+    // Every non-empty mask, every band edge. A rarity with no candidate must
+    // never come back however heavy its weight -- a Common at tier 1 carries
+    // 70% and there are no commons in the table today.
+    for (uint8 mask = 1; mask <= RARITY_MASK_ALL; ++mask)
+        for (uint8 tier : { 1, 20, 21, 40, 41, 60, 61, 80 })
+        {
+            auto const counts = CountRolls(static_cast<uint8>(tier), mask);
+            for (size_t r = 0; r < Rules::RARITY_COUNT; ++r)
+                if (!(mask & RarityBit(static_cast<Rarity>(r))))
+                    EXPECT_EQ(counts[r], 0u)
+                        << RarityName(static_cast<Rarity>(r)) << " was rolled at tier " << tier
+                        << " with mask 0x" << std::hex << unsigned(mask) << " and no candidate";
+        }
+}
+
+TEST(GeneratorRarity, OneCandidateRarityIsAlwaysTheAnswer)
+{
+    // The all-Rare table, which is what the registry is until step 2 of the
+    // plan lands: the roll has one option at every tier and must take it.
+    auto const counts = CountRolls(1, RarityBit(Rarity::Rare));
+    EXPECT_EQ(counts[static_cast<size_t>(Rarity::Rare)], ROLLS);
+
+    // Including at a tier where its weight is the smallest in the band. Five
+    // percent of nothing else is all of it.
+    EXPECT_EQ(Rules::RarityWeight(1, Rarity::Rare), 5u) << "the premise of this test moved";
+}
+
+TEST(GeneratorRarity, TheRollFollowsTheTierWeights)
+{
+    // Every rarity available, at the first tier of each band: the share each
+    // rarity gets must be the band's weight to within a point and a half of a
+    // hundred thousand rolls. This is the whole point of the table -- the
+    // escalation of the run is these numbers -- and it fails if a weight is
+    // read from the wrong band or the roll is not consumed the way Draw
+    // assumes.
+    for (size_t band = 0; band < Rules::RARITY_BANDS; ++band)
+    {
+        uint8 const tier = static_cast<uint8>(band * Rules::RARITY_BAND_TIERS + 1);
+        auto const counts = CountRolls(tier, RARITY_MASK_ALL);
+        for (size_t r = 0; r < Rules::RARITY_COUNT; ++r)
+        {
+            double const share  = 100.0 * double(counts[r]) / double(ROLLS);
+            double const weight = double(Rules::RarityWeight(tier, static_cast<Rarity>(r)));
+            EXPECT_NEAR(share, weight, 1.5)
+                << RarityName(static_cast<Rarity>(r)) << " at tier " << unsigned(tier)
+                << ": rolled " << share << "% against a weight of " << weight;
+        }
+    }
+}
+
+TEST(GeneratorRarity, TheRollRenormalisesOverWhatIsThere)
+{
+    // Two rarities available out of five. The absent three give their share to
+    // the present two in proportion, so the ratio between the two survives:
+    // at tier 1 Common is 70 and Rare is 5, so with only those two the split
+    // must be 70:5 -- fourteen commons to a rare -- not 70:30.
+    uint8 const mask = static_cast<uint8>(RarityBit(Rarity::Common) | RarityBit(Rarity::Rare));
+    auto const counts = CountRolls(1, mask);
+    double const ratio = double(counts[static_cast<size_t>(Rarity::Common)])
+                       / double(counts[static_cast<size_t>(Rarity::Rare)]);
+    EXPECT_NEAR(ratio, 14.0, 1.0);
+}
+
+TEST(GeneratorRarity, ZeroWeightIsNeverWhileSomethingElseIsThere)
+{
+    // Epic weighs nothing at tier 1. With a common beside it, an epic must
+    // never be drawn there -- that is what the dash in the plan's table means.
+    uint8 const mask = static_cast<uint8>(RarityBit(Rarity::Common) | RarityBit(Rarity::Epic));
+    auto const counts = CountRolls(1, mask);
+    EXPECT_EQ(counts[static_cast<size_t>(Rarity::Epic)], 0u);
+    EXPECT_EQ(counts[static_cast<size_t>(Rarity::Common)], ROLLS);
+}
+
+TEST(GeneratorRarity, AllZeroWeightsFallBackToUniformRatherThanNothing)
+{
+    // Only epics and legendaries eligible at tier 1, where both weigh zero.
+    // The weights shape the mix, they do not veto a card the registry made
+    // eligible, so the roll goes uniform over the two rather than emptying the
+    // slot -- and uniform means both, about equally.
+    uint8 const mask = static_cast<uint8>(RarityBit(Rarity::Epic) | RarityBit(Rarity::Legendary));
+    auto const counts = CountRolls(1, mask);
+    uint32 const epic = counts[static_cast<size_t>(Rarity::Epic)];
+    uint32 const leg  = counts[static_cast<size_t>(Rarity::Legendary)];
+    EXPECT_EQ(epic + leg, ROLLS);
+    EXPECT_NEAR(double(epic) / double(ROLLS), 0.5, 0.015);
+}
+
+TEST(GeneratorRarity, TheRollConsumesExactlyOneDraw)
+{
+    // Draw and the tests above assume one RollIn per call, whichever branch
+    // the roll takes. Checked against the stream directly: after a roll the
+    // state must be exactly one Mix on from where it started.
+    for (uint8 mask : { RARITY_MASK_ALL, uint8(RarityBit(Rarity::Rare)),
+                        uint8(RarityBit(Rarity::Epic) | RarityBit(Rarity::Legendary)) })
+        for (uint8 tier : { 1, 45, 80 })
+        {
+            uint64 state = 0xABCDEFu + tier;
+            uint64 const expected = Stream::Mix(state);
+            (void)RollRarity(state, tier, mask);
+            EXPECT_EQ(state, expected) << "tier " << tier << " mask 0x" << std::hex << unsigned(mask);
+        }
+
+    // And an empty mask consumes nothing, so a caller that guards wrongly
+    // does not shift every roll after it.
+    uint64 state = 42;
+    (void)RollRarity(state, 1, 0);
+    EXPECT_EQ(state, 42u);
 }
 
 // ---------------------------------------------------------------------------

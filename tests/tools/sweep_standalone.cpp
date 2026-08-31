@@ -31,6 +31,7 @@
 #include "Gauntlet.h"
 #include "GauntletGenerator.h"
 #include "GauntletRegistry.h"
+#include "GauntletRules.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -116,6 +117,7 @@ namespace
         bool   fullTable   = false;   // include MF_NotImplemented rows
         bool   perTier     = true;
         uint8  familyMask  = FAMILY_MASK_ALL;
+        bool   rarity      = false;   // the rarity census instead of the relaxation one
     };
 
     struct Row
@@ -139,6 +141,16 @@ namespace
         // Sets whose only relaxation was the reward-shaped guarantee: no empty
         // slot, no repeated family, no repeated mechanic.
         uint64 rewardOnly = 0;
+
+        // How many filled offers at this tier were of each rarity. This is the
+        // instrument docs/rarity-plan.md section 7.6 asks for: the tier weights
+        // in GauntletRules.h are the intended mix, and this is the mix the
+        // table actually produces once eligibility, the carried set and the
+        // family rules have had their say. Until the first common is written
+        // every column but Rare reads zero, which is the point of printing it
+        // now -- the number to watch as the table grows.
+        uint64 offers = 0;
+        uint64 byRarity[Rules::RARITY_COUNT] = {};
     };
 }
 
@@ -164,15 +176,18 @@ int main(int argc, char** argv)
         else if (!std::strcmp(argv[i], "--family-mask")) opt.familyMask = uint8(std::strtoul(next("--family-mask"), nullptr, 0));
         else if (!std::strcmp(argv[i], "--full"))        opt.fullTable  = true;
         else if (!std::strcmp(argv[i], "--summary"))     opt.perTier    = false;
+        else if (!std::strcmp(argv[i], "--rarity"))      opt.rarity     = true;
         else
         {
             std::fprintf(stderr,
                 "usage: %s [--seeds N] [--tiers N] [--choices N] [--max-carried N]\n"
-                "          [--family-mask 0xNN] [--full] [--summary]\n"
+                "          [--family-mask 0xNN] [--full] [--summary] [--rarity]\n"
                 "\n"
                 "  --full     include MF_NotImplemented rows (the table as designed,\n"
                 "             rather than the table as built)\n"
-                "  --summary  the key tiers and the totals only\n", argv[0]);
+                "  --summary  the key tiers and the totals only\n"
+                "  --rarity   the share of offers at each rarity per tier, beside the\n"
+                "             weight the tier asked for, instead of the relaxation census\n", argv[0]);
             return 2;
         }
     }
@@ -233,6 +248,11 @@ int main(int argc, char** argv)
                     if (MechanicDef const* def = FindMechanic(o.mechanic))
                         if (def->flags & MF_RewardShaped)
                             rewardShaped = true;
+
+                    ++row.offers;
+                    ++total.offers;
+                    ++row.byRarity[static_cast<size_t>(o.rarity)];
+                    ++total.byRarity[static_cast<size_t>(o.rarity)];
                 }
                 if (!rewardShaped)
                 {
@@ -264,6 +284,45 @@ int main(int argc, char** argv)
                 opt.fullTable ? "full" : "live", unsigned(opt.familyMask));
 
     auto pct = [](uint64 n, uint64 d) { return d ? 100.0 * double(n) / double(d) : 0.0; };
+
+    if (opt.rarity)
+    {
+        // Delivered share beside asked-for weight, per rarity. The two differ
+        // wherever a rarity has no eligible card at that tier -- the roll is
+        // over what is available -- so the gap is the table's, not the
+        // roll's, and closing it is what the new cards are for.
+        std::printf("  tier   offers  ");
+        for (size_t r = 0; r < Rules::RARITY_COUNT; ++r)
+            std::printf("  %9s", RarityName(static_cast<Rarity>(r)).c_str());
+        std::printf("\n                 ");
+        for (size_t r = 0; r < Rules::RARITY_COUNT; ++r)
+            std::printf("  got  want");
+        std::printf("\n");
+
+        auto printRarity = [&pct](unsigned tier, Row const& r) {
+            std::printf("  %4u  %7llu  ", tier, static_cast<unsigned long long>(r.offers));
+            for (size_t k = 0; k < Rules::RARITY_COUNT; ++k)
+            {
+                // The totals row has no single tier, so no single weight.
+                if (tier == 0)
+                    std::printf("  %3.0f%%    -", pct(r.byRarity[k], r.offers));
+                else
+                    std::printf("  %3.0f%%  %3u%%", pct(r.byRarity[k], r.offers),
+                                Rules::RarityWeight(static_cast<uint8>(tier), static_cast<Rarity>(k)));
+            }
+            std::printf("\n");
+        };
+
+        for (uint8 t = FIRST_TIER; t <= opt.tiers; ++t)
+            if (opt.perTier || t == FIRST_TIER || t % 10 == 1 || t == opt.tiers)
+                printRarity(t, rows[t]);
+        std::printf("  ----  -------  ");
+        for (size_t r = 0; r < Rules::RARITY_COUNT; ++r)
+            std::printf("  ---------");
+        std::printf("\n");
+        printRarity(0, total);
+        return 0;
+    }
 
     auto printRow = [&pct](unsigned tier, Row const& r) {
         std::printf("  %4u  %8llu  %7.2f%%  %8llu  %7.2f%%  %6.2f  %7.2f%%  %7.2f%%  %7.2f%%\n",

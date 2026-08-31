@@ -88,6 +88,42 @@ namespace Gauntlet
         }
     }
 
+    // The client's own item-quality words, one step up: a common card is the
+    // client's Common (white), not its Poor (grey). Every player already reads
+    // these five colours off item links, which is the whole reason to borrow
+    // them rather than invent a palette -- an offer card is telling the player
+    // how much of the run it will change, and blue-means-rare needs no legend.
+    std::string RarityName(Rarity r)
+    {
+        switch (r)
+        {
+            case Rarity::Common:    return "Common";
+            case Rarity::Uncommon:  return "Uncommon";
+            case Rarity::Rare:      return "Rare";
+            case Rarity::Epic:      return "Epic";
+            case Rarity::Legendary: return "Legendary";
+            default:                return "Unknown";
+        }
+    }
+
+    // ITEM_QUALITY_COLORS[1..5] of the 3.3.5 client, as the six hex digits a
+    // "|cff" colour code takes. Common is white rather than the grey of a poor
+    // item on purpose: white is the colour of a thing that is ordinary, grey is
+    // the colour of a thing that is worthless, and a common card is the first
+    // and not the second.
+    char const* RarityColor(Rarity r)
+    {
+        switch (r)
+        {
+            case Rarity::Common:    return "ffffff";
+            case Rarity::Uncommon:  return "1eff00";
+            case Rarity::Rare:      return "0070dd";
+            case Rarity::Epic:      return "a335ee";
+            case Rarity::Legendary: return "ff8000";
+            default:                return "ffffff";
+        }
+    }
+
     std::string OfferKindName(OfferKind k)
     {
         switch (k)
