@@ -48,8 +48,8 @@ namespace Gauntlet
     // caps were sized against.
     //
     // Reaching it does not end the choosing. It changes what is on offer: a
-    // full set can still rank up and can still swap, so the late run is about
-    // deepening what you have and deciding what to give up, which is a better
+    // full set can still swap, and any tier can be rerolled or declined, so
+    // the late run is about deciding what to give up, which is a better
     // question than "which of three more".
     constexpr uint8 MAX_CARRIED = 16;
 
@@ -182,8 +182,8 @@ namespace Gauntlet
         uint32 relaxations = GR_None;
     };
 
-    // The magnitude a boon of this category is worth on this mechanic at this
-    // rank, as a percentage.
+    // The magnitude a boon of this category is worth on this mechanic, as a
+    // percentage.
     //
     // The offer builder's own table, exposed because it has a second honest
     // caller: anything that wants to *show* what an affix pays without making
@@ -193,7 +193,7 @@ namespace Gauntlet
     // the fault this redesign exists to remove.
     //
     // Pure: no stream, no state, and calling it does not consume a roll.
-    uint32 BoonMagnitude(uint16 mechanic, Boon boon, uint8 rank);
+    uint32 BoonMagnitude(uint16 mechanic, Boon boon);
 
     // The rarity roll of one offer slot: exactly one draw from the stream,
     // weighted by Rules::RarityWeight at this tier over the rarities whose

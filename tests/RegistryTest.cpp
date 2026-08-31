@@ -180,7 +180,7 @@ TEST(Registry, EveryEntryCanBeShownToAPlayer)
     }
 }
 
-TEST(Registry, TierWindowsAndRanksAreInRange)
+TEST(Registry, TierWindowsAreInRange)
 {
     for (MechanicDef const& def : AllMechanics())
     {
@@ -189,9 +189,6 @@ TEST(Registry, TierWindowsAndRanksAreInRange)
         EXPECT_LE(def.minTier, def.maxTier)
             << "id " << def.id << " has an empty tier window [" << unsigned(def.minTier)
             << ", " << unsigned(def.maxTier) << "]";
-
-        EXPECT_GE(def.maxRank, 1) << "id " << def.id << " can never be offered at any rank";
-        EXPECT_LE(def.maxRank, MAX_RANK) << "id " << def.id << " exceeds MAX_RANK";
     }
 }
 

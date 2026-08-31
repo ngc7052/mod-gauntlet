@@ -46,8 +46,7 @@ namespace Gauntlet
         // past the card and continues the compression to 8, which is short
         // enough that eating a meal is no longer safe -- the point at which
         // the affix stops being about resting and starts being about where.
-        constexpr uint32 STILL_MS[] = { 30000, 20000, 12000, 8000 };
-        static_assert(std::size(STILL_MS) >= MAX_RANK, "STILL_MS is short a rank");
+        constexpr uint32 STILL_MS = 20000;
 
         // The card's fixed numbers: a four-second warning, twelve yards, and a
         // rest clock that resets to sixty seconds afterwards.
@@ -77,11 +76,6 @@ namespace Gauntlet
         // to be in trouble.
         constexpr uint32 SOUND_FOOTSTEPS = 8663;
 
-        uint8 RankIndex(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* MechanicKey()
         {
@@ -209,7 +203,7 @@ namespace Gauntlet
                 return;
 
             _stillMs += diffMs;
-            if (_stillMs < STILL_MS[RankIndex(ctx.self)])
+            if (_stillMs < STILL_MS)
                 return;
 
             _armed = true;
@@ -295,10 +289,9 @@ namespace Gauntlet
 
         std::string Ambush::Describe(AffixInstance const& self) const
         {
-            uint8 const i = RankIndex(&self);
 
             std::string out = "Standing still in the open world for "
-                            + std::to_string(STILL_MS[i] / 1000u)
+                            + std::to_string(STILL_MS / 1000u)
                             + " seconds brings footsteps, and four seconds later an Ambusher."
                               " Moving cancels it, right up to the last moment. Nothing happens"
                               " in inns, in cities or in dungeons.";

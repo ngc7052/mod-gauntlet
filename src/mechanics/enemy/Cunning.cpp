@@ -54,10 +54,8 @@ namespace Gauntlet
         // thirds of a caster's uptime denied while something is in melee
         // range, and a fifth would leave a window too short to land a cast
         // in at all. A role tax with no window is not a tax, it is a ban.
-        constexpr uint32 KICK_CD_MS[] = { 15000, 12000, 8000, 6000 };
-        static_assert(std::size(KICK_CD_MS) >= MAX_RANK, "KICK_CD_MS is short a rank");
-        constexpr uint32 LOCK_MS[]    = { 2000, 3000, 4000, 4000 };
-        static_assert(std::size(LOCK_MS) >= MAX_RANK, "LOCK_MS is short a rank");
+        constexpr uint32 KICK_CD_MS = 12000;
+        constexpr uint32 LOCK_MS = 3000;
 
         // The card's two fixed numbers: five yards of reach, and the half
         // second at each end of the cast that decides whether the kick lands.
@@ -68,11 +66,6 @@ namespace Gauntlet
         // player is dead for other reasons.
         constexpr std::size_t MAX_KICKERS = 8;   // TODO(design)
 
-        uint8 RankIndex(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* MechanicName()
         {
@@ -217,7 +210,6 @@ namespace Gauntlet
 
         void Cunning::Kick(Ctx& ctx, Player* player, Creature* kicker, Spell* spell)
         {
-            uint8 const i = RankIndex(ctx.self);
 
             SpellInfo const* info = spell->GetSpellInfo();
             SpellSchoolMask const school = info ? info->GetSchoolMask() : SPELL_SCHOOL_MASK_NORMAL;
@@ -233,14 +225,14 @@ namespace Gauntlet
             // implementation, which also sends SMSG_SPELL_COOLDOWN so the
             // client greys the school out -- the player can see what was taken
             // and for how long, which design section 4.8 requires.
-            player->ProhibitSpellSchool(school, LOCK_MS[i]);                 // Unit.h:1585
+            player->ProhibitSpellSchool(school, LOCK_MS);                 // Unit.h:1585
 
             while (_kickers.size() >= MAX_KICKERS)
                 _kickers.erase(_kickers.begin());
 
             Kicker record;
             record.guid      = kicker->GetGUID();
-            record.readyInMs = KICK_CD_MS[i];
+            record.readyInMs = KICK_CD_MS;
             _kickers.push_back(record);
 
             // This affix can end a run by taking a heal away, so it claims the
@@ -249,7 +241,7 @@ namespace Gauntlet
                 ctx.run->NoteActor(MECHANIC_CUNNING);
 
             if (ctx.addon)
-                ctx.addon->SendEvent(player, MechanicKey(), LOCK_MS[i] / 1000u, MechanicName());
+                ctx.addon->SendEvent(player, MechanicKey(), LOCK_MS / 1000u, MechanicName());
 
             if (player->GetSession())
                 ChatHandler(player->GetSession()).PSendSysMessage(
@@ -259,11 +251,10 @@ namespace Gauntlet
 
         std::string Cunning::Describe(AffixInstance const& self) const
         {
-            uint8 const i = RankIndex(&self);
 
             std::string out = "Every enemy within five yards can interrupt the spell you are"
-                              " casting once every " + std::to_string(KICK_CD_MS[i] / 1000u)
-                            + " seconds, locking that school for " + std::to_string(LOCK_MS[i] / 1000u)
+                              " casting once every " + std::to_string(KICK_CD_MS / 1000u)
+                            + " seconds, locking that school for " + std::to_string(LOCK_MS / 1000u)
                             + ". It only fires half a second into a cast with more than half a"
                               " second left, so a cancelled cast eats the kick.";
 

@@ -42,11 +42,6 @@ namespace Gauntlet
         constexpr uint32 SPELL_SUMMON_FELHUNTER  = 691;
         constexpr uint32 SPELL_SUMMON_FELGUARD   = 30146;
 
-        uint8 RankIndexOf(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* KeyOf(uint16 id, char const* fallback)
         {
@@ -70,8 +65,7 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_FEL_PACT = 60;
 
         // The card's ladder: 20 -> 15 -> 10 kills before the binding goes.
-        constexpr uint32 PACT_KILLS[] = { 20, 15, 10, 7 };
-        static_assert(std::size(PACT_KILLS) >= MAX_RANK, "PACT_KILLS is short a rank");
+        constexpr uint32 PACT_KILLS = 20;
 
         constexpr uint32 HOSTILE_MS = 15000;
 
@@ -131,7 +125,7 @@ namespace Gauntlet
             std::string Diagnose(Ctx& ctx) const override
             {
                 return "fel pact: " + std::to_string(_kills) + "/"
-                     + std::to_string(PACT_KILLS[RankIndexOf(ctx.self)]) + " kills, grace "
+                     + std::to_string(PACT_KILLS) + " kills, grace "
                      + std::to_string(_graceMs / 1000u) + "s";
             }
 
@@ -148,7 +142,7 @@ namespace Gauntlet
             {
                 if (ctx.player)
                     AddonFor(ctx)->QueueCounter(ctx.player, KeyOf(MECHANIC_FEL_PACT, "c33_fel_pact"),
-                                                _kills, PACT_KILLS[RankIndexOf(ctx.self)]);
+                                                _kills, PACT_KILLS);
             }
 
             void Break(Ctx& ctx, Pet* pet);
@@ -186,7 +180,7 @@ namespace Gauntlet
                 return;
             }
 
-            if (_kills < PACT_KILLS[RankIndexOf(ctx.self)])
+            if (_kills < PACT_KILLS)
                 return;
             if (ctx.run && ctx.run->dead)
                 return;
@@ -254,7 +248,7 @@ namespace Gauntlet
 
         std::string FelPact::Describe(AffixInstance const& self) const
         {
-            uint32 const kills = PACT_KILLS[RankIndexOf(&self)];
+            uint32 const kills = PACT_KILLS;
 
             std::string out = "Every kill your demon makes frays its binding. After "
                             + std::to_string(kills) + " it breaks free and attacks you for 15"
@@ -276,8 +270,7 @@ namespace Gauntlet
         // the demon stay free, so the number of targets you dot becomes a
         // health decision rather than a reflex.
         // ==================================================================
-        constexpr uint32 AFFLICTION_PCT[] = { 20, 30, 40, 50 };
-        static_assert(std::size(AFFLICTION_PCT) >= MAX_RANK, "AFFLICTION_PCT is short a rank");
+        constexpr uint32 AFFLICTION_PCT = 20;
 
         class AfflictionOfTheSelf final : public IMechanic
         {
@@ -300,7 +293,7 @@ namespace Gauntlet
                     return;
 
                 uint32 const share = uint32(uint64(damage)
-                                          * AFFLICTION_PCT[RankIndexOf(ctx.self)] / 100u);
+                                          * AFFLICTION_PCT / 100u);
                 if (share == 0)
                     return;
 
@@ -334,7 +327,7 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint32 const pct  = AFFLICTION_PCT[RankIndexOf(&self)];
+                uint32 const pct  = AFFLICTION_PCT;
                 uint32 const boon = self.boonMag;
 
                 std::string out = std::to_string(pct) + "% of what your curses and corruption"
@@ -373,8 +366,7 @@ namespace Gauntlet
         // ==================================================================
         // Rank IV wants an enemy two levels above you before a shard drops, which
         // is the same instruction Hubris gives from the other side: fight up.
-        constexpr int32 SHARD_LEVEL_DELTA[] = { -2, 0, 1, 2 };
-        static_assert(std::size(SHARD_LEVEL_DELTA) >= MAX_RANK, "SHARD_LEVEL_DELTA is short a rank");
+        constexpr int32 SHARD_LEVEL_DELTA = 0;
 
         constexpr uint32 ITEM_SOUL_SHARD  = 6265;
 
@@ -391,7 +383,7 @@ namespace Gauntlet
                 if (sGauntletSummons->IsGauntletSummon(killed))
                     return;
 
-                int32 const wanted = int32(player->GetLevel()) + SHARD_LEVEL_DELTA[RankIndexOf(ctx.self)];
+                int32 const wanted = int32(player->GetLevel()) + SHARD_LEVEL_DELTA;
                 if (int32(killed->GetLevel()) >= wanted)
                 {
                     // At or above the line: the boon doubles what Drain Soul
@@ -416,7 +408,7 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                int32 const  delta = SHARD_LEVEL_DELTA[RankIndexOf(&self)];
+                int32 const  delta = SHARD_LEVEL_DELTA;
                 std::string  line  = delta < 0
                     ? "no more than " + std::to_string(-delta) + " levels below you"
                     : (delta == 0 ? std::string("at your level or above")
@@ -451,8 +443,7 @@ namespace Gauntlet
         // card means it to be: a warlock who cannot afford the damage fights
         // without one, which is a style rather than a failure.
         // ==================================================================
-        constexpr float SHARED_TAKEN[] = { 1.15f, 1.25f, 1.40f, 1.55f };
-        static_assert(std::size(SHARED_TAKEN) >= MAX_RANK, "SHARED_TAKEN is short a rank");
+        constexpr float SHARED_TAKEN = 1.25f;
 
         class SharedBlood final : public IMechanic
         {
@@ -463,7 +454,7 @@ namespace Gauntlet
                 if (!player || !player->GetPet())
                     return 1.0f;
 
-                return SHARED_TAKEN[RankIndexOf(ctx.self)];
+                return SHARED_TAKEN;
             }
 
             void OnPetDamage(Ctx& ctx, Unit* /*victim*/, uint32& damage) override
@@ -476,7 +467,7 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint32 const extra = uint32((SHARED_TAKEN[RankIndexOf(&self)] - 1.0f) * 100.0f + 0.5f);
+                uint32 const extra = uint32((SHARED_TAKEN - 1.0f) * 100.0f + 0.5f);
                 uint32 const boon  = self.boonMag;
 
                 std::string out = "While your demon is out you take " + std::to_string(extra)

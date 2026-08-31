@@ -51,7 +51,7 @@ namespace
     {
         // Field by field rather than memcmp: Offer has padding, and padding
         // bytes are not part of the value this test is about.
-        return a.mechanic == b.mechanic && a.rank == b.rank && a.rarity == b.rarity
+        return a.mechanic == b.mechanic && a.rarity == b.rarity
             && a.condition == b.condition && a.boon == b.boon && a.boonMag == b.boonMag
             && a.kind == b.kind && a.swapSlot == b.swapSlot;
     }
@@ -71,7 +71,7 @@ namespace
         std::ostringstream out;
         out << "relaxations=0x" << std::hex << set.relaxations << std::dec;
         for (Offer const& offer : set.offers)
-            out << " | id=" << offer.mechanic << " rank=" << unsigned(offer.rank)
+            out << " | id=" << offer.mechanic
                 << " rarity=" << unsigned(static_cast<uint8>(offer.rarity))
                 << " cond=" << unsigned(static_cast<uint8>(offer.condition))
                 << " boon=" << unsigned(static_cast<uint8>(offer.boon))
@@ -102,7 +102,7 @@ namespace
 
             AffixInstance instance;
             instance.mechanic   = def.id;
-            instance.rank       = static_cast<uint8>(Stream::RollIn(state, 1, def.maxRank));
+            instance.rarity     = def.rarity;
             instance.slot       = static_cast<uint8>(Stream::RollIn(state, 1, tier));
             instance.genVersion = GeneratorVersion;
             carried.push_back(instance);
@@ -622,7 +622,7 @@ TEST(GeneratorFamilyMask, DisabledFamilyIsNeverOffered)
                     AffixInstance inst;
                     inst.slot     = tier;
                     inst.mechanic = set.offers[0].mechanic;
-                    inst.rank     = set.offers[0].rank;
+                    inst.rarity   = set.offers[0].rarity;
                     inst.boon     = set.offers[0].boon;
                     inst.boonMag  = set.offers[0].boonMag;
                     if (!std::any_of(carried.begin(), carried.end(),

@@ -72,8 +72,7 @@ namespace Gauntlet
         // Rank IV is past the card at 12 s and 65%. The three-second warning
         // does not move at any rank, so the ladder prices standing still and
         // never shortens the answer to it.
-        constexpr uint32 SEVERITY_PCT[] = { 25, 35, 50, 65 };
-        static_assert(std::size(SEVERITY_PCT) >= MAX_RANK, "SEVERITY_PCT is short a rank");
+        constexpr uint32 SEVERITY_PCT = 35;
 
         // The card's three seconds. Handed to Scheduler::Arm as the warning's
         // lead rather than counted here; Budget() stretches the cadence and
@@ -204,15 +203,7 @@ namespace Gauntlet
         // cannot disagree about what rank II is worth, and it exists at all for
         // the same reason ScalarMagnitude has a fallback: an affix whose card
         // promises an upside must never silently deliver nothing.
-        constexpr uint8 FALLBACK_SPEED_PCT[] = { 5, 10, 15, 20 };   // TODO(design)
-        static_assert(std::size(FALLBACK_SPEED_PCT) >= MAX_RANK, "FALLBACK_SPEED_PCT is short a rank");
-
-        uint8 RankIndex(uint8 rank)
-        {
-            if (rank < 1)
-                return 0;
-            return static_cast<uint8>((rank > MAX_RANK ? MAX_RANK : rank) - 1);
-        }
+        constexpr uint8 FALLBACK_SPEED_PCT = 10;   // TODO(design)
 
         // Both come from the registry rather than from literals here, so the
         // key the addon coalesces on and the name the chat line prints cannot
@@ -261,8 +252,6 @@ namespace Gauntlet
             void ClearMark(Ctx& ctx, bool announce);
             void Strike(Ctx& ctx, Player* player);
             void Reward(Ctx& ctx, Player* player);
-
-            uint8 RankIndexOf(Ctx const& ctx) const { return RankIndex(ctx.self ? ctx.self->rank : 1); }
 
             // Where the sky is going to land, fixed at Warn time. Everything
             // here is transient on purpose and none of it is written to
@@ -344,7 +333,7 @@ namespace Gauntlet
 
             _stillMs += diffMs;
 
-            if (_armed || !FallingSkyArms(ctx.self ? ctx.self->rank : 1, _stillMs))
+            if (_armed || !FallingSkyArms(_stillMs))
                 return;
 
             Arm(ctx);
@@ -521,9 +510,9 @@ namespace Gauntlet
                 Disarm(ctx);
         }
 
-        void FallingSky::Strike(Ctx& ctx, Player* player)
+        void FallingSky::Strike(Ctx& /*ctx*/, Player* player)
         {
-            uint32 const pct = SEVERITY_PCT[RankIndexOf(ctx)];
+            uint32 const pct = SEVERITY_PCT;
 
             // The multiplication is done in 64 bits because health times 50
             // overflows uint32 at about 86 million, which no character has and
@@ -566,7 +555,7 @@ namespace Gauntlet
 
             uint32 const pct = ctx.self->boonMag != 0
                              ? static_cast<uint32>(ctx.self->boonMag)
-                             : static_cast<uint32>(FALLBACK_SPEED_PCT[RankIndexOf(ctx)]);
+                             : static_cast<uint32>(FALLBACK_SPEED_PCT);
             if (pct == 0)
                 return;
 
@@ -611,12 +600,10 @@ namespace Gauntlet
 
         std::string FallingSky::Describe(AffixInstance const& self) const
         {
-            uint8 const rank = RankIndex(self.rank);
-
-            std::string out = "Stand still in combat for " + std::to_string(STILL_MS[rank] / 1000)
+            std::string out = "Stand still in combat for " + std::to_string(STILL_MS / 1000)
                             + " seconds and the sky marks the ground under you; "
                             + std::to_string(WARN_MS / 1000)
-                            + " seconds later it strikes for " + std::to_string(SEVERITY_PCT[rank])
+                            + " seconds later it strikes for " + std::to_string(SEVERITY_PCT)
                             + "% of your maximum health. Keep moving and it never finds you.";
 
             // Not BoonClause. The shared clause reads " In exchange, you move
@@ -631,7 +618,7 @@ namespace Gauntlet
             {
                 uint32 const pct = self.boonMag != 0
                                  ? static_cast<uint32>(self.boonMag)
-                                 : static_cast<uint32>(FALLBACK_SPEED_PCT[rank]);
+                                 : static_cast<uint32>(FALLBACK_SPEED_PCT);
                 if (pct != 0)
                     out += " Move clear in time and you are " + std::to_string(pct)
                          + "% faster for " + std::to_string(DODGE_SPEED_MS / 1000) + " seconds.";

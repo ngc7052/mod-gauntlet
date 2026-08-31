@@ -63,8 +63,7 @@ namespace Gauntlet
         // decision rather than an option you never take. The cap matters
         // more than the cadence here -- Gauntlet.Summons.MaxAlive still
         // bounds what can be standing at once across every spawn mechanic.
-        constexpr uint32 FIRST_MS[]  = { 45000, 30000, 20000, 15000 };
-        static_assert(std::size(FIRST_MS) >= MAX_RANK, "FIRST_MS is short a rank");
+        constexpr uint32 FIRST_MS = 30000;
         // The repeat stops at twelve seconds and stays there, and the reason is
         // not the card.
         //
@@ -85,10 +84,8 @@ namespace Gauntlet
         // escalates on the two axes that do: the first arrival (20 -> 15 s) and
         // the cap (4 -> 6). That is the same shape Half-Tamed and Grave Call
         // take where one of their numbers has run out.
-        constexpr uint32 REPEAT_MS[] = { 15000, 15000, 12000, 12000 };
-        static_assert(std::size(REPEAT_MS) >= MAX_RANK, "REPEAT_MS is short a rank");
-        constexpr uint32 CAP[]       = { 2, 3, 4, 6 };
-        static_assert(std::size(CAP) >= MAX_RANK, "CAP is short a rank");
+        constexpr uint32 REPEAT_MS = 15000;
+        constexpr uint32 CAP = 3;
 
         // "spawns 20 yd away and attacks the owner".
         constexpr float SPAWN_YARDS = 20.0f;
@@ -105,11 +102,6 @@ namespace Gauntlet
         // for the arrival to be legible and does not say how far ahead.
         constexpr uint32 WARN_MS = 5000;   // TODO(design)
 
-        uint8 RankIndex(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* MechanicKey()
         {
@@ -263,7 +255,7 @@ namespace Gauntlet
             // clock, so disengage-and-reset is always available".
             _spawned = 0;
             _armed   = true;
-            Arm(ctx, FIRST_MS[RankIndex(ctx.self)]);
+            Arm(ctx, FIRST_MS);
         }
 
         void Reinforcements::Arm(Ctx& ctx, uint32 inMs)
@@ -323,14 +315,14 @@ namespace Gauntlet
                 return;
             }
 
-            uint32 const cap = CAP[RankIndex(ctx.self)];
+            uint32 const cap = CAP;
             if (_spawned >= cap)
                 return;   // the fight has had its share; no re-arm
 
             Arrive(ctx);
 
             if (_spawned < cap)
-                Arm(ctx, REPEAT_MS[RankIndex(ctx.self)]);
+                Arm(ctx, REPEAT_MS);
         }
 
         void Reinforcements::Arrive(Ctx& ctx)
@@ -343,7 +335,7 @@ namespace Gauntlet
                 // Fighting an elite, a boss or something this module summoned.
                 // The card skips those, and skipping is not spending: re-arm and
                 // look again, because the fight may turn into a copyable one.
-                Arm(ctx, REPEAT_MS[RankIndex(ctx.self)]);
+                Arm(ctx, REPEAT_MS);
                 return;
             }
 
@@ -362,7 +354,7 @@ namespace Gauntlet
                 // The four-summon cap refused, which it may legitimately do
                 // while other affixes have creatures out. Try again on the next
                 // interval rather than dropping the fight's whole ladder.
-                Arm(ctx, REPEAT_MS[RankIndex(ctx.self)]);
+                Arm(ctx, REPEAT_MS);
                 return;
             }
 
@@ -372,7 +364,7 @@ namespace Gauntlet
 
             Addon* addon = AddonFor(ctx);
             addon->SendEvent(player, MechanicKey(), 0, "Reinforcements");
-            addon->QueueCounter(player, MechanicKey(), _spawned, CAP[RankIndex(ctx.self)]);
+            addon->QueueCounter(player, MechanicKey(), _spawned, CAP);
 
             ChatHandler(player->GetSession()).PSendSysMessage(
                 "|cffff2020[Gauntlet]|r {} arrives.", copy->GetNameForLocaleIdx(LOCALE_enUS));
@@ -380,12 +372,11 @@ namespace Gauntlet
 
         std::string Reinforcements::Describe(AffixInstance const& self) const
         {
-            uint8 const i = RankIndex(&self);
 
-            std::string out = "A fight that lasts longer than " + std::to_string(FIRST_MS[i] / 1000u)
+            std::string out = "A fight that lasts longer than " + std::to_string(FIRST_MS / 1000u)
                             + " seconds draws another of whatever you are fighting, and another every "
-                            + std::to_string(REPEAT_MS[i] / 1000u) + " seconds after that, up to "
-                            + std::to_string(CAP[i])
+                            + std::to_string(REPEAT_MS / 1000u) + " seconds after that, up to "
+                            + std::to_string(CAP)
                             + ". Leaving combat resets the clock and sends them away.";
 
             out += BoonClause(self.boon, self.boonMag);

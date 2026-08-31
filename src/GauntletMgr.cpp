@@ -149,33 +149,11 @@ namespace Gauntlet
         {
             switch (kind)
             {
-                case OfferKind::RankUp:  return "rankup";
                 case OfferKind::Bargain: return "bargain";
                 case OfferKind::Swap:    return "swap_in";
                 default:                 return "pick";
             }
         }
-
-        // The leaderboard's numerals, and the addon's RANK_PIP has to agree
-        // with them: a run that ends carrying a rank IV should not be recorded
-        // as "Falling Sky 4" in the one place its epitaph is read.
-        //
-        // IV was missing for the whole of Phase 6, which is how long there had
-        // been a fourth rank. The decimal fallback is deliberate and stays: it
-        // is what a rank the numerals do not cover should look like, and it is
-        // visibly wrong rather than silently plausible.
-        std::string RankNumeral(uint8 rank)
-        {
-            switch (rank)
-            {
-                case 1:  return "I";
-                case 2:  return "II";
-                case 3:  return "III";
-                case 4:  return "IV";
-                default: return std::to_string(static_cast<uint32>(rank));
-            }
-        }
-        static_assert(MAX_RANK <= 4, "RankNumeral needs a case for the new top rank");
 
         // How often the key/value store is written while a character is
         // logged in. CONTRACT-P1 section 5.2 states the sixty seconds.
@@ -460,7 +438,7 @@ namespace Gauntlet
     {
         AffixInstance probe;
         probe.mechanic   = offer.mechanic;
-        probe.rank       = offer.rank;
+        probe.rarity     = offer.rarity;
         probe.condition  = offer.condition;
         probe.boon       = offer.boon;
         probe.boonMag    = offer.boonMag;
@@ -631,11 +609,17 @@ namespace Gauntlet
                 AffixInstance a;
                 a.slot       = f[0].Get<uint8>();
                 a.mechanic   = f[1].Get<uint16>();
-                a.rank       = f[2].Get<uint8>();
                 a.condition  = static_cast<Condition>(f[3].Get<uint8>());
                 a.boon       = static_cast<Boon>(f[4].Get<uint8>());
                 a.boonMag    = f[5].Get<uint8>();
                 a.genVersion = f[6].Get<uint16>();
+
+                // The card's rarity, from the registry and never from the row.
+                // f[2] is the `rank` column the rank system left behind; it
+                // holds whatever the card was worth when it was written, and
+                // rarity is a fact about the card today.
+                if (MechanicDef const* def = FindMechanic(a.mechanic))
+                    a.rarity = def->rarity;
 
                 // A row the migration could not convert, or one written by a
                 // future generator this build does not understand. Skipping it
@@ -824,7 +808,7 @@ namespace Gauntlet
 
             AffixInstance preview;
             preview.mechanic  = o.mechanic;
-            preview.rank      = o.rank;
+            preview.rarity    = o.rarity;
             preview.condition = o.condition;
             preview.boon      = o.boon;
             preview.boonMag   = o.boonMag;
@@ -968,6 +952,14 @@ namespace Gauntlet
         if (chosen.mechanic == MECHANIC_NONE)
             return false;
 
+        // Never twice. The offer builder refuses a carried mechanic at every
+        // relaxation, and until the rank system went a pick of one raised it
+        // in place; with nothing to raise, a carried mechanic arriving here is
+        // a stale offer set and the honest answer is to refuse it, the way a
+        // pick of an empty slot is refused above.
+        if (st->Find(chosen.mechanic))
+            return false;
+
         uint32 const low  = player->GetGUID().GetCounter();
         uint32 const tier = st->pendingTier != 0 ? st->pendingTier : st->tier + 1;
         uint8 const  slot = static_cast<uint8>(std::min<uint32>(tier, 255u));
@@ -984,143 +976,73 @@ namespace Gauntlet
         // never disagrees with itself.
         CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
 
-        AffixInstance* held = st->Find(chosen.mechanic);
-
-        // `held`, not `kind == RankUp`. A pick of a mechanic the run already
-        // carries raises it in place whatever the offer called itself, and
-        // never attaches a second copy.
-        //
-        // It used to be the kind alone, and the else-branch below attached
-        // unconditionally -- so a New offer for a carried mechanic, which the
-        // builder does produce when it has relaxed GR_RepeatedMechanic to fill
-        // a slot, created a duplicate instance in a fresh slot. A level 80 run
-        // reported three Champions: three independent counters, three sets of
-        // OnTick state, three contributions to the same aggregate. At tier 16
-        // the live sweep relaxes 86% of sets, so this was not a rare corner.
-        //
-        // The relaxation itself is correct: when nothing else can fill a slot,
-        // offering something the player has is better than an empty row. What
-        // was wrong is what picking it did.
-        if (held)
+        // Swap first: the discarded affix leaves the table, and its
+        // departure is logged before the arrival so the log reads in the
+        // order the run happened.
+        if (chosen.kind == OfferKind::Swap)
         {
-            // In place, in the same slot: plan section 3.1. The slot is the
-            // tier the affix was first taken at and does not move when it
-            // grows, which is what makes gauntlet_affix_log the record of
-            // when it grew.
-            //
-            // The boon moves with the rank, and until Phase 3 it did not. Only
-            // `rank` was copied here and only `rank` was written below, so a
-            // rank-up raised the curse and left the boon at the magnitude it
-            // was first taken with -- in memory and in the database, for the
-            // rest of the run. Overextended went from "15% more damage per
-            // extra attacker, +10% healing" to "20% more damage per extra
-            // attacker, +10% healing", and the offer the player accepted had
-            // promised 20%.
-            //
-            // BoonTable scales every generic boon linearly by rank and gives
-            // Frenzy and Hubris their own per-rank rows, so this affected
-            // every mechanic with a magnitude -- most of the table. It is the
-            // exact failure the comment above BoonTable warns about: "the
-            // number the offer promises has to be the number the mechanic
-            // pays, or the card is lying at the one moment the player is
-            // reading it."
-            //
-            // The condition is deliberately not copied. Nothing has rolled one
-            // since Phase 2 and both sides are Condition::Always; writing a
-            // dormant field here would be noise in the diff and in the table.
-            // Never downwards. A New offer for a carried mechanic carries the
-            // tier's rank floor, which can sit below a rank the run has
-            // already bought; accepting it must not take a rank away.
-            MechanicDef const* def = FindMechanic(chosen.mechanic);
-            uint8 const ceiling = def ? std::min<uint8>(def->maxRank, MAX_RANK) : MAX_RANK;
-
-            held->rank    = std::min<uint8>(std::max(chosen.rank, held->rank), ceiling);
-            held->boon    = chosen.boon;
-            held->boonMag = chosen.boonMag;
-
-            trans->Append("UPDATE `gauntlet_affix` SET `rank` = {}, `boon` = {}, `boon_mag` = {} "
-                          "WHERE `guid` = {} AND `slot` = {}",
-                          static_cast<uint32>(held->rank), static_cast<uint32>(chosen.boon),
-                          static_cast<uint32>(chosen.boonMag), low, static_cast<uint32>(held->slot));
-            trans->Append(
-                "INSERT INTO `gauntlet_affix_log` (`guid`, `tier`, `action`, `mechanic`, `rank`, `gen_version`) "
-                "VALUES ({}, {}, 'rankup', {}, {}, {})",
-                low, static_cast<uint32>(slot), static_cast<uint32>(chosen.mechanic),
-                static_cast<uint32>(held->rank), static_cast<uint32>(GeneratorVersion));
-        }
-        else
-        {
-            // Swap first: the discarded affix leaves the table, and its
-            // departure is logged before the arrival so the log reads in the
-            // order the run happened.
-            if (chosen.kind == OfferKind::Swap)
+            if (AffixInstance* out = st->AtSlot(chosen.swapSlot))
             {
-                if (AffixInstance* out = st->AtSlot(chosen.swapSlot))
+                trans->Append(
+                    "INSERT INTO `gauntlet_affix_log` "
+                    "(`guid`, `tier`, `action`, `mechanic`, `rank`, `gen_version`) "
+                    "VALUES ({}, {}, 'swap_out', {}, {}, {})",
+                    low, static_cast<uint32>(slot), static_cast<uint32>(out->mechanic),
+                    static_cast<uint32>(out->rarity), static_cast<uint32>(out->genVersion));
+                trans->Append("DELETE FROM `gauntlet_affix` WHERE `guid` = {} AND `slot` = {}",
+                              low, static_cast<uint32>(chosen.swapSlot));
+
+                // Detach before insert: OnDetach may want the run to still
+                // look the way it did while the affix was carried.
+                if (out->impl)
                 {
-                    trans->Append(
-                        "INSERT INTO `gauntlet_affix_log` "
-                        "(`guid`, `tier`, `action`, `mechanic`, `rank`, `gen_version`) "
-                        "VALUES ({}, {}, 'swap_out', {}, {}, {})",
-                        low, static_cast<uint32>(slot), static_cast<uint32>(out->mechanic),
-                        static_cast<uint32>(out->rank), static_cast<uint32>(out->genVersion));
-                    trans->Append("DELETE FROM `gauntlet_affix` WHERE `guid` = {} AND `slot` = {}",
-                                  low, static_cast<uint32>(chosen.swapSlot));
-
-                    // Detach before insert: OnDetach may want the run to still
-                    // look the way it did while the affix was carried.
-                    if (out->impl)
-                    {
-                        Ctx ctx = MakeCtx(player, st, out);
-                        out->impl->OnDetach(ctx);
-                    }
-                    st->DetachSlot(chosen.swapSlot);
+                    Ctx ctx = MakeCtx(player, st, out);
+                    out->impl->OnDetach(ctx);
                 }
+                st->DetachSlot(chosen.swapSlot);
             }
-
-            AffixInstance instance;
-            instance.mechanic   = chosen.mechanic;
-            instance.rank       = chosen.rank;
-            instance.condition  = chosen.condition;
-            instance.boon       = chosen.boon;
-            instance.boonMag    = chosen.boonMag;
-            instance.slot       = slot;
-            instance.genVersion = GeneratorVersion;
-
-            AffixInstance& stored = st->Attach(instance);
-
-            // Before OnAttach, for the reason Mgr::Load spells out: the budget
-            // has to be right by the time the new affix arms its first event.
-            SyncTimedAffixCount(player);
-
-            if (stored.impl)
-            {
-                Ctx ctx = MakeCtx(player, st, &stored);
-                stored.impl->OnAttach(ctx);
-            }
-
-            // REPLACE rather than INSERT so a client that manages to pick
-            // twice for one tier overwrites its own row instead of failing on
-            // the (guid, slot) key and losing the affix entirely.
-            trans->Append(
-                "REPLACE INTO `gauntlet_affix` "
-                "(`guid`, `slot`, `mechanic`, `rank`, `cond`, `boon`, `boon_mag`, `gen_version`) "
-                "VALUES ({}, {}, {}, {}, {}, {}, {}, {})",
-                low, static_cast<uint32>(slot), static_cast<uint32>(chosen.mechanic),
-                static_cast<uint32>(chosen.rank), static_cast<uint32>(chosen.condition),
-                static_cast<uint32>(chosen.boon), static_cast<uint32>(chosen.boonMag),
-                static_cast<uint32>(GeneratorVersion));
-            // A rank-up whose mechanic is not actually carried lands here, as
-            // a new affix; the log has to say what happened rather than what
-            // was offered.
-            char const* const action = chosen.kind == OfferKind::RankUp ? "pick" : LogAction(chosen.kind);
-
-            trans->Append(
-                "INSERT INTO `gauntlet_affix_log` (`guid`, `tier`, `action`, `mechanic`, `rank`, `gen_version`) "
-                "VALUES ({}, {}, '{}', {}, {}, {})",
-                low, static_cast<uint32>(slot), action,
-                static_cast<uint32>(chosen.mechanic), static_cast<uint32>(chosen.rank),
-                static_cast<uint32>(GeneratorVersion));
         }
+
+        AffixInstance instance;
+        instance.mechanic   = chosen.mechanic;
+        instance.rarity     = chosen.rarity;
+        instance.condition  = chosen.condition;
+        instance.boon       = chosen.boon;
+        instance.boonMag    = chosen.boonMag;
+        instance.slot       = slot;
+        instance.genVersion = GeneratorVersion;
+
+        AffixInstance& stored = st->Attach(instance);
+
+        // Before OnAttach, for the reason Mgr::Load spells out: the budget
+        // has to be right by the time the new affix arms its first event.
+        SyncTimedAffixCount(player);
+
+        if (stored.impl)
+        {
+            Ctx ctx = MakeCtx(player, st, &stored);
+            stored.impl->OnAttach(ctx);
+        }
+
+        // REPLACE rather than INSERT so a client that manages to pick
+        // twice for one tier overwrites its own row instead of failing on
+        // the (guid, slot) key and losing the affix entirely. The `rank`
+        // column carries the rarity now -- see AffixInstance::rarity.
+        trans->Append(
+            "REPLACE INTO `gauntlet_affix` "
+            "(`guid`, `slot`, `mechanic`, `rank`, `cond`, `boon`, `boon_mag`, `gen_version`) "
+            "VALUES ({}, {}, {}, {}, {}, {}, {}, {})",
+            low, static_cast<uint32>(slot), static_cast<uint32>(chosen.mechanic),
+            static_cast<uint32>(chosen.rarity), static_cast<uint32>(chosen.condition),
+            static_cast<uint32>(chosen.boon), static_cast<uint32>(chosen.boonMag),
+            static_cast<uint32>(GeneratorVersion));
+
+        trans->Append(
+            "INSERT INTO `gauntlet_affix_log` (`guid`, `tier`, `action`, `mechanic`, `rank`, `gen_version`) "
+            "VALUES ({}, {}, '{}', {}, {}, {})",
+            low, static_cast<uint32>(slot), LogAction(chosen.kind),
+            static_cast<uint32>(chosen.mechanic), static_cast<uint32>(chosen.rarity),
+            static_cast<uint32>(GeneratorVersion));
 
         trans->Append("UPDATE `gauntlet_run` SET `tier` = {}, `dead` = {} WHERE `guid` = {}",
                       st->tier, st->dead ? 1 : 0, low);
@@ -1128,9 +1050,9 @@ namespace Gauntlet
         st->dirty = false;
 
         // The carried set just changed, so anything it contributes to the
-        // health pool has to be recomputed now. A rank-up moves the number, a
-        // swap can take a contribution away entirely, and a new affix adds one;
-        // none of the three is a stat change the core would notice by itself.
+        // health pool has to be recomputed now. A swap can take a contribution
+        // away entirely and a new affix adds one; neither is a stat change the
+        // core would notice by itself.
         RefreshStats(player);
 
         // A pick is one of the four moments CONTRACT-P1 section 5.2 names for
@@ -1187,9 +1109,8 @@ namespace Gauntlet
         for (AffixInstance const& a : st->affixes)
         {
             MechanicDef const* def = FindMechanic(a.mechanic);
-            std::string const entry = (def ? std::string(def->name)
-                                           : "#" + std::to_string(static_cast<uint32>(a.mechanic)))
-                                    + " " + RankNumeral(a.rank);
+            std::string const entry = def ? std::string(def->name)
+                                          : "#" + std::to_string(static_cast<uint32>(a.mechanic));
 
             if (!affixes.empty())
                 affixes += ", ";

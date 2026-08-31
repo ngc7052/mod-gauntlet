@@ -85,7 +85,7 @@ namespace
     {
         I_OFFER_COUNT, I_NON_EMPTY, I_IN_TABLE, I_TIER_WINDOW, I_CLASS_MASK,
         I_SPELL_GATE, I_TREE_GATE, I_PLAIN_CONDITION, I_ROW_BOON,
-        I_CONDITION_RANGE, I_BOON_RANGE, I_RANK_RANGE, I_RANKUP_CARRIED,
+        I_CONDITION_RANGE, I_BOON_RANGE,
         I_NEW_NOT_CARRIED, I_EXCLUSIVE_KEY, I_SWAP_IN_SLOT_C, I_SWAP_TARGET,
         I_FAMILY_BIT, I_MECHANIC_BIT, I_REWARD_BIT, I_SPURIOUS_BIT, I_UNKNOWN_BIT,
         I_NOT_IMPLEMENTED, I_ROW_RARITY,
@@ -104,9 +104,7 @@ namespace
         "an offer's boon is not the one its registry row names",
         "an offer's condition is outside the enum",
         "an offer's boon is outside the enum",
-        "an offer's rank is outside [1, min(maxRank, MAX_RANK)]",
-        "a RankUp is not carried, is already at its ceiling, or is not +1",
-        "a carried mechanic was offered as New, Swap or Bargain",
+        "a carried mechanic was offered again",
         "an offer shares an exclusive key with something carried",
         "slot C is not a Swap at tier 20, 40 or 60 for a run below the carry cap",
         "a Swap names a slot the carried set does not hold",
@@ -142,7 +140,7 @@ namespace
         if (q.carried->empty())
             out << " (none)";
         for (AffixInstance const& a : *q.carried)
-            out << " {id=" << a.mechanic << " rank=" << unsigned(a.rank)
+            out << " {id=" << a.mechanic << " rarity=" << unsigned(static_cast<uint8>(a.rarity))
                 << " cond=" << unsigned(static_cast<uint8>(a.condition))
                 << " slot=" << unsigned(a.slot) << "}";
 
@@ -152,7 +150,6 @@ namespace
             MechanicDef const* def = FindMechanic(o.mechanic);
             out << "\n      id=" << o.mechanic << " (" << (def ? def->key : "not in the table")
                 << ") family=" << (def ? unsigned(static_cast<uint8>(def->family)) : 99u)
-                << " rank=" << unsigned(o.rank)
                 << " rarity=" << unsigned(static_cast<uint8>(o.rarity))
                 << " cond=" << unsigned(static_cast<uint8>(o.condition))
                 << " boon=" << unsigned(static_cast<uint8>(o.boon))
@@ -314,13 +311,9 @@ namespace
             if (def->flags & MF_RewardShaped)
                 rewardShaped = true;
 
-            // maxTier binds a new offer, not a rank-up: the window says when a
-            // mechanic may be introduced, and something already carried may
-            // deepen whatever the tier. minTier still binds both, and binds a
-            // rank-up vacuously, since a mechanic below its own minTier cannot
-            // have been carried in the first place.
-            if (tier < def->minTier
-                || (offer.kind != OfferKind::RankUp && tier > def->maxTier))
+            // Every offer is an introduction now that rank-ups are gone, so
+            // the window binds every kind.
+            if (tier < def->minTier || tier > def->maxTier)
                 tally.Fail(I_TIER_WINDOW, q);
 
             if (def->classMask != 0 && (def->classMask & view.GetClassMask()) == 0)
@@ -355,27 +348,16 @@ namespace
             if (offer.rarity != def->rarity)
                 tally.Fail(I_ROW_RARITY, q);
 
-            uint8 const ceiling = def->maxRank < MAX_RANK ? def->maxRank : MAX_RANK;
-            if (offer.rank < 1 || offer.rank > ceiling)
-                tally.Fail(I_RANK_RANGE, q);
-
-            AffixInstance const* held = nullptr;
+            // Never twice: with the ranks gone a carried mechanic has nothing
+            // to be offered as, and the builder must never hand it back.
             for (AffixInstance const& a : carried)
                 if (a.mechanic == offer.mechanic)
-                    held = &a;
-
-            if (offer.kind == OfferKind::RankUp)
-            {
-                if (!held || held->rank >= ceiling || offer.rank != held->rank + 1)
-                    tally.Fail(I_RANKUP_CARRIED, q);
-            }
-            else if (held)
-                tally.Fail(I_NEW_NOT_CARRIED, q);
+                    tally.Fail(I_NEW_NOT_CARRIED, q);
 
             for (AffixInstance const& a : carried)
             {
                 if (a.mechanic == offer.mechanic)
-                    continue;   // the mechanic being ranked up never excludes itself
+                    continue;   // a mechanic never excludes itself
                 MechanicDef const* other = FindMechanic(a.mechanic);
                 if (other && KeysIntersect(def->exclusiveKeys, other->exclusiveKeys))
                 {
@@ -493,17 +475,11 @@ namespace
 
         for (AffixInstance& a : carried)
             if (a.mechanic == offer.mechanic)
-            {
-                a.rank      = offer.rank;
-                a.condition = offer.condition;
-                a.boon      = offer.boon;
-                a.boonMag   = offer.boonMag;
-                return;
-            }
+                return;   // never offered, per I_NEW_NOT_CARRIED; a pick of one is refused live
 
         AffixInstance instance;
         instance.mechanic   = offer.mechanic;
-        instance.rank       = offer.rank;
+        instance.rarity     = offer.rarity;
         instance.condition  = offer.condition;
         instance.boon       = offer.boon;
         instance.boonMag    = offer.boonMag;
@@ -618,35 +594,42 @@ TEST_F(FullTableSweep, RelaxationRatesAreWhereTheyWereMeasured)
 {
     Census const& census = _census;
 
-    // Tiers 1-4 only. Tier 8 used to be exact too, on an axis where it was
-    // level 40 and a run had taken eight affixes rather than eight-tenths of
-    // its early pool; it is now level 8 and the seven rows that open below tier
-    // 10 are largely spoken for by then.
-    for (uint8 tier : { 1, 2, 3, 4 })
+    // Tiers 1 and 2 exactly. Tiers 3 and 4 were exact too until the rank
+    // system went: a reward-shaped rank-up of a carried Champions or Carrion
+    // paid the guarantee in an otherwise-used family, and with rank-ups gone
+    // the guarantee at tier 3 needs an *uncarried* reward-shaped card in a
+    // family the set has not used -- three such cards exist below tier 8, and a
+    // run that has taken two of them has one left. Measured after the removal:
+    // 3.1% at tier 3 and 7.0% at tier 4, all of it the guarantee reaching for
+    // a repeated family. The ceilings are that measurement with headroom for a
+    // registry edit and none for a regression; the greed redesign's reward-
+    // shaped loot cards are what would take them back to zero.
+    for (uint8 tier : { 1, 2 })
         EXPECT_EQ(census.relaxed[tier], 0u)
             << "tier " << unsigned(tier) << " relaxed a rule " << census.relaxed[tier]
             << " times in " << census.sets[tier] << " sets, where it relaxed none before. These "
-               "are the first four levels of every run and the only tiers where three distinct "
-               "families are guaranteed; if this fails the opening of the game has gone hollow.";
-
-    // Tiers 1-4 have relaxed nothing since Phase 2 and still do not.
+               "are the first two levels of every run; if this fails the opening of the game has "
+               "gone hollow.";
+    EXPECT_LE(100.0 * double(census.relaxed[3]) / double(census.sets[3]), 5.0);
+    EXPECT_LE(100.0 * double(census.relaxed[4]) / double(census.sets[4]), 10.0);
 
     // "At least one reward-shaped offer per tier" (design section 4.4.5) is a
     // guarantee the builder keeps whenever anything reward-shaped is eligible
-    // at all, and it is exact for the first four levels.
+    // at all, and it is exact for the first three levels.
     //
-    // It cannot be exact past them any more. Three of the seven rows that open
-    // below tier 10 are reward-shaped -- Champions, Carrion and Hubris -- and a
-    // run that picks one every level has all three by about level 6, after
-    // which there is nothing reward-shaped left to offer until the next window
+    // It cannot be exact past them. Three of the seven rows that open below
+    // tier 10 are reward-shaped -- Champions, Carrion and Hubris -- and a run
+    // that picks one every level has all three by about level 6, after which
+    // there is nothing reward-shaped left to offer until the next window
     // opens. That is the early pool being thin, not the guarantee being
-    // dropped, which is why what is asserted past tier 4 is the whole-run rate.
-    for (uint8 tier = 1; tier <= 4; ++tier)
+    // dropped, which is why what is asserted past tier 3 is the whole-run rate.
+    for (uint8 tier = 1; tier <= 3; ++tier)
         EXPECT_EQ(census.noReward[tier], 0u)
             << "tier " << unsigned(tier) << " produced " << census.noReward[tier]
             << " sets with no reward-shaped offer, in " << census.sets[tier]
-            << ". The first four levels must always have one: it is the only "
+            << ". The first three levels must always have one: it is the only "
                "promise the offer builder makes about what a run feels like.";
+    EXPECT_LE(100.0 * double(census.noReward[4]) / double(census.sets[4]), 6.0);
 
     uint64 noReward = 0, allSets = 0;
     for (uint8 tier = 1; tier <= TIERS; ++tier)
@@ -681,14 +664,21 @@ TEST_F(FullTableSweep, RelaxationRatesAreWhereTheyWereMeasured)
     //          carried set that fills with them past the cap holds fewer
     //          reward-shaped rank-ups to pay the guarantee with, and the rate
     //          climbs at tiers 40-60 while the empty-slot count falls to zero.
-    //          The mechanism that carries the guarantee late is rank-ups, and
-    //          step 4 of the plan removes them; what replaces it is that
-    //          step's question, and question 7.1 -- does rarity gate the
-    //          carry cap -- is the one this number is asking.
+    //   21.0%  The rarity plan's step 4: the ranks are gone. Every tier is a
+    //          fresh pick, so the sixteen-card cap is reached around tier 17
+    //          rather than 49, and from there every slot is a swap. Rank-ups
+    //          of carried reward-shaped cards were the guarantee's late payer
+    //          and no longer exist; a swap that brings a reward-shaped card
+    //          in pays it now (BuildOffers' replacement builds a Swap on a
+    //          full set), which took the measurement from 42% back to 21%.
+    //          The rest is the table: eleven reward-shaped rows, most of them
+    //          carried by then. Question 7.1 -- does rarity gate the carry
+    //          cap -- is now the loudest number in the module, and the greed
+    //          redesign's loot cards are all reward-shaped by construction.
     //
-    // 18% leaves room for the table to move without leaving room for the
+    // 26% leaves room for the table to move without leaving room for the
     // guarantee to quietly stop being kept.
-    EXPECT_LE(noRewardRate, 18.0)
+    EXPECT_LE(noRewardRate, 26.0)
         << noRewardRate << "% of all sets have no reward-shaped offer; the guarantee has stopped "
            "being kept rather than merely running out of table";
 
@@ -738,7 +728,7 @@ TEST(OfferInvariants, ArbitraryCarriedSet)
 
                     AffixInstance instance;
                     instance.mechanic   = def.id;
-                    instance.rank       = static_cast<uint8>(Stream::RollIn(state, 1, def.maxRank));
+                    instance.rarity     = def.rarity;
                     instance.slot       = static_cast<uint8>(Stream::RollIn(state, 1, tier));
                     instance.genVersion = GeneratorVersion;
                     carried.push_back(instance);
@@ -851,15 +841,7 @@ TEST(OfferInvariants, LiveRegistryView)
                         << "id " << offer.mechanic << " (" << def->key << ") is MF_NotImplemented "
                         << "and was offered to a player\n  " << Describe(q);
                     ASSERT_GE(tier, def->minTier) << Describe(q);
-                    if (offer.kind != OfferKind::RankUp)
-                    {
-                        // See the note in Check(): maxTier gates introducing a
-                        // mechanic, not deepening one already carried.
-                        ASSERT_LE(tier, def->maxTier) << Describe(q);
-                    }
-                    ASSERT_GE(offer.rank, 1) << Describe(q);
-                    ASSERT_LE(offer.rank, def->maxRank < MAX_RANK ? def->maxRank : MAX_RANK)
-                        << Describe(q);
+                    ASSERT_LE(tier, def->maxTier) << Describe(q);
                     ASSERT_EQ(offer.condition, Condition::Always) << Describe(q);
                     ASSERT_EQ(offer.boon, def->boon)
                         << "id " << offer.mechanic << " (" << def->key << ") was offered with a "
@@ -1001,11 +983,14 @@ TEST(OfferInvariants, LiveRegistryView)
     // and says so. It halved in Phase 3 (95.19% -> 56.96% at tier 15, 99.08%
     // -> 86.59% at 16) and closes properly with Phase 4's forty-four class
     // curses.
-    for (uint8 tier = FIRST_TIER; tier <= 4; ++tier)
+    // Tiers 1 and 2 exactly; 3 and 4 lost their zero with the rank system,
+    // for the reason the full-table sweep's comment gives -- the guarantee
+    // used to be paid there by a rank-up of a carried reward-shaped card.
+    for (uint8 tier = FIRST_TIER; tier <= 2; ++tier)
         EXPECT_EQ(relaxedPerTier[tier], 0u)
             << "tier " << unsigned(tier) << " relaxed a rule in " << relaxedPerTier[tier]
             << " of " << setsPerTier[tier] << " sets, where it relaxed none before. Three "
-               "distinct families must be fillable at every one of the first four tiers; if "
+               "distinct families must be fillable at every one of the first two tiers; if "
                "this fails the pool is too narrow and the answer is more mechanics or a wider "
                "tier window, never a weaker assertion.";
 
@@ -1028,16 +1013,23 @@ TEST(OfferInvariants, LiveRegistryView)
     // before it, tier 8 relaxed 48% of sets and tier 9 relaxed 68%, because
     // seven rows cannot survive seven picks. Above 60 the table is exhausted
     // and the ceiling is 99 by arithmetic rather than by tolerance.
-    // Tier 30's ceiling moved 8 -> 10 with GeneratorVersion 15. The version is
-    // folded into the stream, so a bump reshuffles which seeds land badly, and
-    // tier 30 sits on the bargain family's opening edge where the rate is
-    // touchiest: 8.6% measured under 15 against 7-point-something under 14,
-    // with the tiers either side unmoved. Headroom for the dice, not for a
-    // regression.
+    // Re-measured after the rank removal (GeneratorVersion 16), and the shape
+    // is new rather than moved. Every tier is a fresh pick now, so the carried
+    // set fills through tiers 5-20 with the family caps biting all the way --
+    // repeated-family relaxations of 10-17% where rank-ups used to absorb the
+    // slot -- and is full from about tier 17, after which every slot is a swap
+    // and the reward-shaped guarantee runs out of uncarried reward-shaped
+    // cards. Tiers 30 and 40 read near zero because the bargain family opens
+    // at 30 and both bargains are reward-shaped, and 40 is a swap tier.
+    // Measured over 300 seeds: 5: 15%, 9: 46%, 12: 47%, 15: 72%, 20: 56%,
+    // 24: 46%, 29: 45%, 30: 0%, 33: 13%, 36: 19%, 50: 12%, 60: 26%. Headroom
+    // for the dice and a registry edit, none for a regression -- and the
+    // whole ladder is what the plan's question 7.1 and the greed redesign's
+    // loot cards should bring back down.
     constexpr std::array<Ceiling, 12> CEILINGS = { {
-        {  5,  1.0 }, {  9,  6.0 }, { 12, 10.0 }, { 15, 25.0 }, { 20, 75.0 },
-        { 24, 85.0 }, { 29, 92.0 }, { 30, 10.0 }, { 33, 16.0 }, { 36, 45.0 },
-        { 50, 65.0 }, { 60, 80.0 }
+        {  5, 20.0 }, {  9, 55.0 }, { 12, 55.0 }, { 15, 80.0 }, { 20, 65.0 },
+        { 24, 55.0 }, { 29, 55.0 }, { 30,  5.0 }, { 33, 20.0 }, { 36, 28.0 },
+        { 50, 20.0 }, { 60, 35.0 }
     } };
 
     for (Ceiling const& c : CEILINGS)

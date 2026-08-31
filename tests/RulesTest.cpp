@@ -8,12 +8,14 @@
 // already got caught by: an assertion that passes because it is not really
 // asking anything.
 //
-// So these are mostly *shape* tests rather than value tests. "Rank III of
-// Hubris multiplies by 0.65" is a restatement of the table and fails only when
+// So these are mostly *shape* tests rather than value tests. "Hubris' duel
+// multiplies by 0.75" is a restatement of the table and fails only when
 // someone edits the table deliberately. "The duel is always a shelter and the
-// rest of the pull is always an exposure, at every rank" is a claim about the
-// card being the card, and it fails when a digit is transposed -- which is the
-// fault that actually happens.
+// rest of the pull is always an exposure" is a claim about the card being the
+// card, and it fails when a digit is transposed -- which is the fault that
+// actually happens. They were written over rank ladders; the ladders went
+// (docs/rarity-plan.md section 5b) and every claim that survived is a claim
+// about the one value each card has now.
 
 #include "GauntletRules.h"
 
@@ -24,64 +26,14 @@ namespace
     using namespace Gauntlet;
     using namespace Gauntlet::Rules;
 
-    // Every rank a player can actually carry.
-    template <typename Fn>
-    void ForEachRank(Fn&& fn)
-    {
-        for (uint8 rank = 1; rank <= MAX_RANK; ++rank)
-            fn(rank);
-    }
-
-    // ------------------------------------------------------------------
-    // Index: every function below trusts it, so it is checked first.
-    // ------------------------------------------------------------------
-
-    TEST(Rules, RankIsClampedToTheTable)
-    {
-        EXPECT_EQ(Index(1), 0u);
-        EXPECT_EQ(Index(MAX_RANK), MAX_RANK - 1);
-
-        // Out of range in both directions, because a stored rank comes off a
-        // database row and nothing in the schema stops it being nonsense.
-        EXPECT_EQ(Index(0), 0u);
-        EXPECT_EQ(Index(200), MAX_RANK - 1);
-    }
-
     // ------------------------------------------------------------------
     // Hubris. The card is "the duel shelters you, everything else does not".
     // ------------------------------------------------------------------
 
-    TEST(Rules, HubrisDuelIsAlwaysAShelterAndTheRestIsAlwaysAnExposure)
+    TEST(Rules, HubrisDuelIsAShelterAndTheRestIsAnExposure)
     {
-        ForEachRank([](uint8 rank)
-        {
-            EXPECT_LT(HubrisTakenMult(rank, true), 1.0f)
-                << "rank " << int(rank) << ": the duel must take less, or the card is inside out";
-            EXPECT_GT(HubrisTakenMult(rank, false), 1.0f)
-                << "rank " << int(rank) << ": everything else must take more";
-        });
-    }
-
-    TEST(Rules, HubrisStakesRiseWithRank)
-    {
-        // Both halves escalate: the shelter deepens and the exposure sharpens.
-        // A rank that made either one *softer* would be a rank-up that costs a
-        // tier and makes the card easier.
-        for (uint8 rank = 2; rank <= MAX_RANK; ++rank)
-        {
-            EXPECT_LT(HubrisTakenMult(rank, true), HubrisTakenMult(rank - 1, true));
-            EXPECT_GT(HubrisTakenMult(rank, false), HubrisTakenMult(rank - 1, false));
-        }
-    }
-
-    TEST(Rules, HubrisIsNeutralNowhere)
-    {
-        // There is no rank at which carrying this card changes nothing.
-        ForEachRank([](uint8 rank)
-        {
-            EXPECT_NE(HubrisTakenMult(rank, true), 1.0f);
-            EXPECT_NE(HubrisTakenMult(rank, false), 1.0f);
-        });
+        EXPECT_LT(HubrisTakenMult(true), 1.0f) << "the duel must take less, or the card is inside out";
+        EXPECT_GT(HubrisTakenMult(false), 1.0f) << "everything else must take more";
     }
 
     // ------------------------------------------------------------------
@@ -90,18 +42,9 @@ namespace
 
     TEST(Rules, OverextendedChargesOnlyForYourBack)
     {
-        ForEachRank([](uint8 rank)
-        {
-            EXPECT_FLOAT_EQ(OverextendedTakenMult(rank, false), 1.0f)
-                << "rank " << int(rank) << ": facing an enemy must cost nothing, or facing is not the verb";
-            EXPECT_GT(OverextendedTakenMult(rank, true), 1.0f);
-        });
-    }
-
-    TEST(Rules, OverextendedGetsWorseWithRank)
-    {
-        for (uint8 rank = 2; rank <= MAX_RANK; ++rank)
-            EXPECT_GT(OverextendedTakenMult(rank, true), OverextendedTakenMult(rank - 1, true));
+        EXPECT_FLOAT_EQ(OverextendedTakenMult(false), 1.0f)
+            << "facing an enemy must cost nothing, or facing is not the verb";
+        EXPECT_GT(OverextendedTakenMult(true), 1.0f);
     }
 
     // ------------------------------------------------------------------
@@ -111,25 +54,18 @@ namespace
 
     TEST(Rules, FallingSkyDoesNotArmBeforeItsWindow)
     {
-        ForEachRank([](uint8 rank)
-        {
-            EXPECT_FALSE(FallingSkyArms(rank, 0));
-            EXPECT_FALSE(FallingSkyArms(rank, STILL_MS[Index(rank)] - 1));
-            EXPECT_TRUE(FallingSkyArms(rank, STILL_MS[Index(rank)]));
-        });
+        EXPECT_FALSE(FallingSkyArms(0));
+        EXPECT_FALSE(FallingSkyArms(STILL_MS - 1));
+        EXPECT_TRUE(FallingSkyArms(STILL_MS));
     }
 
-    TEST(Rules, FallingSkyWindowShrinksWithRankAndStaysPlayable)
+    TEST(Rules, FallingSkyStaysPlayable)
     {
-        for (uint8 rank = 2; rank <= MAX_RANK; ++rank)
-            EXPECT_LT(STILL_MS[Index(rank)], STILL_MS[Index(rank - 1)]);
-
-        // The top rank is the one most likely to be wrong, and the failure mode
-        // is a card that no caster can play at all. Two seconds is shorter than
-        // a great many casts in 3.3.5; if a tuning pass ever goes below it,
-        // that is a decision someone should have to make on purpose.
-        EXPECT_GE(STILL_MS[Index(MAX_RANK)], 2000u)
-            << "below two seconds this stops being a verb and becomes a class ban";
+        // The failure mode is a card that no caster can play at all. Two
+        // seconds is shorter than a great many casts in 3.3.5; if a tuning
+        // pass ever goes below it, that is a decision someone should have to
+        // make on purpose.
+        EXPECT_GE(STILL_MS, 2000u) << "below two seconds this stops being a verb and becomes a class ban";
     }
 
     TEST(Rules, MovingIsAlwaysAnAnswer)
@@ -149,38 +85,29 @@ namespace
 
     TEST(Rules, FrenzyPaysNothingWithoutAChain)
     {
-        ForEachRank([](uint8 rank)
-        {
-            EXPECT_FLOAT_EQ(FrenzyDoneMult(rank, 0, 0), 1.0f);
-        });
+        EXPECT_FLOAT_EQ(FrenzyDoneMult(0, 0), 1.0f);
     }
 
     TEST(Rules, FrenzyRisesWithEveryStack)
     {
-        ForEachRank([](uint8 rank)
-        {
-            for (uint32 n = 1; n <= MAX_STACKS; ++n)
-                EXPECT_GT(FrenzyDoneMult(rank, n, 0), FrenzyDoneMult(rank, n - 1, 0));
-        });
+        for (uint32 n = 1; n <= MAX_STACKS; ++n)
+            EXPECT_GT(FrenzyDoneMult(n, 0), FrenzyDoneMult(n - 1, 0));
     }
 
     TEST(Rules, FrenzyIsCappedAndCannotBeFarmedPastIt)
     {
         // The cap is the card's only bound. Without it a long enough chain is
         // an unbounded damage multiplier.
-        ForEachRank([](uint8 rank)
-        {
-            float const atCap = FrenzyDoneMult(rank, MAX_STACKS, 0);
-            EXPECT_FLOAT_EQ(FrenzyDoneMult(rank, MAX_STACKS + 1, 0), atCap);
-            EXPECT_FLOAT_EQ(FrenzyDoneMult(rank, 9999, 0), atCap);
-        });
+        float const atCap = FrenzyDoneMult(MAX_STACKS, 0);
+        EXPECT_FLOAT_EQ(FrenzyDoneMult(MAX_STACKS + 1, 0), atCap);
+        EXPECT_FLOAT_EQ(FrenzyDoneMult(9999, 0), atCap);
     }
 
     TEST(Rules, FrenzyPrefersTheOfferCardsNumberOverTheTable)
     {
         // The offer promises boonMag per stack; the multiplier must pay that
         // and not the table, or the card lies on the card.
-        EXPECT_FLOAT_EQ(FrenzyDoneMult(1, 2, 25), 1.0f + 0.25f * 2.0f);
+        EXPECT_FLOAT_EQ(FrenzyDoneMult(2, 25), 1.0f + 0.25f * 2.0f);
     }
 
     // ------------------------------------------------------------------
@@ -192,34 +119,24 @@ namespace
         // The rounding case that matters: a level-one health pool where the
         // percentage floors to nothing. A kill that closes zero reads as the
         // card being broken.
-        ForEachRank([](uint8 rank)
-        {
-            EXPECT_GE(DeepWoundsClose(rank, 0), 1);
-            EXPECT_GE(DeepWoundsClose(rank, 1), 1);
-            EXPECT_GE(DeepWoundsClose(rank, 20), 1);
-        });
+        EXPECT_GE(DeepWoundsClose(0), 1);
+        EXPECT_GE(DeepWoundsClose(1), 1);
+        EXPECT_GE(DeepWoundsClose(20), 1);
     }
 
-    TEST(Rules, DeepWoundsClosesLessAsRankRises)
+    TEST(Rules, DeepWoundsOpensMoreThanAKillCloses)
     {
-        // The ladder tightens from both ends: more of the damage becomes a
-        // wound, and less of it closes per kill.
-        for (uint8 rank = 2; rank <= MAX_RANK; ++rank)
-        {
-            EXPECT_LE(DeepWoundsClose(rank, 10000), DeepWoundsClose(rank - 1, 10000));
-            EXPECT_GT(WOUND_PCT[Index(rank)], WOUND_PCT[Index(rank - 1)]);
-        }
+        // The card's whole tension: a kill closes *some* of the wound, never
+        // all of what the fight opened, or the wound is not a wound.
+        EXPECT_GT(WOUND_PCT, KILL_CLOSE_PCT);
     }
 
     TEST(Rules, DeepWoundsCannotOutrunTheWoundItCloses)
     {
         // A kill must never close more than a full pool: that would hand the
         // player health they never lost.
-        ForEachRank([](uint8 rank)
-        {
-            uint32 const pool = 10000;
-            EXPECT_LT(uint32(DeepWoundsClose(rank, pool)), pool);
-        });
+        uint32 const pool = 10000;
+        EXPECT_LT(uint32(DeepWoundsClose(pool)), pool);
     }
 
     // ------------------------------------------------------------------
@@ -228,57 +145,30 @@ namespace
 
     TEST(Rules, KillingFloorAlwaysHandsSomethingBackForAKill)
     {
-        ForEachRank([](uint8 rank)
-        {
-            EXPECT_GT(KillingFloorPayout(rank, 1000), 0u)
-                << "rank " << int(rank) << ": a kill that pays nothing is a refusal, not a delay";
-        });
+        EXPECT_GT(KillingFloorPayout(1000), 0u) << "a kill that pays nothing is a refusal, not a delay";
     }
 
     TEST(Rules, KillingFloorNeverPaysMoreThanWasHeld)
     {
-        ForEachRank([](uint8 rank)
-        {
-            EXPECT_LE(KillingFloorPayout(rank, 1000), 1000u);
-            EXPECT_LE(KillingFloorLeaveBack(rank, 1000), 1000u);
-        });
+        EXPECT_LE(KillingFloorPayout(1000), 1000u);
+        EXPECT_LE(KillingFloorLeaveBack(1000), 1000u);
     }
 
     TEST(Rules, KillingFloorMakesWinningWorthMoreThanWalkingAway)
     {
         // The whole decision the card offers. If breaking off ever paid at
         // least as well as the kill, "walk away" would be strictly correct and
-        // the card would have no choice in it at all.
-        for (uint8 rank = 2; rank <= MAX_RANK; ++rank)
-            EXPECT_GT(KillingFloorPayout(rank, 1000), KillingFloorLeaveBack(rank, 1000))
-                << "rank " << int(rank) << ": disengaging must cost something";
-    }
-
-    TEST(Rules, KillingFloorRankOneIsPureDelay)
-    {
-        // Rank I is deliberately not a tax: everything held comes back either
-        // way, and only the timing changes. That is what makes the first rank
-        // teachable.
-        EXPECT_EQ(KillingFloorPayout(1, 1000), 1000u);
-        EXPECT_EQ(KillingFloorLeaveBack(1, 1000), 1000u);
-    }
-
-    TEST(Rules, KillingFloorGetsHarsherWithRank)
-    {
-        for (uint8 rank = 2; rank <= MAX_RANK; ++rank)
-        {
-            EXPECT_LT(KillingFloorPayout(rank, 1000), KillingFloorPayout(rank - 1, 1000));
-            EXPECT_LT(KillingFloorLeaveBack(rank, 1000), KillingFloorLeaveBack(rank - 1, 1000));
-        }
+        // the card would have no choice in it at all. The old rank I was pure
+        // delay by design -- the teaching rank -- and went with the ranks; the
+        // card's one value has to carry the decision.
+        EXPECT_GT(KillingFloorPayout(1000), KillingFloorLeaveBack(1000)) << "disengaging must cost something";
+        EXPECT_LT(KillingFloorLeaveBack(1000), 1000u) << "breaking off must lose something, or there is no decision";
     }
 
     TEST(Rules, KillingFloorHandlesAnEmptyBank)
     {
-        ForEachRank([](uint8 rank)
-        {
-            EXPECT_EQ(KillingFloorPayout(rank, 0), 0u);
-            EXPECT_EQ(KillingFloorLeaveBack(rank, 0), 0u);
-        });
+        EXPECT_EQ(KillingFloorPayout(0), 0u);
+        EXPECT_EQ(KillingFloorLeaveBack(0), 0u);
     }
 
     // ------------------------------------------------------------------
@@ -424,10 +314,7 @@ namespace
         // multiplies before it divides, so a large bank is the case where it
         // would wrap.
         uint64 const huge = uint64(1) << 40;
-        ForEachRank([huge](uint8 rank)
-        {
-            EXPECT_LE(KillingFloorPayout(rank, huge), huge);
-            EXPECT_LE(KillingFloorLeaveBack(rank, huge), huge);
-        });
+        EXPECT_LE(KillingFloorPayout(huge), huge);
+        EXPECT_LE(KillingFloorLeaveBack(huge), huge);
     }
 }

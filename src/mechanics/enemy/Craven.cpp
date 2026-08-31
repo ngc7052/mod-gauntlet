@@ -50,10 +50,8 @@ namespace Gauntlet
         // Rank IV is past the card at 50% and 3: every enemy runs at half
         // health, which turns the affix from a nuisance into a rule about
         // how you open a fight -- burst it down or expect the camp.
-        constexpr uint32 FLEE_PCT[]  = { 20, 25, 35, 50 };
-        static_assert(std::size(FLEE_PCT) >= MAX_RANK, "FLEE_PCT is short a rank");
-        constexpr uint32 FETCHES[]   = { 1, 1, 2, 3 };
-        static_assert(std::size(FETCHES) >= MAX_RANK, "FETCHES is short a rank");
+        constexpr uint32 FLEE_PCT = 25;
+        constexpr uint32 FETCHES = 1;
 
         // The card's fixed numbers: five seconds of running, and fifteen yards
         // of camp to fetch from when the running stops.
@@ -65,11 +63,6 @@ namespace Gauntlet
         // than rationing honest play.
         constexpr std::size_t MAX_RUNNERS = 6;   // TODO(design)
 
-        uint8 RankIndex(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* MechanicName()
         {
@@ -160,7 +153,7 @@ namespace Gauntlet
 
             uint32 const after     = now - damage;
             uint32 const threshold = static_cast<uint32>(
-                static_cast<uint64>(max) * FLEE_PCT[RankIndex(ctx.self)] / 100u);
+                static_cast<uint64>(max) * FLEE_PCT / 100u);
 
             // "first drops below": the crossing, not the state. A creature
             // already under the line when this affix was picked up mid-fight
@@ -250,7 +243,7 @@ namespace Gauntlet
             if (!runaway || !runaway->IsAlive())
                 return;
 
-            uint32 const wanted = FETCHES[RankIndex(ctx.self)];
+            uint32 const wanted = FETCHES;
 
             Creature* previous = nullptr;
             uint32    fetched  = 0;
@@ -287,12 +280,11 @@ namespace Gauntlet
 
         std::string Craven::Describe(AffixInstance const& self) const
         {
-            uint8 const i = RankIndex(&self);
 
             std::string out = "The first time an enemy drops below "
-                            + std::to_string(FLEE_PCT[i])
+                            + std::to_string(FLEE_PCT)
                             + "% health it runs for five seconds, and then fetches ";
-            out += FETCHES[i] == 1 ? "the nearest idle enemy of its own kind"
+            out += FETCHES == 1 ? "the nearest idle enemy of its own kind"
                                    : "the two nearest idle enemies of its own kind";
             out += " within fifteen yards of wherever it stopped. Burst, snare or stun through"
                    " the threshold, and fight away from packs.";

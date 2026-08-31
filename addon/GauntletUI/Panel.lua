@@ -13,7 +13,6 @@
 
 local offers, affixes = {}, {}
 local carriedBySlot = {}   -- slot -> resolved affix record; for OFFER's swap-name lookup
-local carriedByMech = {}   -- mechanic id -> the same record; for "II to III" on a rank-up
 local mode, pendingOffer = nil, false
 local run = { seed = "?", tier = 0, state = "alive" }
 
@@ -150,7 +149,6 @@ end
 -- TODO(design): kind-badge colours and labels - likewise not specified.
 local KIND_COLOR = {
     new     = { 0.35, 0.80, 0.35, "NEW"     },
-    rankup  = { 0.40, 0.70, 1.00, "RANK UP" },
     swap    = { 1.00, 0.55, 0.10, "SWAP"    },
     bargain = { 0.90, 0.40, 0.75, "BARGAIN" },
 }
@@ -186,9 +184,6 @@ local function BoonText(boon, mag)
     end
     return f
 end
-
-local RANK_PIP = { [1] = "I", [2] = "II", [3] = "III", [4] = "IV" }
-local function RankText(rank) return RANK_PIP[rank] or "" end
 
 -- Colour/icon for either a fallback record { name, desc } or a protocol
 -- record { name, desc, icon, family, ... } - the two shapes intentionally
@@ -474,7 +469,7 @@ for i = 1, VISIBLE do
         local ri = RarityInfo(d.rarity)
         local tr, tg, tb = 1, 0.82, 0
         if ri then tr, tg, tb = RarityRGB(ri) end
-        GameTooltip:SetText(d.name .. (d.rank and ("  " .. (RANK_PIP[d.rank] or "")) or ""), tr, tg, tb)
+        GameTooltip:SetText(d.name, tr, tg, tb)
 
         local s = RowColor(d)
         local tag = RarityTag(d.rarity)
@@ -548,8 +543,7 @@ local function RefreshMain()
             r.data = a
             r:SetBackdropColor(unpack(((scrollAt + i) % 2 == 0) and ROW_ALT or ROW_BG))
             r.icon:SetTexture(RowIcon(a))
-            r.name:SetText(("%s|cff707070%s|r"):format(
-                a.name, a.rank and ("  " .. (RANK_PIP[a.rank] or "")) or ""))
+            r.name:SetText(a.name)
             r.name:SetTextColor(s[1], s[2], s[3])
             r.tag:SetText(("|cff606060%s|r"):format(s[4]))
 
@@ -756,23 +750,11 @@ local function ShowChooser()
                 cards[i].borderRest, cards[i].borderHover = nil, nil
             end
             cards[i].icon:SetTexture(RowIcon(o))
-            cards[i].name:SetText(o.rank and o.rank > 1
-                                  and (o.name .. "  |cff808080" .. (RANK_PIP[o.rank] or "") .. "|r")
-                                  or o.name)
+            cards[i].name:SetText(o.name)
             cards[i].name:SetTextColor(s[1], s[2], s[3])
             local descText = Body(o.desc)
             if o.kind == "swap" and o.swapName then
                 descText = descText .. "  |cffff8040(swaps out " .. o.swapName .. ")|r"
-            end
-
-            -- What you already carry of this one, so a RANK UP says what it is
-            -- raising rather than only that it raises something. The
-            -- description above is already written at the offered rank, so
-            -- between them the card answers "from what, to what".
-            local held = carriedByMech[o.id]
-            if o.kind == "rankup" and held and held.rank and o.rank then
-                descText = descText .. "  |cff66b0ff(" .. (RANK_PIP[held.rank] or held.rank)
-                         .. " to " .. (RANK_PIP[o.rank] or o.rank) .. ")|r"
             end
 
             -- What it pays, on its own line and in its own colour.
@@ -949,24 +931,25 @@ GauntletProtocol.On("RUN", function(seed, tier, state, class, charges)
     if main:IsShown() then RefreshMain() end
 end)
 
-local pendingCarried, pendingCarriedBySlot, pendingCarriedByMech = {}, {}, {}
-GauntletProtocol.On("AFFIX", function(slot, id, rank, cond, boon, boonMag)
+local pendingCarried, pendingCarriedBySlot = {}, {}
+-- The third field is the card's rarity. It carried a rank until the rank
+-- system went; the wire's word wins over Data.lua's for the same reason it
+-- does on OFFER.
+GauntletProtocol.On("AFFIX", function(slot, id, rarity, cond, boon, boonMag)
     local info = MechInfo(id)
     local rec = {
         name = info.name, desc = info.desc, icon = info.icon, family = info.family,
-        rarity = info.rarity,
-        rank = tonumber(rank), cond = tonumber(cond), boon = tonumber(boon),
+        rarity = tonumber(rarity) or info.rarity,
+        cond = tonumber(cond), boon = tonumber(boon),
         boonMag = tonumber(boonMag), slot = tonumber(slot), id = tonumber(id),
     }
     tinsert(pendingCarried, rec)
     pendingCarriedBySlot[rec.slot] = rec
-    pendingCarriedByMech[rec.id]   = rec
 end)
 
--- The same for a carried affix, keyed by slot. Reinforcements III really draws
--- an enemy after twenty seconds and then every ten; the registry blurb said
--- "longer than 30 seconds ... every 15 seconds", which is the rank I wording,
--- and that is what the tooltip showed a player carrying rank III.
+-- The same for a carried affix, keyed by slot: the mechanic's own sentence,
+-- with its live numbers and its boon clause, where the registry blurb is one
+-- static line.
 GauntletProtocol.On("ADESC", function(slot, text)
     local a = pendingCarriedBySlot[tonumber(slot)]
     if not a then return end
@@ -982,8 +965,8 @@ end)
 GauntletProtocol.On("AFFIX_END", function()
     -- AFFIX_END marks a complete, authoritative snapshot; replace rather than
     -- merge, since the server may resend this after login, a pick or a swap.
-    affixes, carriedBySlot, carriedByMech = pendingCarried, pendingCarriedBySlot, pendingCarriedByMech
-    pendingCarried, pendingCarriedBySlot, pendingCarriedByMech = {}, {}, {}
+    affixes, carriedBySlot = pendingCarried, pendingCarriedBySlot
+    pendingCarried, pendingCarriedBySlot = {}, {}
     -- Unconditional: RefreshMain only writes text and textures, so running it
     -- while the window is hidden costs nothing, and gating it on IsShown() was
     -- how a freshly picked affix failed to appear until the panel was reopened.
@@ -991,7 +974,7 @@ GauntletProtocol.On("AFFIX_END", function()
 end)
 
 local pendingOffers = {}
-GauntletProtocol.On("OFFER", function(i, id, rank, cond, boon, boonMag, kind, swapSlot, rarity)
+GauntletProtocol.On("OFFER", function(i, id, rarity, cond, boon, boonMag, kind, swapSlot)
     local info = MechInfo(id)
     local swapName
     if kind == "swap" then
@@ -1006,18 +989,18 @@ GauntletProtocol.On("OFFER", function(i, id, rank, cond, boon, boonMag, kind, sw
         -- slot -- mechanic 0, which the server prints as "Nothing" -- has no
         -- rarity at all, and must not borrow the field's default.
         rarity = (tonumber(id) or 0) ~= 0 and (tonumber(rarity) or info.rarity) or nil,
-        rank = tonumber(rank), cond = tonumber(cond), boon = tonumber(boon),
+        cond = tonumber(cond), boon = tonumber(boon),
         boonMag = tonumber(boonMag), kind = kind, swapName = swapName,
     }
 end)
 
--- The mechanic's own sentence at the rank being offered, which the server
--- sends as one or more ODESC frames right after the OFFER it belongs to.
+-- The mechanic's own sentence for this offer, which the server sends as one or
+-- more ODESC frames right after the OFFER it belongs to.
 --
 -- It replaces Data.lua's static blurb rather than adding to it: the blurb is
--- one line per registry row and says the same thing at every rank, so a RANK
--- UP offer used to read exactly like the NEW offer beside it. Long sentences
--- arrive in pieces and are joined here in arrival order.
+-- one line per registry row with no boon clause, and the sentence is the
+-- whole card. Long sentences arrive in pieces and are joined here in arrival
+-- order.
 --
 -- A server too old to send ODESC simply never calls this, and the blurb set in
 -- the OFFER handler stands.

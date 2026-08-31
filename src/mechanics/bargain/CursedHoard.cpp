@@ -55,19 +55,13 @@ namespace Gauntlet
         // Gauntlet.Bargain.CursedHoard.EscapeSeconds is the other way out at
         // every rank, so the ladder lengthens the curse rather than sealing
         // it -- a bargain whose price cannot be paid stops being a bargain.
-        constexpr uint32 KILLS_TO_LIFT[] = { 3, 4, 5, 6 };
-        static_assert(std::size(KILLS_TO_LIFT) >= MAX_RANK, "KILLS_TO_LIFT is short a rank");
+        constexpr uint32 KILLS_TO_LIFT = 3;
 
         // The card's one damage number, and it is real: see RelaxCaps.
         constexpr float CURSE_DAMAGE_MULT = 3.0f;
 
         constexpr uint32 DEFAULT_ESCAPE_SECONDS = 10;   // TODO(design)
 
-        uint8 RankIndex(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* MechanicKey()
         {
@@ -255,7 +249,7 @@ namespace Gauntlet
             // Opening a second chest while already cursed does not stack it;
             // it refreshes the debt to full. Stacking would make the affix a
             // death sentence for the one mistake it is meant to make survivable.
-            _debt    = KILLS_TO_LIFT[RankIndex(ctx.self)];
+            _debt    = KILLS_TO_LIFT;
             _calmMs  = 0;
             _engaged = false;
             Save(ctx);
@@ -340,13 +334,12 @@ namespace Gauntlet
                 return;
 
             AddonFor(ctx)->QueueCounter(ctx.player, MechanicKey(), _debt,
-                                        KILLS_TO_LIFT[RankIndex(ctx.self)]);
+                                        KILLS_TO_LIFT);
         }
 
-        std::string CursedHoard::Describe(AffixInstance const& self) const
+        std::string CursedHoard::Describe(AffixInstance const& /*self*/) const
         {
-            uint8 const  i     = RankIndex(&self);
-            uint32 const kills = KILLS_TO_LIFT[i];
+            uint32 const kills = KILLS_TO_LIFT;
             uint32 const secs  = EscapeMs() / 1000u;
 
             std::string out = "Chests give twice as much loot. Opening one curses you: you take"

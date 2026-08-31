@@ -53,11 +53,6 @@ namespace Gauntlet
         // The card's two fixed numbers.
         constexpr uint32 WINDOW_MS  = 8000;
 
-        uint8 RankIndex(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* MechanicKey()
         {
@@ -116,7 +111,7 @@ namespace Gauntlet
                 if (_stacks == 0)
                     return 1.0f;
 
-                return FrenzyDoneMult(ctx.self ? ctx.self->rank : 1, _stacks,
+                return FrenzyDoneMult(_stacks,
                                       ctx.self ? ctx.self->boonMag : 0);
             }
 
@@ -232,8 +227,7 @@ namespace Gauntlet
 
         std::string Frenzy::Describe(AffixInstance const& self) const
         {
-            uint8 const  i    = RankIndex(&self);
-            uint32 const up   = self.boonMag != 0 ? uint32(self.boonMag) : PCT_PER_STACK[i];
+            uint32 const up   = self.boonMag != 0 ? uint32(self.boonMag) : PCT_PER_STACK;
 
             // No BoonClause here, and that is deliberate: this affix's boon is
             // not "in exchange" for anything, it is the other half of the same

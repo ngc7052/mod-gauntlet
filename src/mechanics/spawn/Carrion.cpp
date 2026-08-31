@@ -55,10 +55,8 @@ namespace Gauntlet
         // halves move, because moving only the count would make looting a
         // fight you have already won and moving only the size would make it
         // one you cannot.
-        constexpr int32 LOOTS_PER_PACK[] = { 5, 4, 3, 2 };
-        static_assert(std::size(LOOTS_PER_PACK) >= MAX_RANK, "LOOTS_PER_PACK is short a rank");
-        constexpr uint32 PACK_SIZE[]      = { 2, 2, 3, 4 };
-        static_assert(std::size(PACK_SIZE) >= MAX_RANK, "PACK_SIZE is short a rank");
+        constexpr int32 LOOTS_PER_PACK = 4;
+        constexpr uint32 PACK_SIZE = 2;
 
         // The card's other fixed number: they arrive 25 yards away and charge.
         constexpr float SPAWN_YARDS = 25.0f;
@@ -89,11 +87,6 @@ namespace Gauntlet
         // corpses in front of the player right now.
         constexpr std::size_t RECENT_CORPSES = 8;
 
-        uint8 RankIndex(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* MechanicKey()
         {
@@ -127,7 +120,7 @@ namespace Gauntlet
         private:
             void  Arrive(Ctx& ctx);
             void  ShowCounter(Ctx& ctx) const;
-            int32 Threshold(Ctx const& ctx) const { return LOOTS_PER_PACK[RankIndex(ctx.self)]; }
+            int32 Threshold(Ctx const& /*ctx*/) const { return LOOTS_PER_PACK; }
             int32 Loots(Ctx& ctx) const;
             void  SetLoots(Ctx& ctx, int32 value);
             bool  AlreadyCounted(ObjectGuid const& guid);
@@ -274,7 +267,7 @@ namespace Gauntlet
         {
             Player* player = ctx.player;
 
-            uint32 const wanted = PACK_SIZE[RankIndex(ctx.self)];
+            uint32 const wanted = PACK_SIZE;
             uint32       spawned = 0;
 
             for (uint32 n = 0; n < wanted; ++n)
@@ -347,10 +340,9 @@ namespace Gauntlet
 
         std::string Carrion::Describe(AffixInstance const& self) const
         {
-            uint8 const i = RankIndex(&self);
 
-            std::string out = "Every " + std::to_string(LOOTS_PER_PACK[i])
-                            + "th corpse you loot draws " + std::to_string(PACK_SIZE[i])
+            std::string out = "Every " + std::to_string(LOOTS_PER_PACK)
+                            + "th corpse you loot draws " + std::to_string(PACK_SIZE)
                             + " scavengers, four seconds after the last one you opened."
                               " Loot in cleared ground, and at full health.";
 

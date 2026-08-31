@@ -31,7 +31,7 @@ namespace
     // shape here is: the three families that carry the run's identity
     // (Enemy, Tempo, and the class curses) are the common draw; Spawn and
     // Attrition sit just below because a run wants one or two of each, not
-    // four; Rules were three one-rank entries that all disappear by tier 6, so
+    // four; Rules were three brief entries that all disappear by tier 6, so
     // they are rare; Bargain is reached mostly through slot C's own bargain
     // roll and does not need a large share of the family roll as well.
     //
@@ -89,41 +89,22 @@ namespace
     // generator builds carries Condition::Always, and Mgr::NameOf prints no
     // adjective for it.
 
-    // The rank a mechanic arrives at when it is offered as new.
-    //
-    // TODO(design): §4.6 gives the shape -- "rank-ups dominate from tier 11",
-    // "escalate what exists rather than adding verbs" -- but no floor. One
-    // rank every six tiers means a mechanic first taken at tier 15 arrives at
-    // III instead of being a rank-I curiosity in a run where everything else
-    // is III, while I and II stay reachable for two thirds of the run.
-    uint8 RankFloor(uint8 tier)
-    {
-        // Rescaled with the tier axis in Phase 3: a tier is a level now, not
-        // five of them. The old form was 1 + (tier - 1) / 6 over sixteen
-        // tiers, which put rank II at tier 7 and rank III at tier 13 -- levels
-        // 35 and 65. This is the same two levels expressed on the new axis, so
-        // a run's rank curve is exactly what it was.
-        uint32 const floor = 1u + (tier > 5 ? (tier - 5u) / 30u : 0u);   // rank II at 35, III at 65
-        return static_cast<uint8>(std::min<uint32>(floor, MAX_RANK));
-    }
-
     // TODO(design): the boon magnitudes. §3 states a boon on every card, but
     // most of them -- "Divine Shield cooldown -1 min", "the second life",
     // "Sprint cooldown halved" -- are not one of the seven Boon categories, so
     // there is nothing yet to key a per-mechanic row on. The table is
-    // therefore a base per boon category scaled linearly by rank, sized from
-    // the numbers §3 does state in the categories it can express (+10% damage,
-    // +25% experience, +50% money), with the per-mechanic switch left in place
-    // for the rows that will want to override it.
-    uint32 BoonTable(uint16 mechanic, Boon boon, uint8 rank)
+    // therefore one base per boon category, sized from the numbers §3 does
+    // state in the categories it can express (+10% damage, +25% experience),
+    // with the per-mechanic switch left in place for the rows that override
+    // it. It used to scale linearly by rank; with the ranks gone the base is
+    // the number, and it is the first knob the sweep and play should argue
+    // with.
+    uint32 BoonTable(uint16 mechanic, Boon boon)
     {
         // A common's magnitude is its trade line's, read from the same header
         // the mechanic reads, so the card and the payout cannot disagree.
-        // Before the rank ladder because a common has no rank to ladder by.
         if (TradeDef const* trade = FindTrade(mechanic))
             return trade->boon == boon ? trade->boonPct : 0u;
-
-        uint8 const step = std::clamp<uint8>(rank, 1, MAX_RANK);
 
         // Two rows state their own boon on the card, so they do not take the
         // category's magnitude: the number the offer promises has to be the
@@ -131,11 +112,10 @@ namespace
         // player is reading it.
         switch (mechanic)
         {
-            // T2 Frenzy: "+6% damage dealt and +6% damage taken per stack",
-            // 4/6/8 on the ladder. The boon is the damage-dealt half, so it is
-            // per stack and equal to the curse.
+            // T2 Frenzy: "+6% damage dealt per stack". The boon is the
+            // damage-dealt half, so it is per stack and equal to the curse.
             case 15:
-                return boon == Boon::BonusDamage ? 2u + 2u * step : 0u;
+                return boon == Boon::BonusDamage ? 6u : 0u;
 
             // T5 Hubris. The override used to key on Boon::BonusExperience,
             // back when the card was an experience rule; the redesign moved it
@@ -150,9 +130,7 @@ namespace
                 break;
 
             // C2 Berserker's Bargain: "below 35% health you deal 25% more
-            // damage". The rank moves the health line, not the damage, so the
-            // boon is flat where the category's table would have laddered it
-            // 8/16/24 and promised three numbers the card does not have.
+            // damage". One number, the card's.
             case 29:
                 return boon == Boon::BonusDamage ? 25u : 0u;
 
@@ -188,7 +166,7 @@ namespace
             default:                    return 0;           // Boon::None
         }
 
-        return base * step;
+        return base;
     }
 
     // TODO(design): the relevance discount. §3 prices "a curse that is cheap
@@ -285,13 +263,9 @@ namespace
         return out;
     }
 
-    // Does adding `def` to the run break one of §4.1's counted caps? A rank-up
-    // is exempt: the mechanic is already counted.
-    bool CapsAllow(MechanicDef const& def, Carried const& carried, bool rankUp)
+    // Does adding `def` to the run break one of §4.1's counted caps?
+    bool CapsAllow(MechanicDef const& def, Carried const& carried)
     {
-        if (rankUp)
-            return true;
-
         if ((def.flags & MF_OnKill) && carried.onKill >= CAP_ON_KILL)
             return false;
         if (def.family == Family::Tempo && carried.tempo >= CAP_TEMPO)
@@ -309,7 +283,7 @@ namespace
         for (AffixInstance const& a : *carried.set)
         {
             if (a.mechanic == def.id)
-                continue;   // the mechanic being ranked up never excludes itself
+                continue;   // a mechanic never excludes itself
 
             MechanicDef const* other = FindMechanic(a.mechanic);
             if (other && KeyListsIntersect(def.exclusiveKeys, other->exclusiveKeys))
@@ -383,22 +357,12 @@ namespace
         if (rewardShapedOnly && !(def.flags & MF_RewardShaped))
             return false;
 
-        // The window opens for everyone and closes only for new offers.
-        //
-        // minTier and maxTier say when a mechanic is appropriate to *introduce*
-        // -- Carrion is an early-run curse and offering it fresh at tier 70
-        // would be offering a level-1 problem to a level-70 character. Whether
-        // something you already carry may deepen is a different question, and
-        // the window was answering it too: an affix taken near the end of its
-        // window was frozen at whatever rank it happened to get, permanently,
-        // with no way to ever raise it.
-        //
-        // That is worse the later a run goes, which is exactly where the run
-        // has least else to be offered. Measured over 240,000 sets, letting a
-        // rank-up ignore maxTier takes the empty-slot count from 130,277 to
-        // 122,100 and costs nothing anywhere: a rank-up still requires the
-        // mechanic to be carried, so nothing new can enter through this door.
-        if (ctx.tier < def.minTier || (kind != OfferKind::RankUp && ctx.tier > def.maxTier))
+        // minTier and maxTier say when a mechanic is appropriate to
+        // *introduce*: Carrion is an early-run curse and offering it fresh at
+        // tier 70 would be offering a level-1 problem to a level-70 character.
+        // Every offer is an introduction now that rank-ups are gone, so the
+        // window binds every kind.
+        if (ctx.tier < def.minTier || ctx.tier > def.maxTier)
             return false;
         if (def.family == Family::Bargain && ctx.tier < BARGAIN_MIN_TIER)
             return false;
@@ -408,21 +372,12 @@ namespace
         if (!RelevantTo(def, *ctx.view))
             return false;
 
-        AffixInstance const* held = ctx.carried->Find(def.id);
-        bool const rankUp = kind == OfferKind::RankUp;
+        // Never offer a carried mechanic again: with the ranks gone there is
+        // no "again" to offer, and Mgr::Pick refuses one that slips through.
+        if (ctx.carried->Find(def.id))
+            return false;
 
-        if (rankUp)
-        {
-            if (!held)
-                return false;
-            if (held->rank >= def.maxRank || held->rank >= MAX_RANK)
-                return false;
-        }
-        else if (held)
-        {
-            return false;   // never offer a carried mechanic as new
-        }
-        else if (ctx.carried->set && ctx.carried->set->size() >= ctx.maxCarried)
+        if (ctx.carried->set && ctx.carried->set->size() >= ctx.maxCarried)
         {
             // The set is full, so nothing new may join it. A Swap is exempt
             // and deliberately so: it is the offer that takes one out before
@@ -433,7 +388,7 @@ namespace
                 return false;
         }
 
-        if (!CapsAllow(def, *ctx.carried, rankUp))
+        if (!CapsAllow(def, *ctx.carried))
             return false;
         if (!ExclusiveKeysAllow(def, *ctx.carried))
             return false;
@@ -578,16 +533,7 @@ namespace
         // and that is what the card must say.
         offer.rarity    = def.rarity;
 
-        AffixInstance const* held = ctx.carried->Find(def.id);
-        if (kind == OfferKind::RankUp && held)
-            offer.rank = static_cast<uint8>(held->rank + 1);
-        else
-            offer.rank = RankFloor(ctx.tier);
-
-        offer.rank = static_cast<uint8>(std::min<uint32>(offer.rank, std::min<uint32>(def.maxRank, MAX_RANK)));
-        offer.rank = static_cast<uint8>(std::max<uint32>(1u, offer.rank));
-
-        uint32 const mag = BoonTable(def.id, offer.boon, offer.rank) * RelevancePercent(def) / 100u;
+        uint32 const mag = BoonTable(def.id, offer.boon) * RelevancePercent(def) / 100u;
         offer.boonMag = static_cast<uint8>(std::min<uint32>(mag, 255u));
 
         if (kind == OfferKind::Swap && !ctx.carried->set->empty())
@@ -656,9 +602,9 @@ namespace Gauntlet
 {
     // The anonymous namespace's table, published under a name callers outside
     // the offer builder can use. One line rather than a second copy.
-    uint32 BoonMagnitude(uint16 mechanic, Boon boon, uint8 rank)
+    uint32 BoonMagnitude(uint16 mechanic, Boon boon)
     {
-        return BoonTable(mechanic, boon, rank);
+        return BoonTable(mechanic, boon);
     }
 
     Rarity RollRarity(uint64& state, uint8 tier, uint8 availableMask)
@@ -733,13 +679,18 @@ namespace Gauntlet
         // plan's expression short-circuits; tier is folded into the stream
         // seed, so no two tiers share a stream and the skipped roll cannot
         // shift another tier's offers.
+        //
+        // Slot A used to become a rank-up from tier 9. With the ranks gone
+        // every slot is an introduction, and a run escalates by what it is
+        // offered -- rarer cards later, through the rarity roll in Draw --
+        // rather than by buying the same card again.
         std::vector<OfferKind> kinds(count, OfferKind::New);
         // Levels 20, 40 and 60, which is where tiers 4, 8 and 12 used to fall.
         //
         // They are no longer the only place a swap happens. With one tier per
         // level and a carried set that fills up, every offer past the cap is a
-        // rank-up or a swap -- so the fixed swap tiers are now the three where
-        // a swap is *guaranteed* rather than the three where it is possible.
+        // swap -- so the fixed swap tiers are now the three where a swap is
+        // *guaranteed* rather than the three where it is possible.
         bool const swapTier = tier == 20 || tier == 40 || tier == 60;
 
         // A full carried set changes what a tier asks. Nothing new may join it,
@@ -747,15 +698,12 @@ namespace Gauntlet
         // bargain roll is not consumed, because a bargain is a new mechanic and
         // there is no room for one.
         //
-        // Without this the cap was a wall rather than a design. Slot C stayed
-        // New, found nothing, degraded to a rank-up, and once everything
-        // carried sat at rank III the whole offer set came back empty: measured
-        // at 100% relaxed with every slot empty from tier 55 to 80, which is
-        // thirty levels of a run being asked nothing at all.
+        // Without this the cap was a wall rather than a design: slot C stayed
+        // New, found nothing, and the whole offer set came back empty --
+        // measured at 100% relaxed with every slot empty from tier 55 to 80,
+        // which is thirty levels of a run being asked nothing at all.
         bool const full = carried.size() >= maxCarried;
 
-        if (count >= 1 && (carried.size() >= 3 || tier >= 9))
-            kinds[0] = OfferKind::RankUp;
         if (count >= 3)
             kinds[2] = (swapTier || full)
                      ? OfferKind::Swap
@@ -769,10 +717,10 @@ namespace Gauntlet
             uint32 step = FirstUsableStep(ctx, kind, false, pools);
 
             // A kind the table cannot satisfy degrades rather than blocking the
-            // slot: a bargain before the family opens becomes a new mechanic, a
-            // rank-up with nothing to raise becomes new, and a slot with no new
-            // mechanic left to offer becomes a rank-up. The offer says which it
-            // is, so nothing is hidden from the player.
+            // slot: a bargain before the family opens becomes a new mechanic,
+            // and a slot with nothing new to offer becomes a swap once the set
+            // is full. The offer says which it is, so nothing is hidden from
+            // the player.
             // A bargain is a bonus, never a requirement, and it must not be
             // bought with the offer set's distinct-family guarantee.
             //
@@ -787,9 +735,7 @@ namespace Gauntlet
             //
             // So the test is not "can a bargain be placed at all" but "can it
             // be placed without giving anything up". If not, and an ordinary
-            // new mechanic can, the ordinary one wins. This is the same
-            // preference Phase 2 added for New over RankUp a few lines below,
-            // for the same reason.
+            // new mechanic can, the ordinary one wins.
             if (kind == OfferKind::Bargain && step > RELAX_STRICT)
             {
                 Pools newPools;
@@ -805,28 +751,11 @@ namespace Gauntlet
                     step = FirstUsableStep(ctx, kind, false, pools);
                 }
             }
-            if (step == RELAX_COUNT && kind == OfferKind::RankUp)
-            {
-                kind = OfferKind::New;
-                step = FirstUsableStep(ctx, kind, false, pools);
-            }
-            if (step == RELAX_COUNT && (kind == OfferKind::New || kind == OfferKind::Swap))
-            {
-                OfferKind const fallback = OfferKind::RankUp;
-                Pools rankPools;
-                if (FirstUsableStep(ctx, fallback, false, rankPools) != RELAX_COUNT)
-                {
-                    kind  = fallback;
-                    pools = std::move(rankPools);
-                    step  = RELAX_STRICT;
-                }
-            }
-
             // Last resort, and it only exists once the set is full: a slot with
-            // no new mechanic to offer and nothing left to rank up can still
-            // offer a trade. This is what keeps the late run from going quiet
-            // -- a character carrying sixteen affixes at rank III has nothing
-            // to gain and everything still to choose between.
+            // no new mechanic to offer can still offer a trade. This is what
+            // keeps the late run from going quiet -- a character carrying
+            // sixteen affixes has nothing to add and everything still to
+            // choose between, and reroll and skip are the other two answers.
             if (step == RELAX_COUNT && kind != OfferKind::Swap && full)
             {
                 Pools swapPools;
@@ -834,41 +763,6 @@ namespace Gauntlet
                 {
                     kind  = OfferKind::Swap;
                     pools = std::move(swapPools);
-                    step  = RELAX_STRICT;
-                }
-            }
-
-            // Distinct families outrank the kind of the slot, and this is where
-            // that is decided. §2.4 rolls three *families* first and only then
-            // a mechanic inside one, and §4.1 makes a rank-up a first-class
-            // offer rather than a consolation -- "an affix already carried is
-            // never offered again as a duplicate; it is offered as its next
-            // rank, which replaces it in the same slot". So a New slot that can
-            // only be filled by repeating a family gives way to a rank-up in a
-            // family nothing has used yet.
-            //
-            // Without this the builder took the first thing it could offer as
-            // new, however many families that repeated, and never looked at the
-            // rank-ups sitting in the family it had just exhausted. Measured on
-            // the live view over 160,000 sets, that was the *only* rule being
-            // relaxed below tier 11 -- 30% of tier 3, 37% of tier 10 -- and it
-            // was not a pool problem at all: the offers were there.
-            //
-            // Swap is excluded on purpose. Slot C at tiers 4, 8 and 12 is the
-            // run's one chance to undo an early mistake (§4.4.3), and trading
-            // that away for a tidier family spread is a worse offer, not a
-            // better one.
-            //
-            // The stream is untouched: FirstUsableStep only builds pools, and
-            // Draw below still consumes exactly one family roll and one
-            // mechanic roll per slot whichever branch got here.
-            if (step > RELAX_STRICT && kind == OfferKind::New)
-            {
-                Pools rankPools;
-                if (FirstUsableStep(ctx, OfferKind::RankUp, false, rankPools) == RELAX_STRICT)
-                {
-                    kind  = OfferKind::RankUp;
-                    pools = std::move(rankPools);
                     step  = RELAX_STRICT;
                 }
             }
@@ -937,35 +831,21 @@ namespace Gauntlet
                 if (i != 1)
                     Remember(replace, result.offers[i]);
 
-            OfferKind kind = OfferKind::New;
-            Pools     pools;
-            uint32    step = FirstUsableStep(replace, kind, true, pools);
+            // A swap once the set is full, because nothing New can join a full
+            // set and the guarantee is about the *offer*: a swap that brings a
+            // reward-shaped card in is one. Until the ranks went, a
+            // reward-shaped rank-up of something carried paid the guarantee
+            // here; now the cap is reached in the low twenties and the late
+            // run is trades, so the trade is what has to pay it.
+            OfferKind const kind = full ? OfferKind::Swap : OfferKind::New;
+            Pools           pools;
+            uint32 const    step = FirstUsableStep(replace, kind, true, pools);
 
+            // Once a run carries every reward-shaped card its class can be
+            // offered, the guarantee genuinely runs out of table. The invariant
+            // sweep's ceiling on how often that happens is where that shows.
             if (step == RELAX_COUNT)
-            {
-                // Nothing new is reward-shaped, but something carried may be
-                // one rank short of its ceiling; that still pays the tier its
-                // reward-shaped offer.
-                kind = OfferKind::RankUp;
-                step = FirstUsableStep(replace, kind, true, pools);
-                if (step == RELAX_COUNT)
-                    pools = Pools();
-            }
-            else if (step > RELAX_STRICT)
-            {
-                // The same preference the slot loop above applies, for the same
-                // reason: this replacement is measured against its two siblings,
-                // and a reward-shaped rank-up in a family neither of them used
-                // satisfies §4.4.1 and §4.4.5 at once, where a new mechanic in a
-                // family already on the table gives up the first to buy the
-                // second.
-                Pools rankPools;
-                if (FirstUsableStep(replace, OfferKind::RankUp, true, rankPools) == RELAX_STRICT)
-                {
-                    kind  = OfferKind::RankUp;
-                    pools = std::move(rankPools);
-                }
-            }
+                pools = Pools();
 
             if (AnyPool(pools))
             {

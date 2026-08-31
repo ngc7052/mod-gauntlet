@@ -61,8 +61,7 @@ namespace Gauntlet
         // interval that still leaves room to travel between them: the Shade
         // has to be outrun or killed, and one that rises before the last is
         // dealt with stops being a chase and becomes an escort.
-        constexpr uint32 INTERVAL_MS[] = { 900000u, 600000u, 420000u, 300000u };
-        static_assert(std::size(INTERVAL_MS) >= MAX_RANK, "INTERVAL_MS is short a rank");
+        constexpr uint32 INTERVAL_MS = 600000u;
 
         // The card's other ladder is health x1.5 -> x2 -> x2.5 of a normal mob.
         // creature_template row 900001 already carries HealthModifier 1.5, so
@@ -70,8 +69,7 @@ namespace Gauntlet
         // own comment. Damage is a single figure on the card (~1.2x) with no
         // ladder, and the template carries that too, so rank alone changes
         // nothing about how hard it hits.
-        constexpr float HEALTH_RATIO[] = { 1.0f, 4.0f / 3.0f, 5.0f / 3.0f, 2.0f };
-        static_assert(std::size(HEALTH_RATIO) >= MAX_RANK, "HEALTH_RATIO is short a rank");
+        constexpr float HEALTH_RATIO = 4.0f / 3.0f;
 
         // The card's numbers, unaltered. The 150 yd / 15 s leash is absent
         // because it is not this mechanic's to enforce: GauntletSummons.h
@@ -170,12 +168,6 @@ namespace Gauntlet
             return NEMESIS_NAMES[seed % uint32(std::size(NEMESIS_NAMES))];
         }
 
-        uint8 RankOf(AffixInstance const* self)
-        {
-            if (!self)
-                return 1;
-            return self->rank < 1 ? 1 : (self->rank > MAX_RANK ? MAX_RANK : self->rank);
-        }
 
         char const* MechanicKey()
         {
@@ -285,16 +277,13 @@ namespace Gauntlet
             void  CountEscape(Ctx& ctx);
             bool  NemesisAsleep(Ctx& ctx) const;
             int32 NemesisStep(Ctx& ctx) const;
-            // Rank III and up, not MAX_RANK.
-            //
-            // It was >= MAX_RANK, which read as "the last rank" and was rank
-            // III while there were three. Phase 6 added a fourth, and leaving
-            // it as written would have quietly taken the named nemesis away
-            // from every character already carrying a Shade III -- a mechanic
-            // removed by a constant moving, which is not a thing a rank-up
-            // should ever do. Three is the number the card names, so three is
-            // what it says.
-            bool  IsNemesis(Ctx& ctx) const { return RankOf(ctx.self) >= 3; }
+            // Always. The nemesis -- one named creature that returns stronger
+            // every time it is left behind -- used to start at rank III, and
+            // with the ranks gone the choice was between a Shade that is always
+            // the nemesis and one that never is. The design doc names Shadow
+            // of Mordor's nemesis as the memorable model (section 2.7), and a
+            // Shade that forgets you is the one thing this card must not be.
+            bool  IsNemesis(Ctx&) const { return true; }
             std::string Label(Ctx& ctx) const;
 
             ObjectGuid _guid;                 // the Shade currently hunting
@@ -360,7 +349,7 @@ namespace Gauntlet
             if (!ctx.clock)
                 return;
 
-            uint32 const interval = INTERVAL_MS[RankOf(ctx.self) - 1];
+            uint32 const interval = INTERVAL_MS;
 
             // A telegraph for something that is not going to happen is a lie,
             // so a sleeping nemesis arms the fire alone. The fire still runs,
@@ -479,7 +468,7 @@ namespace Gauntlet
 
             int32 const step = NemesisStep(ctx);
             sGauntletSummons->Scale(shade,
-                                    HEALTH_RATIO[RankOf(ctx.self) - 1] + float(step) * NEMESIS_HEALTH_STEP,
+                                    HEALTH_RATIO + float(step) * NEMESIS_HEALTH_STEP,
                                     1.0f + float(step) * NEMESIS_DAMAGE_STEP);
 
             // The card's emote. A one-shot animation rather than a line of
@@ -700,20 +689,18 @@ namespace Gauntlet
             amount = uint32(std::min<uint64>(boosted, 0xFFFFFFFFull));
         }
 
-        std::string Shade::Describe(AffixInstance const& self) const
+        std::string Shade::Describe(AffixInstance const& /*self*/) const
         {
-            uint8 const rank = RankOf(&self);
 
             std::string out = "A Shade rises behind you every " +
-                              std::to_string(INTERVAL_MS[rank - 1] / 60000u) +
+                              std::to_string(INTERVAL_MS / 60000u) +
                               " minutes and hunts you until you kill it or leave it behind."
                               " It is slower than you are, and much slower than a mount.";
 
-            // Three, matching IsNemesis. The blurb and the behaviour have to
-            // agree about which rank the nemesis starts at.
-            if (rank >= 3)
-                out += " It is one named creature: every time you leave it behind it returns"
-                       " stronger, and killing it keeps it down for two tiers.";
+            // Unconditional, matching IsNemesis: the sentence and the behaviour
+            // have to agree that the Shade is the nemesis.
+            out += " It is one named creature: every time you leave it behind it returns"
+                   " stronger, and killing it keeps it down for two tiers.";
 
             out += " Killing it grants Vindication: " + std::to_string(VINDICATION_PCT) +
                    "% more experience for five minutes.";

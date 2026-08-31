@@ -23,11 +23,6 @@ namespace Gauntlet
 {
     namespace
     {
-        uint8 RankIndexOf(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* KeyOf(uint16 id, char const* fallback)
         {
@@ -54,8 +49,7 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_FAINT = 68;
 
         // The card's ladder: 2 -> 3 -> 4 seconds.
-        constexpr uint32 FAINT_MS[] = { 2000, 3000, 4000, 5000 };
-        static_assert(std::size(FAINT_MS) >= MAX_RANK, "FAINT_MS is short a rank");
+        constexpr uint32 FAINT_MS = 2000;
 
         // The card's own once-per-ten-seconds, so a caster who is genuinely out
         // is not stun-locked by their own empty bar.
@@ -81,7 +75,7 @@ namespace Gauntlet
 
             std::string Diagnose(Ctx& ctx) const override
             {
-                std::string out = "faint: " + std::to_string(FAINT_MS[RankIndexOf(ctx.self)] / 1000u)
+                std::string out = "faint: " + std::to_string(FAINT_MS / 1000u)
                                 + "s blackout";
                 if (ctx.player)
                     out += ", mana " + std::to_string(ctx.player->GetPower(POWER_MANA));
@@ -140,12 +134,12 @@ namespace Gauntlet
             if (player->GetPower(POWER_MANA) != 0)
                 return;
 
-            _control.Apply(player, SelfControl::Kind::Stun, FAINT_MS[RankIndexOf(ctx.self)]);
+            _control.Apply(player, SelfControl::Kind::Stun, FAINT_MS);
             _cooldownMs = FAINT_COOLDOWN_MS;
             ++_times;
 
             AddonFor(ctx)->SendEvent(player, KeyOf(MECHANIC_FAINT, "c41_faint"),
-                                     FAINT_MS[RankIndexOf(ctx.self)] / 1000u, "Faint");
+                                     FAINT_MS / 1000u, "Faint");
 
             if (player->GetSession())
                 ChatHandler(player->GetSession()).PSendSysMessage(
@@ -155,7 +149,7 @@ namespace Gauntlet
 
         std::string Faint::Describe(AffixInstance const& self) const
         {
-            uint32 const secs = FAINT_MS[RankIndexOf(&self)] / 1000u;
+            uint32 const secs = FAINT_MS / 1000u;
             uint32 const pct  = self.boonMag;
 
             std::string out = "Reaching zero mana in combat stuns you for " + std::to_string(secs)

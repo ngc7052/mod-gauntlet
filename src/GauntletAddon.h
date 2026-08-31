@@ -97,14 +97,15 @@ namespace Gauntlet
         // RUN seed tier state class rerollCharges
         void SendRun(Player* player);
 
-        // AFFIX slot id rank cond boon boonMag, one per carried affix, then
+        // AFFIX slot id rarity cond boon boonMag, one per carried affix, then
         // AFFIX_END. The pair is the authoritative carried set: the addon
-        // replaces rather than merges on AFFIX_END.
+        // replaces rather than merges on AFFIX_END. The third field carried a
+        // rank until the rank system went; the rarity took its place.
         void SendAffixes(Player* player);
 
-        // OFFER i id rank cond boon boonMag kind swapSlot rarity, then
-        // OFFER_END. Sends nothing at all when no offer is on the table,
-        // because OFFER_END is what makes the addon raise its chooser.
+        // OFFER i id rarity cond boon boonMag kind swapSlot, then OFFER_END.
+        // Sends nothing at all when no offer is on the table, because
+        // OFFER_END is what makes the addon raise its chooser.
         void SendOffers(Player* player);
 
         // RUN, the affix list and any pending offers: what login and SYNC

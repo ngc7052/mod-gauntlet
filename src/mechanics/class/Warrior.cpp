@@ -71,11 +71,6 @@ namespace Gauntlet
         constexpr uint32 SPELL_LAST_STAND           = 12975;
         constexpr uint32 SPELL_ENRAGED_REGENERATION = 55694;
 
-        uint8 RankIndexOf(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* KeyOf(uint16 id, char const* fallback)
         {
@@ -103,8 +98,7 @@ namespace Gauntlet
         // 100 -> 90 -> 80 rage. Rage is stored times ten
         // (Player::GetPower(POWER_RAGE) counts in tenths), so these are the
         // stored values.
-        constexpr uint32 RAGE_TRIGGER[] = { 1000, 900, 800, 700 };
-        static_assert(std::size(RAGE_TRIGGER) >= MAX_RANK, "RAGE_TRIGGER is short a rank");
+        constexpr uint32 RAGE_TRIGGER = 1000;
 
         // The card's two fixed numbers.
         constexpr uint32 MIST_MS     = 3000;
@@ -151,7 +145,7 @@ namespace Gauntlet
             std::string Diagnose(Ctx& ctx) const override
             {
                 std::string out = "red mist: trigger at "
-                                + std::to_string(RAGE_TRIGGER[RankIndexOf(ctx.self)] / 10u) + " rage";
+                                + std::to_string(RAGE_TRIGGER / 10u) + " rage";
                 if (ctx.player)
                     out += ", now " + std::to_string(ctx.player->GetPower(POWER_RAGE) / 10u);
                 out += _control.Held() ? ", HELD" : ", free";
@@ -189,7 +183,7 @@ namespace Gauntlet
             if (ctx.run && ctx.run->dead)
                 return;
 
-            if (player->GetPower(POWER_RAGE) < RAGE_TRIGGER[RankIndexOf(ctx.self)])
+            if (player->GetPower(POWER_RAGE) < RAGE_TRIGGER)
                 return;
 
             // Confuse first, then empty the rage. The other order would give a
@@ -220,7 +214,7 @@ namespace Gauntlet
             // How close the bar is to the line, as a percentage of the trigger
             // rather than of the cap -- because the trigger is what the player
             // has to stay under, and at rank III it is not the cap.
-            uint32 const trigger = RAGE_TRIGGER[RankIndexOf(ctx.self)];
+            uint32 const trigger = RAGE_TRIGGER;
             uint32 const rage    = uint32(player->GetPower(POWER_RAGE));
             uint32 const pct     = trigger != 0 ? std::min<uint32>(100u, rage * 100u / trigger) : 0u;
 
@@ -229,8 +223,7 @@ namespace Gauntlet
 
         std::string RedMist::Describe(AffixInstance const& self) const
         {
-            uint8 const  i    = RankIndexOf(&self);
-            uint32 const rage = RAGE_TRIGGER[i] / 10u;
+            uint32 const rage = RAGE_TRIGGER / 10u;
 
             std::string out = "Reaching " + std::to_string(rage)
                             + " rage confuses you for 3 seconds and empties your rage. This can"
@@ -260,9 +253,8 @@ namespace Gauntlet
         // Rank IV puts the line at half health, which is where a warrior spends
         // most of a hard fight: the damage is free and the panic buttons are
         // gone for the half of the fight you most want them.
-        constexpr uint32 LINE_PCT[] = { 30, 35, 40, 50 };
+        constexpr uint32 LINE_PCT = 35;
 
-        static_assert(std::size(LINE_PCT) >= MAX_RANK, "LINE_PCT is short a rank");
 
         // The card's number, and it does not ladder.
         constexpr float BARGAIN_DAMAGE_MULT = 1.25f;
@@ -297,7 +289,7 @@ namespace Gauntlet
             std::string Diagnose(Ctx& ctx) const override
             {
                 std::string out = "berserker's bargain: line at "
-                                + std::to_string(LINE_PCT[RankIndexOf(ctx.self)]) + "%";
+                                + std::to_string(LINE_PCT) + "%";
                 if (ctx.player)
                     out += ", health " + std::to_string(uint32(ctx.player->GetHealthPct())) + "%";
                 out += _below ? ", BELOW (panic buttons held)" : ", above";
@@ -319,7 +311,7 @@ namespace Gauntlet
                 return;
 
             bool const below = player->IsAlive()
-                            && player->GetHealthPct() < float(LINE_PCT[RankIndexOf(ctx.self)]);
+                            && player->GetHealthPct() < float(LINE_PCT);
 
             // Only on the crossing. Denying and allowing every tick would send
             // the client two cooldown packets per second for three spells,
@@ -367,7 +359,7 @@ namespace Gauntlet
 
         std::string BerserkersBargain::Describe(AffixInstance const& self) const
         {
-            uint32 const line = LINE_PCT[RankIndexOf(&self)];
+            uint32 const line = LINE_PCT;
 
             // No BoonClause, for Frenzy's reason: the upside is the other half
             // of the same sentence, not a separate promise.
@@ -393,8 +385,7 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_ROAR = 31;
 
         // The card's ladder, in yards.
-        constexpr float ROAR_YARDS[] = { 20.0f, 30.0f, 40.0f, 50.0f };
-        static_assert(std::size(ROAR_YARDS) >= MAX_RANK, "ROAR_YARDS is short a rank");
+        constexpr float ROAR_YARDS = 30.0f;
 
         // The boon: "shouts free and long". Four minutes is the card's number.
         constexpr int32 SHOUT_DURATION_MS = 4 * 60 * 1000;
@@ -478,7 +469,7 @@ namespace Gauntlet
                                                      player->GetPower(POWER_RAGE) + cost));
             }
 
-            float const range = ROAR_YARDS[RankIndexOf(ctx.self)];
+            float const range = ROAR_YARDS;
             uint32      woke  = 0;
 
             for (Creature* creature : CreaturesNear(player, range))
@@ -575,8 +566,7 @@ namespace Gauntlet
         // The card's ladder, in seconds of lockout on the other two stances.
         // Thirty seconds at rank IV: a stance is a decision for the whole
         // fight rather than a rotation step.
-        constexpr uint32 STANCE_LOCK_MS[] = { 6000, 10000, 20000, 30000 };
-        static_assert(std::size(STANCE_LOCK_MS) >= MAX_RANK, "STANCE_LOCK_MS is short a rank");
+        constexpr uint32 STANCE_LOCK_MS = 10000;
 
         constexpr uint32 SPELL_BATTLE_STANCE     = 2457;
         constexpr uint32 SPELL_DEFENSIVE_STANCE  = 71;
@@ -613,7 +603,7 @@ namespace Gauntlet
                 if (ctx.run && ctx.run->dead)
                     return;
 
-                uint32 const ms = STANCE_LOCK_MS[RankIndexOf(ctx.self)];
+                uint32 const ms = STANCE_LOCK_MS;
 
                 // The other two only. The stance just entered is not put on
                 // cooldown, because re-casting the stance you are already in is
@@ -647,7 +637,7 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint32 const secs = STANCE_LOCK_MS[RankIndexOf(&self)] / 1000u;
+                uint32 const secs = STANCE_LOCK_MS / 1000u;
 
                 std::string out = "Changing stance locks the other two for " + std::to_string(secs)
                                 + " seconds. Choose before the pull.";
@@ -660,7 +650,7 @@ namespace Gauntlet
 
             std::string Diagnose(Ctx& ctx) const override
             {
-                return "iron discipline: " + std::to_string(STANCE_LOCK_MS[RankIndexOf(ctx.self)] / 1000u)
+                return "iron discipline: " + std::to_string(STANCE_LOCK_MS / 1000u)
                      + "s lock, " + std::to_string(_changes) + " change(s)";
             }
 
@@ -672,7 +662,7 @@ namespace Gauntlet
 
         std::string DeafeningRoar::Describe(AffixInstance const& self) const
         {
-            uint32 const yards = uint32(ROAR_YARDS[RankIndexOf(&self)]);
+            uint32 const yards = uint32(ROAR_YARDS);
 
             return "Your shouts wake every idle enemy within " + std::to_string(yards)
                  + " yards and pull them onto you. Elites and bosses do not hear it. In exchange"

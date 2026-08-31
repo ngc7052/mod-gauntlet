@@ -53,15 +53,17 @@ namespace
     };
 
     // Reads the instance, so that "Aggregate forwards the affix it is
-    // iterating" is checked rather than assumed.
-    class RankFactor : public IMechanic
+    // iterating" is checked rather than assumed. The boon magnitude is the
+    // field read, because it is the one per-instance number a mechanic
+    // legitimately varies on -- the rank was, until the ranks went.
+    class InstanceFactor : public IMechanic
     {
     public:
-        explicit RankFactor(AggregateKind kind) : _kind(kind) { }
+        explicit InstanceFactor(AggregateKind kind) : _kind(kind) { }
 
         float AggregateFactor(AffixInstance const& self, AggregateKind kind) const override
         {
-            return kind == _kind ? 1.0f + 0.1f * static_cast<float>(self.rank) : 1.0f;
+            return kind == _kind ? 1.0f + 0.01f * static_cast<float>(self.boonMag) : 1.0f;
         }
 
         std::string Describe(AffixInstance const& /*self*/) const override { return "a test stub"; }
@@ -216,16 +218,16 @@ TEST(Aggregate, AnUnimplementedMechanicIsIgnoredEntirely)
 TEST(Aggregate, TheAffixIsForwardedToItsImplementation)
 {
     AggregateCaps const caps;
-    RankFactor scaling(AggregateKind::DamageTaken);
+    InstanceFactor scaling(AggregateKind::DamageTaken);
 
-    for (uint8 rank = 1; rank <= MAX_RANK; ++rank)
+    for (uint8 mag : { 5, 10, 25, 40 })
     {
         AffixInstance instance = Carrying(&scaling);
-        instance.rank = rank;
+        instance.boonMag = mag;
         std::vector<AffixInstance> const carried = { instance };
         EXPECT_FLOAT_EQ(Aggregate(carried, Everything(AggregateKind::DamageTaken), caps),
-                        1.0f + 0.1f * float(rank))
-            << "rank " << unsigned(rank);
+                        1.0f + 0.01f * float(mag))
+            << "boonMag " << unsigned(mag);
     }
 }
 

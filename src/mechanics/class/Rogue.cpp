@@ -35,11 +35,6 @@ namespace Gauntlet
         constexpr uint32 SPELL_VANISH = 1856;   // the registry's own requiresSpell for C13
         constexpr uint32 SPELL_SPRINT = 2983;
 
-        uint8 RankIndexOf(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         // ==================================================================
         // C13 - Cold Trail (40)
@@ -58,8 +53,7 @@ namespace Gauntlet
         // LADDER-SENTINEL: 0 is not a shorter cooldown, it is no Vanish.
         // Rank III is a standing denial and there is nothing past never, so Cold
         // Trail keeps maxRank = 3; the fourth entry is unreachable.
-        constexpr uint32 VANISH_COOLDOWN_MS[] = { 600000, 1800000, 0, 0 };
-        static_assert(std::size(VANISH_COOLDOWN_MS) >= MAX_RANK, "VANISH_COOLDOWN_MS is short a rank");
+        constexpr uint32 VANISH_COOLDOWN_MS = 600000;
 
         class ColdTrail final : public IMechanic
         {
@@ -72,9 +66,9 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override;
 
-            std::string Diagnose(Ctx& ctx) const override
+            std::string Diagnose(Ctx& /*ctx*/) const override
             {
-                uint32 const ms = VANISH_COOLDOWN_MS[RankIndexOf(ctx.self)];
+                uint32 const ms = VANISH_COOLDOWN_MS;
                 return std::string("cold trail: ")
                      + (ms == 0 ? "Vanish denied outright"
                                 : "Vanish on " + std::to_string(ms / 60000) + " min");
@@ -86,7 +80,7 @@ namespace Gauntlet
                 // Rank III only, and Hold() is what makes Preparation and Cold
                 // Snap unable to give the button back -- the card asks for
                 // exactly that.
-                if (VANISH_COOLDOWN_MS[RankIndexOf(ctx.self)] == 0)
+                if (VANISH_COOLDOWN_MS == 0)
                     PermanentCooldown::Hold(ctx.player, SPELL_VANISH);
             }
         };
@@ -116,7 +110,7 @@ namespace Gauntlet
             if (base != SPELL_VANISH)
                 return;
 
-            uint32 const ms = VANISH_COOLDOWN_MS[RankIndexOf(ctx.self)];
+            uint32 const ms = VANISH_COOLDOWN_MS;
             if (ms == 0)
                 return;
 
@@ -130,7 +124,7 @@ namespace Gauntlet
 
         std::string ColdTrail::Describe(AffixInstance const& self) const
         {
-            uint32 const ms  = VANISH_COOLDOWN_MS[RankIndexOf(&self)];
+            uint32 const ms  = VANISH_COOLDOWN_MS;
             uint32 const pct = self.boonMag;
 
             std::string out = ms == 0
@@ -155,8 +149,7 @@ namespace Gauntlet
         // itself. Back to a wall, Blind the second mob, Gouge and reposition.
         // ==================================================================
         // The card's ladder for damage taken from outside the front arc.
-        constexpr float BEHIND_MULT[] = { 1.30f, 1.50f, 1.75f, 2.00f };
-        static_assert(std::size(BEHIND_MULT) >= MAX_RANK, "BEHIND_MULT is short a rank");
+        constexpr float BEHIND_MULT = 1.50f;
 
         class ExposedBack final : public IMechanic
         {
@@ -190,7 +183,7 @@ namespace Gauntlet
                 if (player->HasInArc(float(M_PI), attacker))
                     return 1.0f;
 
-                return BEHIND_MULT[RankIndexOf(ctx.self)];
+                return BEHIND_MULT;
             }
 
             std::string Describe(AffixInstance const& self) const override;
@@ -203,7 +196,7 @@ namespace Gauntlet
 
         std::string ExposedBack::Describe(AffixInstance const& self) const
         {
-            uint32 const extra = uint32((BEHIND_MULT[RankIndexOf(&self)] - 1.0f) * 100.0f + 0.5f);
+            uint32 const extra = uint32((BEHIND_MULT - 1.0f) * 100.0f + 0.5f);
             uint32 const pct   = self.boonMag;
 
             std::string out = "Anything striking you from behind deals " + std::to_string(extra)
@@ -226,8 +219,7 @@ namespace Gauntlet
         // Multi-DoTting a camp is the greedy play and bleeds accordingly, and
         // unpoisoned blades are always an option.
         // ==================================================================
-        constexpr uint32 POISON_SHARE_PCT[] = { 25, 35, 50, 65 };
-        static_assert(std::size(POISON_SHARE_PCT) >= MAX_RANK, "POISON_SHARE_PCT is short a rank");
+        constexpr uint32 POISON_SHARE_PCT = 25;
 
         class PoisonedBlades final : public IMechanic
         {
@@ -250,7 +242,7 @@ namespace Gauntlet
                     return;
 
                 uint32 const share = uint32(uint64(damage)
-                                          * POISON_SHARE_PCT[RankIndexOf(ctx.self)] / 100u);
+                                          * POISON_SHARE_PCT / 100u);
                 if (share == 0)
                     return;
 
@@ -289,7 +281,7 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint32 const pct  = POISON_SHARE_PCT[RankIndexOf(&self)];
+                uint32 const pct  = POISON_SHARE_PCT;
                 uint32 const boon = self.boonMag;
 
                 std::string out = std::to_string(pct) + "% of the damage your poisons deal is"
@@ -325,8 +317,7 @@ namespace Gauntlet
         // ends. Regeneration is already zero and the combo-point half is spent,
         // so Slow Hands keeps maxRank = 3 rather than offering a rank-up that
         // changes nothing. The fourth entry is unreachable.
-        constexpr float MOVING_REGEN[] = { 0.5f, 0.0f, 0.0f, 0.0f };
-        static_assert(std::size(MOVING_REGEN) >= MAX_RANK, "MOVING_REGEN is short a rank");
+        constexpr float MOVING_REGEN = 0.0f;
 
         // The boon's flat addition to the energy bar.
         constexpr uint32 EXTRA_ENERGY = 20;
@@ -351,18 +342,14 @@ namespace Gauntlet
 
             void OnTick(Ctx& ctx, uint32 /*diffMs*/) override;
 
-            std::string Describe(AffixInstance const& self) const override
+            std::string Describe(AffixInstance const& /*self*/) const override
             {
-                uint8 const i = RankIndexOf(&self);
 
-                std::string out = MOVING_REGEN[i] > 0.0f
+                std::string out = MOVING_REGEN > 0.0f
                     ? std::string("Your energy regenerates at half rate while you are moving in"
                                   " combat.")
                     : std::string("Your energy does not regenerate at all while you are moving in"
                                   " combat.");
-
-                if (i >= 2)
-                    out += " You gain no combo points while moving either.";
 
                 out += " In exchange your energy bar holds " + std::to_string(EXTRA_ENERGY)
                      + " more. Stand and fight, or leave.";
@@ -405,7 +392,7 @@ namespace Gauntlet
             // Spending energy shows up as a fall and is never touched.
             if (now > _lastEnergy && player->isMoving() && player->IsInCombat())
             {
-                float const keep   = MOVING_REGEN[RankIndexOf(ctx.self)];
+                float const keep   = MOVING_REGEN;
                 int32 const gained = now - _lastEnergy;
                 int32 const allowed = int32(float(gained) * keep);
 

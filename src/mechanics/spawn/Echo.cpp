@@ -54,8 +54,7 @@ namespace Gauntlet
         constexpr uint32 EVENT_RISE = 1;
 
         // The card's ladder: every 30 -> 25 -> 18 kills, health x2 -> x2.5 -> x3.
-        constexpr int32 KILLS_PER_ECHO[] = { 30, 25, 18, 12 };
-        static_assert(std::size(KILLS_PER_ECHO) >= MAX_RANK, "KILLS_PER_ECHO is short a rank");
+        constexpr int32 KILLS_PER_ECHO = 25;
 
         // creature_template row 900005 already carries HealthModifier 2.0, so
         // what is left to code is the ratio to it -- the SQL says so in its own
@@ -65,8 +64,7 @@ namespace Gauntlet
         // copy of the player, so the health ladder is what decides whether it
         // is a fight or an execution, and 1.75 is the last step that still
         // loses to a character playing well.
-        constexpr float HEALTH_RATIO[] = { 1.0f, 1.25f, 1.5f, 1.75f };
-        static_assert(std::size(HEALTH_RATIO) >= MAX_RANK, "HEALTH_RATIO is short a rank");
+        constexpr float HEALTH_RATIO = 1.25f;
 
         // The card's twenty yards, and its reward: "killing it grants five
         // kills' worth of XP".
@@ -108,12 +106,6 @@ namespace Gauntlet
         constexpr uint32 SPELL_CLONE_ME    = 45204;
         constexpr uint32 SPELL_COPY_WEAPON = 41055;
 
-        uint8 RankOf(AffixInstance const* self)
-        {
-            if (!self)
-                return 1;
-            return self->rank < 1 ? 1 : (self->rank > MAX_RANK ? MAX_RANK : self->rank);
-        }
 
         char const* MechanicKey()
         {
@@ -155,7 +147,7 @@ namespace Gauntlet
             void  Poll(Ctx& ctx);
             void  Reward(Ctx& ctx);
             void  ShowCounter(Ctx& ctx) const;
-            int32 Threshold(Ctx const& ctx) const { return KILLS_PER_ECHO[RankOf(ctx.self) - 1]; }
+            int32 Threshold(Ctx const& /*ctx*/) const { return KILLS_PER_ECHO; }
             int32 Kills(Ctx& ctx) const;
             void  SetKills(Ctx& ctx, int32 value);
 
@@ -352,7 +344,7 @@ namespace Gauntlet
                 return;
             }
 
-            sGauntletSummons->Scale(echo, HEALTH_RATIO[RankOf(ctx.self) - 1], 1.0f);
+            sGauntletSummons->Scale(echo, HEALTH_RATIO, 1.0f);
 
             // The copy, in the two directions the core's own scripts use them.
             player->CastSpell(echo, SPELL_CLONE_ME, true);
@@ -482,12 +474,11 @@ namespace Gauntlet
 
         std::string Echo::Describe(AffixInstance const& self) const
         {
-            uint8 const rank = RankOf(&self);
 
-            std::string out = "Every " + std::to_string(KILLS_PER_ECHO[rank - 1])
+            std::string out = "Every " + std::to_string(KILLS_PER_ECHO)
                             + "th enemy you kill returns as an Echo of yourself: your face, your"
                               " weapon, and "
-                            + (rank == 1 ? "twice" : (rank == 2 ? "two and a half times" : "three times"))
+                            + "two and a half times"
                             + " a normal enemy's health. The counter is on your screen, so you"
                               " choose which kill is the one.";
 

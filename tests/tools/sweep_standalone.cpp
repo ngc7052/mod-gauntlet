@@ -89,17 +89,11 @@ namespace
 
         for (AffixInstance& a : carried)
             if (a.mechanic == offer.mechanic)
-            {
-                a.rank      = offer.rank;
-                a.condition = offer.condition;
-                a.boon      = offer.boon;
-                a.boonMag   = offer.boonMag;
                 return;
-            }
 
         AffixInstance instance;
         instance.mechanic   = offer.mechanic;
-        instance.rank       = offer.rank;
+        instance.rarity     = offer.rarity;
         instance.condition  = offer.condition;
         instance.boon       = offer.boon;
         instance.boonMag    = offer.boonMag;

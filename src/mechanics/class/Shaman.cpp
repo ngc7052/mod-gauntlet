@@ -32,11 +32,6 @@ namespace Gauntlet
 {
     namespace
     {
-        uint8 RankIndexOf(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* KeyOf(uint16 id, char const* fallback)
         {
@@ -80,13 +75,11 @@ namespace Gauntlet
 
         // Rank II makes the standing totem die to one hit; rank III doubles
         // what totems cost. Rank I is the rule alone.
-        constexpr bool FRAGILE[]     = { false, true,  true,  true };
-        static_assert(std::size(FRAGILE) >= MAX_RANK, "FRAGILE is short a rank");
+        constexpr bool FRAGILE = true;
         // Rank IV triples the cost. Fragility is already on from rank II and a
         // totem cannot die to less than one hit, so the price is the only axis
         // the last rank has left.
-        constexpr uint32 COST_MULT[]  = { 1,     1,     2,     3 };
-        static_assert(std::size(COST_MULT) >= MAX_RANK, "COST_MULT is short a rank");
+        constexpr uint32 COST_MULT = 1;
 
         class OneTotem final : public IMechanic
         {
@@ -128,7 +121,7 @@ namespace Gauntlet
 
             // The cost half of rank III, refunded in reverse: the cast has
             // already paid once, so a second payment is taken here.
-            if (COST_MULT[RankIndexOf(ctx.self)] > 1 && info->ManaCost != 0)
+            if (COST_MULT > 1 && info->ManaCost != 0)
             {
                 bool summonsTotem = false;
                 ForEachTotem(player, [&summonsTotem](uint8, Creature*) { summonsTotem = true; });
@@ -192,7 +185,7 @@ namespace Gauntlet
             // Rank II: whatever stands is fragile. Applied every tick because a
             // totem's health is restored by nothing else, and one hit is one
             // hit whether it lands now or in a minute.
-            if (FRAGILE[RankIndexOf(ctx.self)])
+            if (FRAGILE)
                 ForEachTotem(player, [](uint8, Creature* totem)
                 {
                     if (totem->GetMaxHealth() > 1)
@@ -208,18 +201,17 @@ namespace Gauntlet
 
         std::string OneTotem::Describe(AffixInstance const& self) const
         {
-            uint8 const i = RankIndexOf(&self);
 
             std::string out = "Only one of your totems may stand at a time; planting another"
                               " takes the first away.";
 
-            if (FRAGILE[i])
+            if (FRAGILE)
                 out += " The one that stands dies to a single hit.";
             // The number, not the word. It said "double" at every rank above
             // one, so rank IV's triple cost read exactly as rank III's -- the
             // behaviour differed and the card did not say so.
-            if (COST_MULT[i] > 1)
-                out += " Totems cost " + std::to_string(COST_MULT[i]) + " times as much.";
+            if (COST_MULT > 1)
+                out += " Totems cost " + std::to_string(COST_MULT) + " times as much.";
 
             out += " In exchange the standing totem lasts twice as long.";
             return out;
@@ -237,9 +229,8 @@ namespace Gauntlet
         // ==================================================================
         constexpr uint16 MECHANIC_TOTEMIC_ANCHOR = 53;
 
-        constexpr float ADRIFT_MULT[] = { 1.20f, 1.30f, 1.40f, 1.55f };
+        constexpr float ADRIFT_MULT = 1.30f;
 
-        static_assert(std::size(ADRIFT_MULT) >= MAX_RANK, "ADRIFT_MULT is short a rank");
         constexpr float ANCHOR_YARDS = 15.0f;
 
         class TotemicAnchor final : public IMechanic
@@ -271,12 +262,12 @@ namespace Gauntlet
 
             float DamageTakenMult(Ctx& ctx, Unit*, SpellInfo const*) override
             {
-                return Anchored(ctx.player) ? 1.0f : ADRIFT_MULT[RankIndexOf(ctx.self)];
+                return Anchored(ctx.player) ? 1.0f : ADRIFT_MULT;
             }
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint32 const extra = uint32((ADRIFT_MULT[RankIndexOf(&self)] - 1.0f) * 100.0f + 0.5f);
+                uint32 const extra = uint32((ADRIFT_MULT - 1.0f) * 100.0f + 0.5f);
 
                 return "You take " + std::to_string(extra) + "% more damage whenever no totem of"
                        " yours is within " + std::to_string(uint32(ANCHOR_YARDS))
@@ -314,8 +305,7 @@ namespace Gauntlet
         // Lava Burst and totem drops is the reward -- the rotation the class
         // should have, enforced.
         // ==================================================================
-        constexpr float REPEAT_COST_MULT[] = { 1.5f, 2.0f, 3.0f, 4.0f };
-        static_assert(std::size(REPEAT_COST_MULT) >= MAX_RANK, "REPEAT_COST_MULT is short a rank");
+        constexpr float REPEAT_COST_MULT = 2.0f;
 
         class ElementalOverload final : public IMechanic
         {
@@ -344,7 +334,7 @@ namespace Gauntlet
                 // The extra, taken after the fact for the reason every cost
                 // curse in this module takes it that way: Spell::TakePower runs
                 // before any hook here.
-                float const  mult  = REPEAT_COST_MULT[RankIndexOf(ctx.self)];
+                float const  mult  = REPEAT_COST_MULT;
                 int32 const  extra = int32(float(info->ManaCost) * (mult - 1.0f));
                 if (extra <= 0)
                     return;
@@ -368,7 +358,7 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                float const  mult = REPEAT_COST_MULT[RankIndexOf(&self)];
+                float const  mult = REPEAT_COST_MULT;
                 uint32 const pct  = self.boonMag;
 
                 std::string out = "Casting the same spell twice in a row costs "
@@ -402,8 +392,7 @@ namespace Gauntlet
         // reapply them when you need the heal or the proc, and get out of DoTs.
         // Enemies that hit fast are the ones to control first.
         // ==================================================================
-        constexpr uint32 DEBT_PCT[] = { 2, 3, 4, 5 };
-        static_assert(std::size(DEBT_PCT) >= MAX_RANK, "DEBT_PCT is short a rank");
+        constexpr uint32 DEBT_PCT = 2;
 
         constexpr uint32 SPELL_LIGHTNING_SHIELD = 324;
         constexpr uint32 SPELL_EARTH_SHIELD     = 974;
@@ -425,7 +414,7 @@ namespace Gauntlet
                     return;
 
                 uint32 const want   = uint32(uint64(player->GetMaxHealth())
-                                           * DEBT_PCT[RankIndexOf(ctx.self)] / 100u);
+                                           * DEBT_PCT / 100u);
                 uint32 const health = uint32(player->GetHealth());
                 uint32 const cost   = health > 1 ? std::min(want, health - 1) : 0;
                 if (cost == 0)
@@ -467,7 +456,7 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint32 const pct = DEBT_PCT[RankIndexOf(&self)];
+                uint32 const pct = DEBT_PCT;
 
                 std::string out = "While a shield is on you, every hit you take also costs "
                                 + std::to_string(pct) + "% of your maximum health. It cannot kill"

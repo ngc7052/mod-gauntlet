@@ -44,7 +44,6 @@ TEST(Trades, EveryLineBacksACommonRow)
         MechanicDef const* def = FindMechanic(t.id);
         ASSERT_NE(def, nullptr) << "trade line " << t.id << " has no registry row";
         EXPECT_EQ(def->rarity, Rarity::Common) << def->key << " has a trade line but is not a common";
-        EXPECT_EQ(def->maxRank, 1) << def->key << ": a common has no ladder";
         EXPECT_EQ(def->boon, t.boon)
             << def->key << ": the registry names one boon and the trade line pays another";
         EXPECT_TRUE(IsImplemented(*def)) << def->key;
@@ -143,14 +142,14 @@ TEST(Trades, TheOfferPromisesWhatTheTablePays)
     // generator's own published function rather than a copy of the arithmetic.
     for (TradeDef const& t : TRADES)
     {
-        EXPECT_EQ(BoonMagnitude(t.id, t.boon, 1), uint32(t.boonPct)) << "id " << t.id;
+        EXPECT_EQ(BoonMagnitude(t.id, t.boon), uint32(t.boonPct)) << "id " << t.id;
 
         // And nothing for a boon the line does not name, so a registry row
         // that drifted to another boon pays zero rather than the wrong thing --
         // which Trades.EveryLineBacksACommonRow would already have caught.
         for (uint8 b = 0; b < static_cast<uint8>(Boon::MAX); ++b)
             if (static_cast<Boon>(b) != t.boon)
-                EXPECT_EQ(BoonMagnitude(t.id, static_cast<Boon>(b), 1), 0u) << "id " << t.id;
+                EXPECT_EQ(BoonMagnitude(t.id, static_cast<Boon>(b)), 0u) << "id " << t.id;
     }
 }
 

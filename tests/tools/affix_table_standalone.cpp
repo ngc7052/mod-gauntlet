@@ -101,21 +101,16 @@ namespace
         if (!noun)
             return "&mdash;";
 
-        uint8 const top = std::min<uint8>(def.maxRank, MAX_RANK);
-        uint32 const lo = BoonMagnitude(def.id, def.boon, 1);
-        uint32 const hi = BoonMagnitude(def.id, def.boon, top);
+        uint32 const mag = BoonMagnitude(def.id, def.boon);
 
         // A boon with no magnitude is one the mechanic delivers itself and the
         // blurb describes -- a second life, a named ability's cooldown. Naming
         // it without inventing a number is the honest cell.
-        if (lo == 0 && hi == 0)
+        if (mag == 0)
             return noun;
 
         char buf[128];
-        if (lo == hi)
-            std::snprintf(buf, sizeof(buf), "+%u%% %s", lo, noun);
-        else
-            std::snprintf(buf, sizeof(buf), "+%u&ndash;%u%% %s", lo, hi, noun);
+        std::snprintf(buf, sizeof(buf), "+%u%% %s", mag, noun);
         return buf;
     }
 
@@ -136,19 +131,18 @@ namespace
 
 int main()
 {
-    std::printf("| # | Affix | Family | Rarity | Who | Levels | Ranks | What it does to you | What it pays |\n");
-    std::printf("|---|---|---|---|---|---|---|---|---|\n");
+    std::printf("| # | Affix | Family | Rarity | Who | Levels | What it does to you | What it pays |\n");
+    std::printf("|---|---|---|---|---|---|---|---|\n");
 
     for (MechanicDef const& def : AllMechanics())
     {
-        std::printf("| %u | **%s** | %s | %s | %s | %u&ndash;%u | %u | %s | %s |\n",
+        std::printf("| %u | **%s** | %s | %s | %s | %u&ndash;%u | %s | %s |\n",
                     unsigned(def.id),
                     Cell(def.name).c_str(),
                     Cell(FamilyName(def.family)).c_str(),
                     Cell(RarityName(def.rarity)).c_str(),
                     Cell(ClassesOf(def.classMask)).c_str(),
                     unsigned(def.minTier), unsigned(def.maxTier),
-                    unsigned(std::min<uint8>(def.maxRank, MAX_RANK)),
                     Cell(def.blurb).c_str(),
                     Cell(PaysOf(def)).c_str());
     }

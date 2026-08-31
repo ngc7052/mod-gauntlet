@@ -47,19 +47,13 @@ namespace Gauntlet
         // four at rank IV. This is the one ladder in the table where a higher
         // rank is a smaller gift and nothing else, because the gift is the
         // whole mechanic: Last Rites has no curse half to escalate.
-        constexpr uint8 LEVELS_PER_CHARGE[] = { 1, 2, 3, 4 };
-        static_assert(std::size(LEVELS_PER_CHARGE) >= MAX_RANK, "LEVELS_PER_CHARGE is short a rank");
+        constexpr uint8 LEVELS_PER_CHARGE = 1;
 
         // The card's two fixed numbers.
         constexpr uint32 MARK_MS          = 600000;   // ten minutes
         constexpr float  MARK_DAMAGE_MULT = 1.5f;
         // Half the *current* maximum, so a Deep Wound and the Mark compound.
 
-        uint8 RankIndex(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* MechanicKey()
         {
@@ -103,7 +97,7 @@ namespace Gauntlet
             void Publish(Ctx& ctx);
             void PublishCharge(Ctx& ctx);
 
-            uint8 Ladder(Ctx const& ctx) const { return LEVELS_PER_CHARGE[RankIndex(ctx.self)]; }
+            uint8 Ladder(Ctx const& /*ctx*/) const { return LEVELS_PER_CHARGE; }
 
             uint32 _markMs    = 0;
             uint32 _saves     = 0;
@@ -269,9 +263,9 @@ namespace Gauntlet
             AddonFor(ctx)->QueueCounter(player, "last_rites_charge", up ? 1u : 0u, 1u);
         }
 
-        std::string LastRites::Describe(AffixInstance const& self) const
+        std::string LastRites::Describe(AffixInstance const& /*self*/) const
         {
-            uint8 const every = LEVELS_PER_CHARGE[RankIndex(&self)];
+            uint8 const every = LEVELS_PER_CHARGE;
 
             std::string how_often = every == 1
                 ? std::string("once per level")

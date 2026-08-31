@@ -129,7 +129,6 @@ namespace Gauntlet
         switch (k)
         {
             case OfferKind::New:     return "New";
-            case OfferKind::RankUp:  return "Rank up";
             case OfferKind::Swap:    return "Swap";
             case OfferKind::Bargain: return "Bargain";
             default:                 return "Unknown";

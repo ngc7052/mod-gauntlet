@@ -36,7 +36,7 @@ namespace
 
 TEST(HarnessSmoke, CommittedConstants)
 {
-    EXPECT_EQ(Gauntlet::GeneratorVersion, 15);
+    EXPECT_EQ(Gauntlet::GeneratorVersion, 16);
 
     // 72 and 73 were Withering and Forgetful. Both were deleted from the
     // registry in Phase 2 and the constants stay behind as reservations: the
@@ -45,7 +45,6 @@ TEST(HarnessSmoke, CommittedConstants)
     // this only pins the numbers themselves.
     EXPECT_EQ(Gauntlet::MECHANIC_WITHERING, 72);
     EXPECT_EQ(Gauntlet::MECHANIC_FORGETFUL, 73);
-    EXPECT_EQ(Gauntlet::MAX_RANK, 4);
 }
 
 TEST(HarnessSmoke, PlayerViewClassMask)

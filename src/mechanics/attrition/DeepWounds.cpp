@@ -313,7 +313,7 @@ namespace Gauntlet
                      + " | saved " + std::to_string(_savedWound)
                      + " | cap " + std::to_string(CapFor(base))
                      + " | level " + std::to_string(uint32(_level))
-                     + " | a kill closes " + std::to_string(CloseFor(ctx.self ? ctx.self->rank : 1)) + "%"
+                     + " | a kill closes " + std::to_string(KILL_CLOSE_PCT) + "%"
                      + (_detached ? " | DETACHED" : "")
                      + " | ticks " + std::to_string(_sawTick)
                      + " blows " + std::to_string(_sawDamage)
@@ -322,26 +322,16 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                std::string out = std::to_string(PctFor(self.rank))
+                std::string out = std::to_string(WOUND_PCT)
                                 + "% of the damage you take becomes a wound. Only a kill closes one.";
                 out += BoonClause(self.boon, self.boonMag);
                 return out;
             }
 
         private:
-            static int32 CloseFor(uint8 rank)
+            static int32 Severity(Ctx const&)
             {
-                return KILL_CLOSE_PCT[std::clamp<uint8>(rank, 1, MAX_RANK) - 1];
-            }
-
-            static int32 PctFor(uint8 rank)
-            {
-                return WOUND_PCT[std::clamp<uint8>(rank, 1, MAX_RANK) - 1];
-            }
-
-            static int32 Severity(Ctx const& ctx)
-            {
-                return PctFor(ctx.self ? ctx.self->rank : 1);
+                return WOUND_PCT;
             }
 
             static int32 CapFor(uint32 base)
@@ -407,7 +397,7 @@ namespace Gauntlet
                 if (base == 0)
                     return;
 
-                int32 const closed = DeepWoundsClose(ctx.self ? ctx.self->rank : 1, base);
+                int32 const closed = DeepWoundsClose(base);
 
                 SetWound(std::max<int64>(0, int64(_wound) - closed));
                 Mirror(ctx);

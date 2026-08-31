@@ -49,6 +49,9 @@ CREATE TABLE IF NOT EXISTS `gauntlet_affix` (
     -- 0 is Gauntlet::MECHANIC_NONE and doubles as the "not yet converted"
     -- marker the one-shot startup routine looks for on a migrated realm.
     `mechanic`    SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    -- The card's rarity (Gauntlet::Rarity) since the rank system went, kept in
+    -- the column that held its rank. Written on every pick, never read back:
+    -- the registry is the authority. updates/2026_09_01_01 normalises old rows.
     `rank`        TINYINT UNSIGNED NOT NULL DEFAULT 1,
     `cond`        TINYINT UNSIGNED NOT NULL DEFAULT 0,
     `boon`        TINYINT UNSIGNED NOT NULL DEFAULT 0,

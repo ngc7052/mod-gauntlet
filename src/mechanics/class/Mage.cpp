@@ -37,11 +37,6 @@ namespace Gauntlet
         constexpr uint32 SPELL_BLINK      = 1953;   // the registry's requiresSpell for C29
         constexpr uint32 SPELL_FROST_NOVA = 122;
 
-        uint8 RankIndexOf(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* KeyOf(uint16 id, char const* fallback)
         {
@@ -70,8 +65,7 @@ namespace Gauntlet
         // 15%, 25%, then gone -- price, higher price, removal, in one row. There
         // is nothing past removal, so Cold Feet keeps maxRank = 3 and the fourth
         // entry is unreachable.
-        constexpr uint32 BLINK_COST_PCT[] = { 15, 25, 0, 0 };
-        static_assert(std::size(BLINK_COST_PCT) >= MAX_RANK, "BLINK_COST_PCT is short a rank");
+        constexpr uint32 BLINK_COST_PCT = 15;
 
         class ColdFeet final : public IMechanic
         {
@@ -84,9 +78,9 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override;
 
-            std::string Diagnose(Ctx& ctx) const override
+            std::string Diagnose(Ctx& /*ctx*/) const override
             {
-                uint32 const pct = BLINK_COST_PCT[RankIndexOf(ctx.self)];
+                uint32 const pct = BLINK_COST_PCT;
                 return std::string("cold feet: ")
                      + (pct == 0 ? "Blink denied outright"
                                  : "Blink costs " + std::to_string(pct) + "% max health")
@@ -96,7 +90,7 @@ namespace Gauntlet
         private:
             void Sync(Ctx& ctx)
             {
-                if (BLINK_COST_PCT[RankIndexOf(ctx.self)] == 0)
+                if (BLINK_COST_PCT == 0)
                     PermanentCooldown::Hold(ctx.player, SPELL_BLINK);
             }
 
@@ -128,7 +122,7 @@ namespace Gauntlet
             if (base != SPELL_BLINK)
                 return;
 
-            uint32 const pct = BLINK_COST_PCT[RankIndexOf(ctx.self)];
+            uint32 const pct = BLINK_COST_PCT;
             if (pct == 0)
                 return;   // rank III: Sync holds it denied
 
@@ -159,7 +153,7 @@ namespace Gauntlet
 
         std::string ColdFeet::Describe(AffixInstance const& self) const
         {
-            uint32 const pct  = BLINK_COST_PCT[RankIndexOf(&self)];
+            uint32 const pct  = BLINK_COST_PCT;
             uint32 const boon = self.boonMag;
 
             std::string out = pct == 0
@@ -189,9 +183,8 @@ namespace Gauntlet
         // Rank III already burns a point of mana for every point of damage, and
         // there is nothing past all of it, so Mana Burn keeps maxRank = 3. The
         // fourth entry is unreachable.
-        constexpr uint32 BURN_PCT[] = { 30, 50, 100, 100 };
+        constexpr uint32 BURN_PCT = 50;
 
-        static_assert(std::size(BURN_PCT) >= MAX_RANK, "BURN_PCT is short a rank");
 
         class ManaBurn final : public IMechanic
         {
@@ -206,7 +199,7 @@ namespace Gauntlet
             {
                 if (ctx.player)
                     AddonFor(ctx)->QueueStat(ctx.player, KeyOf(MECHANIC_MANA_BURN, "c31_mana_burn"),
-                                             int32(BURN_PCT[RankIndexOf(ctx.self)]));
+                                             int32(BURN_PCT));
             }
 
             // An observer, on the damage that actually landed. It runs after
@@ -236,7 +229,7 @@ namespace Gauntlet
                     return;
                 }
 
-                uint32 const burn = uint32(uint64(amount) * BURN_PCT[RankIndexOf(ctx.self)] / 100u);
+                uint32 const burn = uint32(uint64(amount) * BURN_PCT / 100u);
                 if (burn == 0)
                     return;
 
@@ -274,7 +267,7 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint32 const pct  = BURN_PCT[RankIndexOf(&self)];
+                uint32 const pct  = BURN_PCT;
                 uint32 const boon = self.boonMag;
 
                 std::string out = std::to_string(pct) + "% of the damage you take is also taken"
@@ -291,9 +284,9 @@ namespace Gauntlet
             // answers this has to tell apart, and the percentage alone told
             // neither: _blows counts every blow the observer saw, so a zero
             // there means the hook never reached this mechanic at all.
-            std::string Diagnose(Ctx& ctx) const override
+            std::string Diagnose(Ctx& /*ctx*/) const override
             {
-                return "mana burn: " + std::to_string(BURN_PCT[RankIndexOf(ctx.self)])
+                return "mana burn: " + std::to_string(BURN_PCT)
                      + "% of damage taken, " + std::to_string(_blows) + " blow(s) seen, "
                      + std::to_string(_burned) + " mana burned"
                      + (_noPool ? ", " + std::to_string(_noPool) + " skipped (no mana pool)" : "")
@@ -323,8 +316,7 @@ namespace Gauntlet
         constexpr uint32 SPELL_ENRAGE    = 8599;
 
         // The card's ladder, and it shortens as the affix worsens.
-        constexpr int32 SHEEP_MS[] = { 5000, 4000, 3000, 2000 };
-        static_assert(std::size(SHEEP_MS) >= MAX_RANK, "SHEEP_MS is short a rank");
+        constexpr int32 SHEEP_MS = 5000;
 
         constexpr int32 ENRAGE_MS = 10000;
 
@@ -346,7 +338,7 @@ namespace Gauntlet
                 if (aura->GetCasterGUID() != player->GetGUID())
                     return;
 
-                AuraDurationEdit::Edit(aura, SHEEP_MS[RankIndexOf(ctx.self)]);
+                AuraDurationEdit::Edit(aura, SHEEP_MS);
                 _sheeped.push_back(target->GetGUID());
             }
 
@@ -354,7 +346,7 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint32 const secs = uint32(SHEEP_MS[RankIndexOf(&self)] / 1000);
+                uint32 const secs = uint32(SHEEP_MS / 1000);
 
                 std::string out = "Your Polymorph lasts " + std::to_string(secs)
                                 + " seconds, whatever its tooltip says, and what comes out of it"
@@ -420,21 +412,18 @@ namespace Gauntlet
         // MaxHealth floor to its own number -- see RelaxCaps below. Without
         // that, Gauntlet.Caps.MaxHealth at 0.6 would clamp the last rank back
         // to the third and the offer would promise a drop it never delivers.
-        constexpr float FRAILTY_HEALTH[] = { 0.80f, 0.70f, 0.60f, 0.50f };
-        static_assert(std::size(FRAILTY_HEALTH) >= MAX_RANK, "FRAILTY_HEALTH is short a rank");
-        constexpr uint32 FRAILTY_DAMAGE_PCT[] = { 20, 30, 40, 50 };
-        static_assert(std::size(FRAILTY_DAMAGE_PCT) >= MAX_RANK, "FRAILTY_DAMAGE_PCT is short a rank");
+        constexpr float FRAILTY_HEALTH = 0.70f;
+        constexpr uint32 FRAILTY_DAMAGE_PCT = 30;
 
         class ArcaneFrailty final : public IMechanic
         {
         public:
-            float AggregateFactor(AffixInstance const& self, AggregateKind kind) const override
+            float AggregateFactor(AffixInstance const& /*self*/, AggregateKind kind) const override
             {
                 if (kind != AggregateKind::MaxHealth)
                     return 1.0f;
 
-                uint8 const rank = self.rank < 1 ? 1 : (self.rank > MAX_RANK ? MAX_RANK : self.rank);
-                return FRAILTY_HEALTH[rank - 1];
+                return FRAILTY_HEALTH;
             }
 
             // Without this the floor eats the affix: Gauntlet.Caps.MaxHealth is
@@ -442,41 +431,39 @@ namespace Gauntlet
             // Wolf alongside it would be clamped away. It relaxes to its own
             // number and no further -- the same rule Lone Wolf and Cursed Hoard
             // established in Phase 3.
-            void RelaxCaps(AffixInstance const& self, AggregateKind kind,
+            void RelaxCaps(AffixInstance const& /*self*/, AggregateKind kind,
                            AggregateCaps& caps) const override
             {
                 if (kind != AggregateKind::MaxHealth)
                     return;
 
-                uint8 const rank = self.rank < 1 ? 1 : (self.rank > MAX_RANK ? MAX_RANK : self.rank);
-                float const want = FRAILTY_HEALTH[rank - 1];
+                float const want = FRAILTY_HEALTH;
                 if (caps.maxHealthMin > want)
                     caps.maxHealthMin = want;
             }
 
-            float DamageDoneMult(Ctx& ctx, Unit*, SpellInfo const* info) override
+            float DamageDoneMult(Ctx& /*ctx*/, Unit*, SpellInfo const* info) override
             {
                 if (!info)
                     return 1.0f;   // spells only, which is what the card says
 
-                return 1.0f + float(FRAILTY_DAMAGE_PCT[RankIndexOf(ctx.self)]) / 100.0f;
+                return 1.0f + float(FRAILTY_DAMAGE_PCT) / 100.0f;
             }
 
-            std::string Describe(AffixInstance const& self) const override
+            std::string Describe(AffixInstance const& /*self*/) const override
             {
-                uint8 const  i    = RankIndexOf(&self);
-                uint32 const less = uint32((1.0f - FRAILTY_HEALTH[i]) * 100.0f + 0.5f);
+                uint32 const less = uint32((1.0f - FRAILTY_HEALTH) * 100.0f + 0.5f);
 
                 // No BoonClause: the damage is the other half of the same
                 // sentence, not a separate promise.
                 return std::to_string(less) + "% less health, and "
-                     + std::to_string(FRAILTY_DAMAGE_PCT[i]) + "% more spell damage.";
+                     + std::to_string(FRAILTY_DAMAGE_PCT) + "% more spell damage.";
             }
 
-            std::string Diagnose(Ctx& ctx) const override
+            std::string Diagnose(Ctx& /*ctx*/) const override
             {
                 return "arcane frailty: health x"
-                     + std::to_string(FRAILTY_HEALTH[RankIndexOf(ctx.self)]);
+                     + std::to_string(FRAILTY_HEALTH);
             }
         };
     }

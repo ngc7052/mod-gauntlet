@@ -42,11 +42,6 @@ namespace Gauntlet
         constexpr uint32 SPELL_DEATH_PACT       = 48743;
         constexpr uint32 SPELL_ARMY_OF_THE_DEAD = 42650;
 
-        uint8 RankIndexOf(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* KeyOf(uint16 id, char const* fallback)
         {
@@ -68,9 +63,8 @@ namespace Gauntlet
         // ==================================================================
         constexpr uint16 MECHANIC_RUNE_STARVED = 48;
 
-        constexpr float STARVED_MULT[] = { 1.20f, 1.30f, 1.40f, 1.55f };
+        constexpr float STARVED_MULT = 1.30f;
 
-        static_assert(std::size(STARVED_MULT) >= MAX_RANK, "STARVED_MULT is short a rank");
 
         bool AllRunesSpent(Player* player)
         {
@@ -115,12 +109,12 @@ namespace Gauntlet
 
             float DamageTakenMult(Ctx& ctx, Unit*, SpellInfo const*) override
             {
-                return AllRunesSpent(ctx.player) ? STARVED_MULT[RankIndexOf(ctx.self)] : 1.0f;
+                return AllRunesSpent(ctx.player) ? STARVED_MULT : 1.0f;
             }
 
-            std::string Describe(AffixInstance const& self) const override
+            std::string Describe(AffixInstance const& /*self*/) const override
             {
-                uint32 const extra = uint32((STARVED_MULT[RankIndexOf(&self)] - 1.0f) * 100.0f + 0.5f);
+                uint32 const extra = uint32((STARVED_MULT - 1.0f) * 100.0f + 0.5f);
 
                 // The boon is Boon::BonusRegen and the card spends it on runic
                 // power decaying more slowly. That decay is entirely inside the
@@ -153,16 +147,14 @@ namespace Gauntlet
 
         // The card's ladder, and it runs the interesting way: the window to
         // claim a corpse shrinks as the affix worsens.
-        constexpr uint32 CLAIM_MS[] = { 8000, 5000, 3000, 2000 };
-        static_assert(std::size(CLAIM_MS) >= MAX_RANK, "CLAIM_MS is short a rank");
+        constexpr uint32 CLAIM_MS = 5000;
 
         // Rank III's risen are not weak. The first two ranks are, and the
         // mechanic does that at runtime rather than with a second template.
         // Full health from rank III on. Rank IV escalates on the claim window
         // instead -- two seconds to touch a corpse -- because a risen stronger
         // than the thing that died would stop being a corpse standing up.
-        constexpr float WEAK_HEALTH_PCT[] = { 0.5f, 0.5f, 1.0f, 1.0f };
-        static_assert(std::size(WEAK_HEALTH_PCT) >= MAX_RANK, "WEAK_HEALTH_PCT is short a rank");
+        constexpr float WEAK_HEALTH_PCT = 0.5f;
 
         constexpr uint32 RISEN_LIFETIME_MS = 120000;   // TODO(design)
 
@@ -237,7 +229,7 @@ namespace Gauntlet
 
             Corpse corpse;
             corpse.at     = killed->GetPosition();
-            corpse.leftMs = CLAIM_MS[RankIndexOf(ctx.self)];
+            corpse.leftMs = CLAIM_MS;
             _pending.push_back(corpse);
 
             AddonFor(ctx)->SendEvent(ctx.player, KeyOf(MECHANIC_GRAVE_CALL, "c22_grave_call"),
@@ -279,7 +271,7 @@ namespace Gauntlet
             if (!risen)
                 return;   // the cap refused; a corpse that does not rise is not a fault
 
-            float const share = WEAK_HEALTH_PCT[RankIndexOf(ctx.self)];
+            float const share = WEAK_HEALTH_PCT;
             if (share < 1.0f)
             {
                 uint32 const pool = uint32(float(risen->GetMaxHealth()) * share);
@@ -340,9 +332,8 @@ namespace Gauntlet
 
         std::string GraveCall::Describe(AffixInstance const& self) const
         {
-            uint8 const  i    = RankIndexOf(&self);
-            uint32 const secs = CLAIM_MS[i] / 1000u;
-            bool const   weak = WEAK_HEALTH_PCT[i] < 1.0f;
+            uint32 const secs = CLAIM_MS / 1000u;
+            bool const   weak = WEAK_HEALTH_PCT < 1.0f;
             uint32 const pct  = self.boonMag;
 
             std::string out = "Anything you kill rises against you after " + std::to_string(secs)
@@ -376,9 +367,8 @@ namespace Gauntlet
             SPELL_BLOOD_PRESENCE, SPELL_FROST_PRESENCE, SPELL_UNHOLY_PRESENCE
         } };
 
-        constexpr uint32 PRESENCE_LOCK_MS[] = { 6000, 10000, 20000, 30000 };
+        constexpr uint32 PRESENCE_LOCK_MS = 10000;
 
-        static_assert(std::size(PRESENCE_LOCK_MS) >= MAX_RANK, "PRESENCE_LOCK_MS is short a rank");
 
         bool IsPresence(uint32 spellId)
         {
@@ -410,7 +400,7 @@ namespace Gauntlet
 
                 player->SetPower(POWER_RUNIC_POWER, 0);
 
-                uint32 const ms = PRESENCE_LOCK_MS[RankIndexOf(ctx.self)];
+                uint32 const ms = PRESENCE_LOCK_MS;
                 for (uint32 id : PRESENCES)
                     if (id != info->Id)
                         _lock.Lock(player, id, ms);
@@ -423,9 +413,9 @@ namespace Gauntlet
                         "|cffff2020[Gauntlet]|r The change costs everything you had stored.");
             }
 
-            std::string Describe(AffixInstance const& self) const override
+            std::string Describe(AffixInstance const& /*self*/) const override
             {
-                uint32 const secs = PRESENCE_LOCK_MS[RankIndexOf(&self)] / 1000u;
+                uint32 const secs = PRESENCE_LOCK_MS / 1000u;
 
                 // The card's boon is "+25% presence effects", which lives
                 // inside each presence's own aura and has no seam this module
@@ -434,9 +424,9 @@ namespace Gauntlet
                      + std::to_string(secs) + " seconds. Dump before you switch.";
             }
 
-            std::string Diagnose(Ctx& ctx) const override
+            std::string Diagnose(Ctx& /*ctx*/) const override
             {
-                return "cold presence: " + std::to_string(PRESENCE_LOCK_MS[RankIndexOf(ctx.self)] / 1000u)
+                return "cold presence: " + std::to_string(PRESENCE_LOCK_MS / 1000u)
                      + "s lock";
             }
 
@@ -456,19 +446,12 @@ namespace Gauntlet
 
         constexpr uint32 SPELL_ANTI_MAGIC_SHELL    = 48707;
         constexpr uint32 SPELL_ICEBOUND_FORTITUDE  = 48792;
-        constexpr uint32 SPELL_LICHBORNE           = 49039;
 
-        // The card's shared cooldown is the longer of the two, two minutes, and
-        // it used to be flat across every rank. With Lichborne only joining the
-        // share at rank III, that made ranks I and II identical -- the same
-        // behaviour and, because Describe() reads only the rank-III branch, the
-        // same offer text word for word. `.gauntlet debug cards` is what found
-        // it.
-        //
-        // So the shared cooldown carries the ladder and Lichborne still joins at
-        // III: two minutes, three, five, and eight.
-        constexpr uint32 WARD_SHARED_MS[] = { 120000, 180000, 300000, 480000 };
-        static_assert(std::size(WARD_SHARED_MS) >= MAX_RANK, "WARD_SHARED_MS is short a rank");
+        // The shared cooldown, three minutes: longer than either ward's own,
+        // which is what makes sharing one a cost. Lichborne joined the share at
+        // the old rank III and left with the ranks; the blurb names two wards
+        // and two is what it is.
+        constexpr uint32 WARD_SHARED_MS = 180000;
 
         class OneWard final : public IMechanic
         {
@@ -489,27 +472,23 @@ namespace Gauntlet
                 if (!info)
                     return;
 
-                bool const rankThree = RankIndexOf(ctx.self) >= 2;
                 bool const isWard = info->Id == SPELL_ANTI_MAGIC_SHELL
-                                 || info->Id == SPELL_ICEBOUND_FORTITUDE
-                                 || (rankThree && info->Id == SPELL_LICHBORNE);
+                                 || info->Id == SPELL_ICEBOUND_FORTITUDE;
                 if (!isWard)
                     return;
                 if (ctx.run && ctx.run->dead)
                     return;
 
-                for (uint32 id : { SPELL_ANTI_MAGIC_SHELL, SPELL_ICEBOUND_FORTITUDE, SPELL_LICHBORNE })
+                for (uint32 id : { SPELL_ANTI_MAGIC_SHELL, SPELL_ICEBOUND_FORTITUDE })
                 {
                     if (id == info->Id)
                         continue;
-                    if (id == SPELL_LICHBORNE && !rankThree)
-                        continue;
 
-                    _lock.Lock(player, id, WARD_SHARED_MS[RankIndexOf(ctx.self)]);
+                    _lock.Lock(player, id, WARD_SHARED_MS);
                 }
 
                 AddonFor(ctx)->SendEvent(player, KeyOf(MECHANIC_ONE_WARD, "c24_one_ward"),
-                                         WARD_SHARED_MS[RankIndexOf(ctx.self)] / 1000u,
+                                         WARD_SHARED_MS / 1000u,
                                          "One Ward");
             }
 
@@ -523,8 +502,7 @@ namespace Gauntlet
                 SpellInfo const* info = aura->GetSpellInfo();
                 if (!info)
                     return;
-                if (info->Id != SPELL_ANTI_MAGIC_SHELL && info->Id != SPELL_ICEBOUND_FORTITUDE
-                    && info->Id != SPELL_LICHBORNE)
+                if (info->Id != SPELL_ANTI_MAGIC_SHELL && info->Id != SPELL_ICEBOUND_FORTITUDE)
                     return;
 
                 AuraDurationEdit::Scale(aura, 1.0f + float(ctx.self->boonMag) / 100.0f);
@@ -532,15 +510,11 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint8 const  i     = RankIndexOf(&self);
-                bool const   three = i >= 2;
-                uint32 const pct   = self.boonMag;
+                uint32 const pct = self.boonMag;
 
                 std::string out = "Anti-Magic Shell and Icebound Fortitude share a "
-                                + std::to_string(WARD_SHARED_MS[i] / 60000u)
-                                + "-minute cooldown";
-                out += three ? ", and so does Lichborne." : ".";
-                out += " Read the fight before you spend one.";
+                                + std::to_string(WARD_SHARED_MS / 60000u)
+                                + "-minute cooldown. Read the fight before you spend one.";
 
                 if (pct != 0)
                     out += " In exchange whichever you use lasts " + std::to_string(pct)
@@ -549,9 +523,9 @@ namespace Gauntlet
                 return out;
             }
 
-            std::string Diagnose(Ctx& ctx) const override
+            std::string Diagnose(Ctx& /*ctx*/) const override
             {
-                return "one ward: " + std::to_string(WARD_SHARED_MS[RankIndexOf(ctx.self)] / 60000u)
+                return "one ward: " + std::to_string(WARD_SHARED_MS / 60000u)
                      + "-minute shared cooldown";
             }
 

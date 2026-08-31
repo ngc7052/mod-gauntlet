@@ -57,7 +57,7 @@ namespace Gauntlet
 
     // ---------------------------------------------------------------------
     // Boons: the upside paired with a curse. One fixed type per mechanic in
-    // the redesign; magnitude comes from the rank.
+    // the redesign; the magnitude is the card's, one number per row.
     //
     // The enum is append-only and its values are stored in
     // gauntlet_affix.boon, so nothing here may ever be renumbered, reordered
@@ -161,8 +161,11 @@ namespace Gauntlet
         MF_NotImplemented = 1u << 31
     };
 
-    // What an offer slot is asking the player to do.
-    enum class OfferKind : uint8 { New, RankUp, Swap, Bargain };
+    // What an offer slot is asking the player to do. RankUp was the second of
+    // these until the rank system went (docs/rarity-plan.md section 5b); the
+    // kind is not stored anywhere -- the log and the wire spell it as text --
+    // so the enum simply closes over the gap.
+    enum class OfferKind : uint8 { New, Swap, Bargain };
 
     // Reserved: no mechanic. Registry ids start at 1.
     constexpr uint16 MECHANIC_NONE = 0;
@@ -198,6 +201,11 @@ namespace Gauntlet
     // match it, because Data.lua is generated from the registry: the change
     // that moves a mechanic id is exactly the change that must invalidate the
     // addon's table.
+    //
+    // 16 is step 4 of docs/rarity-plan.md: the ranks are gone. Every ladder
+    // collapsed to the one value the card's blurb states, RankUp left the
+    // offer kinds and the slot loop with it, and the AFFIX and OFFER frames
+    // carry a rarity where they carried a rank. Every offer set moves.
     //
     // 15 is step 3 of docs/rarity-plan.md: reroll and skip. The reroll count
     // is folded into the stream seed -- bits 16-23, between the tier and the
@@ -260,9 +268,7 @@ namespace Gauntlet
     // with one test froze an affix taken near the end of its window at whatever
     // rank it happened to get. Every offer set that could contain a rank-up of
     // an out-of-window mechanic moves.
-    constexpr uint16 GeneratorVersion = 15;
-
-    constexpr uint8 MAX_RANK = 4;
+    constexpr uint16 GeneratorVersion = 16;
 
     class IMechanic;   // GauntletMechanic.h
 
@@ -271,7 +277,13 @@ namespace Gauntlet
     struct AffixInstance
     {
         uint16     mechanic  = MECHANIC_NONE;
-        uint8      rank      = 1;
+        // The card's rarity, copied from the registry row on attach and on
+        // load. It is stored in gauntlet_affix's `rank` column -- the column
+        // the rank system left behind, the same width -- but never *read* from
+        // it: a card's rarity is a fact about the row, and Mgr::Load takes it
+        // from the registry so a table re-tuned between two logins cannot
+        // leave a stored affix saying something its card no longer says.
+        Rarity     rarity    = Rarity::Rare;
         Condition  condition = Condition::Always;
         Boon       boon      = Boon::None;
         uint8      boonMag   = 0;
@@ -285,7 +297,6 @@ namespace Gauntlet
     struct Offer
     {
         uint16    mechanic  = MECHANIC_NONE;
-        uint8     rank      = 1;
         Rarity    rarity    = Rarity::Common;   // the card's; see MakeOffer
         Condition condition = Condition::Always;
         Boon      boon      = Boon::None;

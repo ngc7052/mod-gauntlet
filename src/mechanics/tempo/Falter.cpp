@@ -43,10 +43,8 @@ namespace Gauntlet
         // Rank IV is 22 s and 5 s past the card -- a fifth of every fight
         // spent unable to act, which is where a tempo tax should top out: it
         // is survivable by planning around it and unsurvivable by ignoring it.
-        constexpr uint32 CADENCE_MS[]  = { 60000, 45000, 30000, 22000 };
-        static_assert(std::size(CADENCE_MS) >= MAX_RANK, "CADENCE_MS is short a rank");
-        constexpr uint32 DURATION_MS[] = { 2000, 3000, 4000, 5000 };
-        static_assert(std::size(DURATION_MS) >= MAX_RANK, "DURATION_MS is short a rank");
+        constexpr uint32 CADENCE_MS = 45000;
+        constexpr uint32 DURATION_MS = 3000;
 
         // "You are warned two seconds ahead."
         constexpr uint32 WARN_MS = 2000;
@@ -71,11 +69,6 @@ namespace Gauntlet
         constexpr uint32 SPELL_DISARM  = 676;
         constexpr uint32 SPELL_SILENCE = 15487;
 
-        uint8 RankIndex(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* MechanicName()
         {
@@ -203,7 +196,7 @@ namespace Gauntlet
         {
             ++_eventId;
             _armed = true;
-            ctx.clock->Arm(MECHANIC_FALTER, _eventId, CADENCE_MS[RankIndex(ctx.self)], WARN_MS);
+            ctx.clock->Arm(MECHANIC_FALTER, _eventId, CADENCE_MS, WARN_MS);
         }
 
         void Falter::Disarm(Ctx& ctx)
@@ -273,7 +266,7 @@ namespace Gauntlet
         {
             bool const   silence = Silenced(player);
             uint32 const spellId = silence ? SPELL_SILENCE : SPELL_DISARM;
-            uint32 const ms      = DURATION_MS[RankIndex(ctx.self)];
+            uint32 const ms      = DURATION_MS;
 
             // Unit::AddAura(uint32, Unit*) applies the aura with no cast, no
             // global cooldown and no line of sight, and answers null rather
@@ -313,11 +306,10 @@ namespace Gauntlet
 
         std::string Falter::Describe(AffixInstance const& self) const
         {
-            uint8 const i = RankIndex(&self);
 
-            std::string out = "Every " + std::to_string(CADENCE_MS[i] / 1000u)
+            std::string out = "Every " + std::to_string(CADENCE_MS / 1000u)
                             + " seconds in combat your hands fail you for "
-                            + std::to_string(DURATION_MS[i] / 1000u)
+                            + std::to_string(DURATION_MS / 1000u)
                             + " seconds: disarmed if you fight with weapons, silenced if you cast."
                               " You are warned two seconds ahead, every time.";
 

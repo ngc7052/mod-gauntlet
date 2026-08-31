@@ -45,14 +45,8 @@ namespace Gauntlet
         // The card's ladder: 2 -> 3 -> 5% of the maximum pool per cast, and 7
         // at rank IV. It still cannot kill -- the cost is refused below the
         // health it would take -- so the ladder prices casting, not living.
-        constexpr uint32 PCT_OF_MAX[] = { 2, 3, 5, 7 };
-        static_assert(std::size(PCT_OF_MAX) >= MAX_RANK, "PCT_OF_MAX is short a rank");
+        constexpr uint32 PCT_OF_MAX = 3;
 
-        uint8 RankIndex(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* MechanicKey()
         {
@@ -104,9 +98,9 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override;
 
-            std::string Diagnose(Ctx& ctx) const override
+            std::string Diagnose(Ctx& /*ctx*/) const override
             {
-                return "blood magic: " + std::to_string(PCT_OF_MAX[RankIndex(ctx.self)])
+                return "blood magic: " + std::to_string(PCT_OF_MAX)
                      + "% of max per cast, " + std::to_string(_paid) + " cast(s) paid this session, "
                      + std::to_string(_spared) + " spared at low health";
             }
@@ -129,7 +123,7 @@ namespace Gauntlet
             if (!player->IsAlive())
                 return;
 
-            uint32 const pct  = PCT_OF_MAX[RankIndex(ctx.self)];
+            uint32 const pct  = PCT_OF_MAX;
             uint32 const want = uint32(uint64(player->GetMaxHealth()) * pct / 100u);
             if (want == 0)
                 return;
@@ -198,15 +192,14 @@ namespace Gauntlet
             // has no event: what the player wants on screen is how much a cast
             // is about to cost, not how many they have paid for.
             AddonFor(ctx)->QueueStat(ctx.player, MechanicKey(),
-                                     int32(PCT_OF_MAX[RankIndex(ctx.self)]));
+                                     int32(PCT_OF_MAX));
         }
 
         std::string BloodMagic::Describe(AffixInstance const& self) const
         {
-            uint8 const i = RankIndex(&self);
 
             std::string out = "Every spell that costs mana also costs "
-                            + std::to_string(PCT_OF_MAX[i])
+                            + std::to_string(PCT_OF_MAX)
                             + "% of your maximum health, healing spells included."
                               " It can never take you below one health.";
 

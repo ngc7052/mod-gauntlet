@@ -40,11 +40,6 @@ namespace Gauntlet
         constexpr uint32 SPELL_CONSECRATION = 26573;
         constexpr uint32 SPELL_HOLY_LIGHT   = 635;
 
-        uint8 RankIndexOf(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* KeyOf(uint16 id, char const* fallback)
         {
@@ -101,8 +96,7 @@ namespace Gauntlet
         // The card's ladder: 2 -> 3 -> 5 minutes.
         // Eight minutes at rank IV, which is longer than most levelling fights
         // are apart: the bubble becomes a once-a-zone answer.
-        constexpr int32 FORBEARANCE_MS[] = { 120000, 180000, 300000, 480000 };
-        static_assert(std::size(FORBEARANCE_MS) >= MAX_RANK, "FORBEARANCE_MS is short a rank");
+        constexpr int32 FORBEARANCE_MS = 180000;
 
         class LongForbearance final : public IMechanic
         {
@@ -113,17 +107,17 @@ namespace Gauntlet
                 if (!AuraDurationEdit::Matches(target, aura, player, SPELL_FORBEARANCE))
                     return;
 
-                AuraDurationEdit::Edit(aura, FORBEARANCE_MS[RankIndexOf(ctx.self)]);
+                AuraDurationEdit::Edit(aura, FORBEARANCE_MS);
                 ++_stretched;
 
                 AddonFor(ctx)->SendEvent(player, KeyOf(MECHANIC_FORBEARANCE, "c05_long_forbearance"),
-                                         uint32(FORBEARANCE_MS[RankIndexOf(ctx.self)] / 1000),
+                                         uint32(FORBEARANCE_MS / 1000),
                                          "Forbearance");
 
                 if (player->GetSession())
                     ChatHandler(player->GetSession()).PSendSysMessage(
                         "|cffff2020[Gauntlet]|r Forbearance will hold for {} minutes.",
-                        FORBEARANCE_MS[RankIndexOf(ctx.self)] / 60000);
+                        FORBEARANCE_MS / 60000);
             }
 
             void OnSpellCast(Ctx& ctx, Spell* spell) override;
@@ -171,7 +165,7 @@ namespace Gauntlet
 
         std::string LongForbearance::Describe(AffixInstance const& self) const
         {
-            int32 const  mins = FORBEARANCE_MS[RankIndexOf(&self)] / 60000;
+            int32 const  mins = FORBEARANCE_MS / 60000;
             uint32 const pct  = self.boonMag;
 
             std::string out = "Forbearance lasts " + std::to_string(mins)
@@ -198,8 +192,7 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_CONSECRATED = 33;
 
         // The card's ladder for the damage taken off the circle.
-        constexpr float OFF_CIRCLE_MULT[] = { 1.15f, 1.25f, 1.40f, 1.60f };
-        static_assert(std::size(OFF_CIRCLE_MULT) >= MAX_RANK, "OFF_CIRCLE_MULT is short a rank");
+        constexpr float OFF_CIRCLE_MULT = 1.25f;
 
         // The card's own eight yards. Consecration's real radius is smaller;
         // this is the affix's circle, and it is deliberately the more generous
@@ -238,7 +231,7 @@ namespace Gauntlet
 
             float DamageTakenMult(Ctx& ctx, Unit*, SpellInfo const*) override
             {
-                return OnCircle(ctx.player) ? 1.0f : OFF_CIRCLE_MULT[RankIndexOf(ctx.self)];
+                return OnCircle(ctx.player) ? 1.0f : OFF_CIRCLE_MULT;
             }
 
             void OnSpellCast(Ctx& ctx, Spell* spell) override;
@@ -303,9 +296,9 @@ namespace Gauntlet
                                      0, "Consecration");
         }
 
-        std::string ConsecratedGround::Describe(AffixInstance const& self) const
+        std::string ConsecratedGround::Describe(AffixInstance const& /*self*/) const
         {
-            uint32 const extra = uint32((OFF_CIRCLE_MULT[RankIndexOf(&self)] - 1.0f) * 100.0f + 0.5f);
+            uint32 const extra = uint32((OFF_CIRCLE_MULT - 1.0f) * 100.0f + 0.5f);
 
             return "You take " + std::to_string(extra) + "% more damage whenever you are more than "
                  + std::to_string(uint32(SAFE_YARDS)) + " yards from your own Consecration."
@@ -334,37 +327,11 @@ namespace Gauntlet
         public:
             void OnSpellCast(Ctx& ctx, Spell* spell) override;
 
-            // Rank III: the bubble breaks the moment you swing. Watched at the
-            // damage site rather than on a cast, because auto-attack is the
-            // most likely first blow and it is not a spell.
-            void OnCreatureDamaged(Ctx& ctx, Creature* /*victim*/, uint32 /*damage*/) override
-            {
-                Player* player = ctx.player;
-                if (!player || RankIndexOf(ctx.self) < 2)
-                    return;
-                if (!player->HasAura(SPELL_DIVINE_SHIELD))
-                    return;
-
-                player->RemoveAurasDueToSpell(SPELL_DIVINE_SHIELD);
-                ++_broken;
-
-                if (player->GetSession())
-                    ChatHandler(player->GetSession()).PSendSysMessage(
-                        "|cffff2020[Gauntlet]|r The Light will not shield a raised hand.");
-            }
-
             std::string Describe(AffixInstance const& self) const override
             {
-                uint8 const i = RankIndexOf(&self);
 
                 std::string out = "Your Hearthstone is refused while Divine Shield or Hand of"
-                                  " Protection is on you";
-                if (i >= 1)
-                    out += ", and while Forbearance is up";
-                out += ".";
-
-                if (i >= 2)
-                    out += " Divine Shield also breaks the moment you attack.";
+                                  " Protection is on you, and while Forbearance is up.";
 
                 if (self.boonMag != 0)
                     out += " In exchange, Divine Shield comes back "
@@ -375,13 +342,11 @@ namespace Gauntlet
 
             std::string Diagnose(Ctx&) const override
             {
-                return "no sanctuary: " + std::to_string(_refused) + " hearth(s) refused, "
-                     + std::to_string(_broken) + " bubble(s) broken";
+                return "no sanctuary: " + std::to_string(_refused) + " hearth(s) refused";
             }
 
         private:
             uint32 _refused = 0;
-            uint32 _broken  = 0;
         };
 
         void NoSanctuary::OnSpellCast(Ctx& ctx, Spell* spell)
@@ -408,11 +373,10 @@ namespace Gauntlet
             if (info->Id != SPELL_HEARTHSTONE)
                 return;
 
-            uint8 const i = RankIndexOf(ctx.self);
 
             bool const shielded = player->HasAura(SPELL_DIVINE_SHIELD)
                                || player->HasAura(SPELL_HAND_OF_PROTECTION)
-                               || (i >= 1 && player->HasAura(SPELL_FORBEARANCE));
+                               || player->HasAura(SPELL_FORBEARANCE);
             if (!shielded)
                 return;
 
@@ -440,8 +404,7 @@ namespace Gauntlet
         constexpr uint32 SPELL_HAMMER_OF_JUSTICE = 853;
 
         // The card's ladder, in seconds of root on the paladin.
-        constexpr uint32 COMMIT_MS[] = { 3000, 4000, 6000, 8000 };
-        static_assert(std::size(COMMIT_MS) >= MAX_RANK, "COMMIT_MS is short a rank");
+        constexpr uint32 COMMIT_MS = 4000;
 
         class Commitment final : public IMechanic
         {
@@ -467,7 +430,7 @@ namespace Gauntlet
                 if (ctx.run && ctx.run->dead)
                     return;
 
-                uint32 const ms = COMMIT_MS[RankIndexOf(ctx.self)];
+                uint32 const ms = COMMIT_MS;
                 _control.Apply(player, SelfControl::Kind::Root, ms);
 
                 // The boon: Hammer comes back sooner, cut from the cooldown the
@@ -491,7 +454,7 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint32 const secs = COMMIT_MS[RankIndexOf(&self)] / 1000u;
+                uint32 const secs = COMMIT_MS / 1000u;
 
                 std::string out = "Hammer of Justice roots you for " + std::to_string(secs)
                                 + " seconds as well as your target. Stun and finish, not stun and"

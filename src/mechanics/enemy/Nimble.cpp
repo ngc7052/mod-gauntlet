@@ -55,18 +55,12 @@ namespace Gauntlet
         // second axis, not a bigger multiplier, and there is not one on the
         // card. The fourth entry below exists only to satisfy the assert and
         // is unreachable: Eligible refuses a rank-up past def.maxRank.
-        constexpr uint32 SPEED_PCT[] = { 20, 30, 40, 40 };
-        static_assert(std::size(SPEED_PCT) >= MAX_RANK, "SPEED_PCT is short a rank");
+        constexpr uint32 SPEED_PCT = 30;
 
         // How many creatures are hurried at once. A pull bigger than this is
         // already a death; the cap bounds the bookkeeping, not the affix.
         constexpr std::size_t MAX_HURRIED = 8;   // TODO(design)
 
-        uint8 RankIndex(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         class Nimble final : public IMechanic
         {
@@ -84,7 +78,7 @@ namespace Gauntlet
             float AggregateFactor(AffixInstance const& self, AggregateKind kind) const override
             {
                 if (kind == AggregateKind::EnemySpeed)
-                    return 1.0f + static_cast<float>(SPEED_PCT[RankIndex(&self)]) / 100.0f;
+                    return 1.0f + static_cast<float>(SPEED_PCT) / 100.0f;
 
                 return BoonFactor(self, kind);
             }
@@ -234,10 +228,9 @@ namespace Gauntlet
 
         std::string Nimble::Describe(AffixInstance const& self) const
         {
-            uint8 const i = RankIndex(&self);
 
             std::string out = "Every ordinary enemy fighting you runs "
-                            + std::to_string(SPEED_PCT[i])
+                            + std::to_string(SPEED_PCT)
                             + "% faster, up to the realm's ceiling, until it evades or the fight"
                               " ends. Mounts are untouched, so riding away still works; snares"
                               " matter again, and so does choosing the fight before you take it.";

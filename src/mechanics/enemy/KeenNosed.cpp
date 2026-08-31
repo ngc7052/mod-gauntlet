@@ -50,8 +50,7 @@ namespace Gauntlet
         // that the affix stops being about pulling carefully and starts
         // being about whether a zone can be crossed at all, which is a
         // different affix.
-        constexpr float BONUS_YARDS[] = { 5.0f, 8.0f, 12.0f, 18.0f };
-        static_assert(std::size(BONUS_YARDS) >= MAX_RANK, "BONUS_YARDS is short a rank");
+        constexpr float BONUS_YARDS = 8.0f;
 
         // How wide a net the grid search casts. It has to reach past the
         // widest aggro range a creature can have plus the widest bonus above;
@@ -66,11 +65,6 @@ namespace Gauntlet
         // than the answer can change.
         constexpr uint32 SWEEP_MS = 1000;   // TODO(design)
 
-        uint8 RankIndex(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* MechanicKey()
         {
@@ -153,7 +147,7 @@ namespace Gauntlet
 
         void KeenNosed::Sweep(Ctx& ctx, Player* player)
         {
-            float const bonus = BONUS_YARDS[RankIndex(ctx.self)];
+            float const bonus = BONUS_YARDS;
 
             uint32 alerted = 0;
 
@@ -227,10 +221,9 @@ namespace Gauntlet
 
         std::string KeenNosed::Describe(AffixInstance const& self) const
         {
-            uint8 const i = RankIndex(&self);
 
             std::string out = "Enemies notice you from "
-                            + std::to_string(static_cast<uint32>(BONUS_YARDS[i]))
+                            + std::to_string(static_cast<uint32>(BONUS_YARDS))
                             + " yards further away than they should. Stealth still hides you, a"
                               " mount still outruns them, and nothing wakes while you are resting"
                               " or already fighting.";

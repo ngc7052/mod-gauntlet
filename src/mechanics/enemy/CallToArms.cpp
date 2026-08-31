@@ -43,16 +43,9 @@ namespace Gauntlet
         // is past the card at 50 yd and 3 kin: the radius is already wider
         // than a pull, so what the last rank really adds is that a kill in a
         // camp brings most of the camp.
-        constexpr float RADIUS_YARDS[] = { 20.0f, 30.0f, 40.0f, 50.0f };
-        static_assert(std::size(RADIUS_YARDS) >= MAX_RANK, "RADIUS_YARDS is short a rank");
-        constexpr uint32 KIN_COUNT[]    = { 1, 1, 2, 3 };
-        static_assert(std::size(KIN_COUNT) >= MAX_RANK, "KIN_COUNT is short a rank");
+        constexpr float RADIUS_YARDS = 30.0f;
+        constexpr uint32 KIN_COUNT = 1;
 
-        uint8 RankIndex(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* MechanicName()
         {
@@ -109,9 +102,8 @@ namespace Gauntlet
             if (!IsOrdinaryFoe(killed))
                 return;
 
-            uint8 const  i      = RankIndex(ctx.self);
-            float const  range  = RADIUS_YARDS[i];
-            uint32 const wanted = KIN_COUNT[i];
+            float const  range  = RADIUS_YARDS;
+            uint32 const wanted = KIN_COUNT;
 
             // The search starts at the corpse and not at the player, which is
             // the whole of the counterplay: killing the outermost mob puts the
@@ -160,12 +152,11 @@ namespace Gauntlet
 
         std::string CallToArms::Describe(AffixInstance const& self) const
         {
-            uint8 const i = RankIndex(&self);
 
             std::string out = "Killing an enemy alerts ";
-            out += KIN_COUNT[i] == 1 ? "the nearest idle enemy of its own kind"
+            out += KIN_COUNT == 1 ? "the nearest idle enemy of its own kind"
                                      : "the two nearest idle enemies of its own kind";
-            out += " within " + std::to_string(static_cast<uint32>(RADIUS_YARDS[i]))
+            out += " within " + std::to_string(static_cast<uint32>(RADIUS_YARDS))
                  + " yards of the corpse. Kill the outermost first, and retreat between kills.";
 
             out += BoonClause(self.boon, self.boonMag);

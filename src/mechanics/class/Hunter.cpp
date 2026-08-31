@@ -39,11 +39,6 @@ namespace Gauntlet
         constexpr uint32 SPELL_FEIGN_DEATH = 5384;   // the registry's own requiresSpell for C10
         constexpr uint32 SPELL_DISENGAGE   = 781;
 
-        uint8 RankIndexOf(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* KeyOf(uint16 id, char const* fallback)
         {
@@ -71,8 +66,7 @@ namespace Gauntlet
         // CONTENT is the top of this ladder -- a pet cannot be more than content
         // without being happy, and turning on a happy pet is a different affix.
         // Rank IV escalates on the other axis instead: it stays hostile longer.
-        constexpr uint32 TURNS_AT[] = { UNHAPPY, UNHAPPY, CONTENT, CONTENT };
-        static_assert(std::size(TURNS_AT) >= MAX_RANK, "TURNS_AT is short a rank");
+        constexpr uint32 TURNS_AT = UNHAPPY;
 
         // The card gives two numbers -- fifteen seconds, twenty-five at rank III
         // -- for three rungs, and the middle one used to be filled by repeating
@@ -83,8 +77,7 @@ namespace Gauntlet
         //
         // So the ladder walks between the card's own two numbers instead of
         // repeating one of them.
-        constexpr uint32 HOSTILE_MS[] = { 15000, 20000, 25000, 40000 };
-        static_assert(std::size(HOSTILE_MS) >= MAX_RANK, "HOSTILE_MS is short a rank");
+        constexpr uint32 HOSTILE_MS = 20000;
 
         // Not on the card. A short grace after a break so a hunter who calls the
         // pet straight back into the same unhappiness is not attacked twice in
@@ -198,7 +191,7 @@ namespace Gauntlet
                 return;
             }
 
-            if (uint32(pet->GetHappinessState()) > TURNS_AT[RankIndexOf(ctx.self)])
+            if (uint32(pet->GetHappinessState()) > TURNS_AT)
                 return;
 
             Break(ctx, pet);
@@ -221,7 +214,7 @@ namespace Gauntlet
             ++_broke;
 
             Creature* feral = sGauntletSummons->Summon(player, entry, at,
-                                                       HOSTILE_MS[RankIndexOf(ctx.self)],
+                                                       HOSTILE_MS,
                                                        /*countsAsStalker*/ false,
                                                        MECHANIC_HALF_TAMED);
 
@@ -234,7 +227,7 @@ namespace Gauntlet
             }
 
             AddonFor(ctx)->SendEvent(player, KeyOf(MECHANIC_HALF_TAMED, "c09_half_tamed"),
-                                     HOSTILE_MS[RankIndexOf(ctx.self)] / 1000u, "Half-Tamed");
+                                     HOSTILE_MS / 1000u, "Half-Tamed");
 
             if (player->GetSession())
                 ChatHandler(player->GetSession()).PSendSysMessage(
@@ -244,9 +237,8 @@ namespace Gauntlet
 
         std::string HalfTamed::Describe(AffixInstance const& self) const
         {
-            uint8 const  i    = RankIndexOf(&self);
-            bool const   soon = TURNS_AT[i] >= CONTENT;
-            uint32 const secs = HOSTILE_MS[i] / 1000u;
+            bool const   soon = TURNS_AT >= CONTENT;
+            uint32 const secs = HOSTILE_MS / 1000u;
 
             std::string out = std::string("A pet that is ")
                             + (soon ? "no better than content" : "unhappy")
@@ -275,8 +267,7 @@ namespace Gauntlet
         // 3 min, 5 min, then gone. Rank III is a standing denial and there is
         // nothing past never, so Dead Weight keeps maxRank = 3; the fourth entry
         // is unreachable and exists only for the assert.
-        constexpr uint32 FEIGN_COOLDOWN_MS[] = { 180000, 300000, 0, 0 };
-        static_assert(std::size(FEIGN_COOLDOWN_MS) >= MAX_RANK, "FEIGN_COOLDOWN_MS is short a rank");
+        constexpr uint32 FEIGN_COOLDOWN_MS = 180000;
 
         class DeadWeight final : public IMechanic
         {
@@ -294,9 +285,9 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override;
 
-            std::string Diagnose(Ctx& ctx) const override
+            std::string Diagnose(Ctx& /*ctx*/) const override
             {
-                uint32 const ms = FEIGN_COOLDOWN_MS[RankIndexOf(ctx.self)];
+                uint32 const ms = FEIGN_COOLDOWN_MS;
                 return std::string("dead weight: ")
                      + (ms == 0 ? "Feign Death denied outright"
                                 : "Feign Death on " + std::to_string(ms / 60000) + " min");
@@ -310,7 +301,7 @@ namespace Gauntlet
                 // III is a standing denial and has to be re-asserted, because
                 // the login path and anything that clears cooldowns would
                 // otherwise hand the button back.
-                if (FEIGN_COOLDOWN_MS[RankIndexOf(ctx.self)] == 0)
+                if (FEIGN_COOLDOWN_MS == 0)
                     PermanentCooldown::Hold(ctx.player, SPELL_FEIGN_DEATH);
             }
         };
@@ -343,7 +334,7 @@ namespace Gauntlet
             if (base != SPELL_FEIGN_DEATH)
                 return;
 
-            uint32 const ms = FEIGN_COOLDOWN_MS[RankIndexOf(ctx.self)];
+            uint32 const ms = FEIGN_COOLDOWN_MS;
             if (ms == 0)
                 return;   // rank III: Sync holds it denied and the cast never lands
 
@@ -356,7 +347,7 @@ namespace Gauntlet
 
         std::string DeadWeight::Describe(AffixInstance const& self) const
         {
-            uint32 const ms = FEIGN_COOLDOWN_MS[RankIndexOf(&self)];
+            uint32 const ms = FEIGN_COOLDOWN_MS;
 
             std::string out = ms == 0
                 ? std::string("Feign Death does not answer at all. Disengage, traps and a pet that"
@@ -383,8 +374,7 @@ namespace Gauntlet
         // purpose.
         // ==================================================================
         // The card's ladder, in yards.
-        constexpr float DEAD_ZONE_YARDS[] = { 8.0f, 10.0f, 15.0f, 20.0f };
-        static_assert(std::size(DEAD_ZONE_YARDS) >= MAX_RANK, "DEAD_ZONE_YARDS is short a rank");
+        constexpr float DEAD_ZONE_YARDS = 10.0f;
 
         // The boon's threshold: beyond this, shots hit harder.
         constexpr float LONG_SHOT_YARDS = 20.0f;
@@ -422,7 +412,7 @@ namespace Gauntlet
                 if (!at)
                     return;
 
-                if (player->GetExactDist2d(at) >= DEAD_ZONE_YARDS[RankIndexOf(ctx.self)])
+                if (player->GetExactDist2d(at) >= DEAD_ZONE_YARDS)
                     return;
 
                 player->InterruptSpell(CURRENT_AUTOREPEAT_SPELL);
@@ -454,9 +444,9 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override;
 
-            std::string Diagnose(Ctx& ctx) const override
+            std::string Diagnose(Ctx& /*ctx*/) const override
             {
-                return "wide dead zone: " + std::to_string(uint32(DEAD_ZONE_YARDS[RankIndexOf(ctx.self)]))
+                return "wide dead zone: " + std::to_string(uint32(DEAD_ZONE_YARDS))
                      + " yd, " + std::to_string(_refused) + " shot(s) refused";
             }
 
@@ -490,7 +480,7 @@ namespace Gauntlet
             if (!victim || victim == player)
                 return;
 
-            if (player->GetExactDist2d(victim) >= DEAD_ZONE_YARDS[RankIndexOf(ctx.self)])
+            if (player->GetExactDist2d(victim) >= DEAD_ZONE_YARDS)
                 return;
 
             // cancel() as well as the interrupt: an instant shot is already
@@ -507,7 +497,7 @@ namespace Gauntlet
 
         std::string WideDeadZone::Describe(AffixInstance const& self) const
         {
-            uint32 const yards = uint32(DEAD_ZONE_YARDS[RankIndexOf(&self)]);
+            uint32 const yards = uint32(DEAD_ZONE_YARDS);
             uint32 const pct   = self.boonMag;
 
             std::string out = "Ranged attacks are refused within " + std::to_string(yards)
@@ -533,9 +523,8 @@ namespace Gauntlet
         // ==================================================================
         constexpr uint16 MECHANIC_BLOOD_BOND = 39;
 
-        constexpr uint32 BOND_PCT[] = { 20, 30, 40, 50 };
+        constexpr uint32 BOND_PCT = 20;
 
-        static_assert(std::size(BOND_PCT) >= MAX_RANK, "BOND_PCT is short a rank");
 
         constexpr uint32 SPELL_MEND_PET = 136;
 
@@ -546,7 +535,7 @@ namespace Gauntlet
             {
                 if (ctx.player)
                     AddonFor(ctx)->QueueStat(ctx.player, KeyOf(MECHANIC_BLOOD_BOND, "c12_blood_bond"),
-                                             int32(BOND_PCT[RankIndexOf(ctx.self)]));
+                                             int32(BOND_PCT));
             }
 
             void OnDetach(Ctx& ctx) override
@@ -565,7 +554,7 @@ namespace Gauntlet
                 if (!player->IsAlive())
                     return;
 
-                uint32 const share = uint32(uint64(damage) * BOND_PCT[RankIndexOf(ctx.self)] / 100u);
+                uint32 const share = uint32(uint64(damage) * BOND_PCT / 100u);
                 if (share == 0)
                     return;
 
@@ -616,7 +605,7 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint32 const pct  = BOND_PCT[RankIndexOf(&self)];
+                uint32 const pct  = BOND_PCT;
                 uint32 const boon = self.boonMag;
 
                 std::string out = std::to_string(pct) + "% of the damage your pet takes is dealt"
@@ -629,9 +618,9 @@ namespace Gauntlet
                 return out;
             }
 
-            std::string Diagnose(Ctx& ctx) const override
+            std::string Diagnose(Ctx& /*ctx*/) const override
             {
-                return "blood bond: " + std::to_string(BOND_PCT[RankIndexOf(ctx.self)])
+                return "blood bond: " + std::to_string(BOND_PCT)
                      + "% of pet damage shared";
             }
         };

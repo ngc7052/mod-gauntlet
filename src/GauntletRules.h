@@ -28,14 +28,11 @@ namespace Gauntlet
 {
 namespace Rules
 {
-    // Clamps a stored rank to a table index. Every function below takes the
-    // rank as the player carries it (1..MAX_RANK) rather than an index, because
-    // an off-by-one at a call site is exactly the kind of thing this file
-    // exists to make testable.
-    constexpr uint8 Index(uint8 rank)
-    {
-        return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-    }
+    // One value per card, not a ladder. The rank system is gone (docs/
+    // rarity-plan.md section 5b): every number below is what the card is worth
+    // at its rarity, and it is the number the registry blurb states -- the
+    // design's middle value, where the blurb states none. A card escalates a
+    // run by being rarer, not by being the same card bigger.
 
     // ------------------------------------------------------------------
     // Rarity (docs/rarity-plan.md section 2) -- which rarity an offer slot
@@ -136,45 +133,40 @@ namespace Rules
     // Hubris (18) -- the first enemy in a fight is your duel.
     // ------------------------------------------------------------------
 
-    constexpr uint32 DUEL_TAKEN_PCT[]  = { 85, 75, 65, 50 };
-    static_assert(std::size(DUEL_TAKEN_PCT) >= MAX_RANK, "DUEL_TAKEN_PCT is short a rank");
+    constexpr uint32 DUEL_TAKEN_PCT = 75;
 
-    constexpr uint32 OTHER_TAKEN_PCT[] = { 115, 130, 150, 175 };
-    static_assert(std::size(OTHER_TAKEN_PCT) >= MAX_RANK, "OTHER_TAKEN_PCT is short a rank");
+    constexpr uint32 OTHER_TAKEN_PCT = 130;
 
-    // The shelter must always be a shelter and the exposure always an exposure,
-    // at every rank. Getting this backwards at one rank would turn the card
-    // inside out there and nowhere else, which is the hardest kind of tuning
-    // bug to notice in play.
-    constexpr float HubrisTakenMult(uint8 rank, bool isDuel)
+    // The shelter must always be a shelter and the exposure always an exposure.
+    // Getting this backwards would turn the card inside out, which is the
+    // hardest kind of tuning bug to notice in play.
+    constexpr float HubrisTakenMult(bool isDuel)
     {
-        return float(isDuel ? DUEL_TAKEN_PCT[Index(rank)] : OTHER_TAKEN_PCT[Index(rank)]) / 100.f;
+        return float(isDuel ? DUEL_TAKEN_PCT : OTHER_TAKEN_PCT) / 100.f;
     }
 
     // ------------------------------------------------------------------
     // Overextended (16) -- your back is what costs.
     // ------------------------------------------------------------------
 
-    constexpr uint32 BEHIND_PCT[] = { 20, 30, 45, 60 };
-    static_assert(std::size(BEHIND_PCT) >= MAX_RANK, "BEHIND_PCT is short a rank");
+    constexpr uint32 BEHIND_PCT = 30;
 
-    constexpr float OverextendedTakenMult(uint8 rank, bool behind)
+    constexpr float OverextendedTakenMult(bool behind)
     {
-        return behind ? 1.f + float(BEHIND_PCT[Index(rank)]) / 100.f : 1.f;
+        return behind ? 1.f + float(BEHIND_PCT) / 100.f : 1.f;
     }
 
     // ------------------------------------------------------------------
     // Falling Sky (14) -- it marks ground you refused to leave.
     // ------------------------------------------------------------------
 
-    constexpr uint32 STILL_MS[]  = { 8000, 6000, 4500, 3000 };
-    static_assert(std::size(STILL_MS) >= MAX_RANK, "STILL_MS is short a rank");
+    constexpr uint32 STILL_MS = 6000;
 
     constexpr float MOVED_YARDS = 5.0f;
 
-    constexpr bool FallingSkyArms(uint8 rank, uint32 stillMs)
+    constexpr bool FallingSkyArms(uint32 stillMs)
     {
-        return stillMs >= STILL_MS[Index(rank)];
+        return stillMs >= STILL_MS;
     }
 
     constexpr bool FallingSkyMoved(float travelled)
@@ -186,17 +178,16 @@ namespace Rules
     // Frenzy (15) -- damage only, and the chain is fragile.
     // ------------------------------------------------------------------
 
-    constexpr uint32 PCT_PER_STACK[] = { 4, 6, 8, 10 };
-    static_assert(std::size(PCT_PER_STACK) >= MAX_RANK, "PCT_PER_STACK is short a rank");
+    constexpr uint32 PCT_PER_STACK = 6;
 
     constexpr uint32 MAX_STACKS = 5;
 
     // `boonMag` is the generator's per-stack figure for this row when it has
     // one, so the offer card and the multiplier cannot disagree; zero falls
     // back to the table.
-    constexpr float FrenzyDoneMult(uint8 rank, uint32 stacks, uint32 boonMag)
+    constexpr float FrenzyDoneMult(uint32 stacks, uint32 boonMag)
     {
-        uint32 const pct = boonMag != 0 ? boonMag : PCT_PER_STACK[Index(rank)];
+        uint32 const pct = boonMag != 0 ? boonMag : PCT_PER_STACK;
         uint32 const n   = stacks > MAX_STACKS ? MAX_STACKS : stacks;
         return 1.f + float(pct) / 100.f * float(n);
     }
@@ -205,18 +196,16 @@ namespace Rules
     // Deep Wounds (19) -- a kill closes what damage opened.
     // ------------------------------------------------------------------
 
-    constexpr int32 WOUND_PCT[]      = { 30, 40, 50, 60 };
-    static_assert(std::size(WOUND_PCT) >= MAX_RANK, "WOUND_PCT is short a rank");
+    constexpr int32 WOUND_PCT = 30;
 
-    constexpr int32 KILL_CLOSE_PCT[] = { 12, 10, 8, 6 };
-    static_assert(std::size(KILL_CLOSE_PCT) >= MAX_RANK, "KILL_CLOSE_PCT is short a rank");
+    constexpr int32 KILL_CLOSE_PCT = 12;
 
     // At least one point, always: a kill that closes nothing would read to the
     // player as the card being broken, and at low levels the percentage rounds
     // to zero long before the wound does.
-    constexpr int32 DeepWoundsClose(uint8 rank, uint32 basePool)
+    constexpr int32 DeepWoundsClose(uint32 basePool)
     {
-        int32 const share = int32(int64(basePool) * KILL_CLOSE_PCT[Index(rank)] / 100);
+        int32 const share = int32(int64(basePool) * KILL_CLOSE_PCT / 100);
         return share > 1 ? share : 1;
     }
 
@@ -226,29 +215,27 @@ namespace Rules
 
     // These two were first written as complements -- payout 100/85/70/50
     // against loss 0/15/30/50 -- which makes `bank * payout` and
-    // `bank * (100 - loss)` the *same number at every rank*. Breaking off paid
-    // exactly what winning paid, so the choice the card is built around did not
-    // exist, and the card was back to being the tax it was redesigned out of.
+    // `bank * (100 - loss)` the *same number*. Breaking off paid exactly what
+    // winning paid, so the choice the card is built around did not exist, and
+    // the card was back to being the tax it was redesigned out of.
     //
     // RulesTest.KillingFloorMakesWinningWorthMoreThanWalkingAway caught it on
-    // the first run it was ever given. They are independent ladders now and the
-    // test holds them apart.
-    constexpr uint32 KILL_PAYOUT_PCT[] = { 100, 95, 85, 70 };
-    static_assert(std::size(KILL_PAYOUT_PCT) >= MAX_RANK, "KILL_PAYOUT_PCT is short a rank");
+    // the first run it was ever given. They are independent numbers now and
+    // the test holds them apart.
+    constexpr uint32 KILL_PAYOUT_PCT = 95;
 
-    constexpr uint32 LEAVE_LOSS_PCT[]  = { 0, 25, 45, 65 };
-    static_assert(std::size(LEAVE_LOSS_PCT) >= MAX_RANK, "LEAVE_LOSS_PCT is short a rank");
+    constexpr uint32 LEAVE_LOSS_PCT = 25;
 
     // What a kill hands back out of the bank.
-    constexpr uint64 KillingFloorPayout(uint8 rank, uint64 bank)
+    constexpr uint64 KillingFloorPayout(uint64 bank)
     {
-        return bank * KILL_PAYOUT_PCT[Index(rank)] / 100u;
+        return bank * KILL_PAYOUT_PCT / 100u;
     }
 
     // What breaking off hands back instead.
-    constexpr uint64 KillingFloorLeaveBack(uint8 rank, uint64 bank)
+    constexpr uint64 KillingFloorLeaveBack(uint64 bank)
     {
-        return bank * (100u - LEAVE_LOSS_PCT[Index(rank)]) / 100u;
+        return bank * (100u - LEAVE_LOSS_PCT) / 100u;
     }
 }
 }

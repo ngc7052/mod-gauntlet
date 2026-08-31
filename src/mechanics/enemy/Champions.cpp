@@ -57,15 +57,12 @@ namespace Gauntlet
         // promoted real mob rather than a summon, so the reward scales with
         // it -- which is what keeps the top rank of a reward-shaped affix
         // worth taking rather than only worth surviving.
-        constexpr uint32 FIGHTS_PER_CHAMPION[] = { 10, 8, 6, 4 };
-        static_assert(std::size(FIGHTS_PER_CHAMPION) >= MAX_RANK, "FIGHTS_PER_CHAMPION is short a rank");
-        constexpr float HEALTH_MULT[]         = { 2.0f, 2.5f, 3.0f, 4.0f };
-        static_assert(std::size(HEALTH_MULT) >= MAX_RANK, "HEALTH_MULT is short a rank");
+        constexpr uint32 FIGHTS_PER_CHAMPION = 8;
+        constexpr float HEALTH_MULT = 2.0f;
 
-        // "twice the health" for each rung of the ladder above, for Describe.
-        constexpr char const* HEALTH_WORDS[] = { "twice the", "two and a half times the",
-                                                 "three times the", "four times the" };
-        static_assert(std::size(HEALTH_WORDS) >= MAX_RANK, "HEALTH_WORDS is short a rank");
+        // HEALTH_MULT in words, for Describe: the blurb says "twice the health"
+        // and the multiplier is 2.0, and the two must keep saying the same thing.
+        constexpr char const* HEALTH_WORDS = "twice the";
 
         // The card names one number for each of these and does not vary them
         // by rank, so neither do we.
@@ -112,14 +109,11 @@ namespace Gauntlet
         // pointer, so a stale one cannot dangle.
         constexpr std::size_t MAX_TRACKED = 4;
 
-        uint8 RankOf(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank);
-        }
-
-        uint32 Threshold(AffixInstance const* self) { return FIGHTS_PER_CHAMPION[RankOf(self) - 1]; }
-        float  HealthMult(AffixInstance const* self) { return HEALTH_MULT[RankOf(self) - 1]; }
+        // Kept as functions of the instance rather than bare constants so the
+        // call sites read as "this affix's threshold": the ladder they used to
+        // index is gone, and one value is what every instance is worth now.
+        uint32 Threshold(AffixInstance const*) { return FIGHTS_PER_CHAMPION; }
+        float  HealthMult(AffixInstance const*) { return HEALTH_MULT; }
 
         // The buff taken back out of the buff, so that only the glow is left.
         // AddAura returns the Aura it applied (Unit.h:1351, Unit.cpp:15150) and
@@ -546,12 +540,11 @@ namespace Gauntlet
 
         std::string Champions::Describe(AffixInstance const& self) const
         {
-            uint8 const rank = RankOf(&self);
 
             // 6, 8 and 10 all take "th", so the ordinal needs no table.
-            std::string out = "Every " + std::to_string(FIGHTS_PER_CHAMPION[rank - 1])
+            std::string out = "Every " + std::to_string(FIGHTS_PER_CHAMPION)
                             + "th fight you start opens against a Champion: "
-                            + HEALTH_WORDS[rank - 1]
+                            + HEALTH_WORDS
                             + " health, harder hits, and double the reward.";
 
             out += BoonClause(self.boon, self.boonMag);

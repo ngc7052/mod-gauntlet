@@ -61,8 +61,7 @@ namespace Gauntlet
         // and five yards -- so the whole of the ladder is what it costs to
         // not take them, which is what makes the last rank a real threat
         // rather than a bigger number.
-        constexpr uint32 SEVERITY_PCT[] = { 8, 12, 18, 25 };
-        static_assert(std::size(SEVERITY_PCT) >= MAX_RANK, "SEVERITY_PCT is short a rank");
+        constexpr uint32 SEVERITY_PCT = 12;
 
         // "Two seconds after a kill".
         constexpr uint32 FUSE_MS = 2000;
@@ -101,11 +100,6 @@ namespace Gauntlet
         // still finds its circle standing.
         constexpr uint32 TRIGGER_LIFE_MS = 30000;   // TODO(design)
 
-        uint8 RankIndex(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* MechanicName()
         {
@@ -317,7 +311,7 @@ namespace Gauntlet
             if (player->GetExactDist2d(fuse.at) > MARK_RADIUS)
                 return;
 
-            uint32 const pct = SEVERITY_PCT[RankIndex(ctx.self)];
+            uint32 const pct = SEVERITY_PCT;
 
             // Sixty-four bits on the way through: health times eighteen
             // overflows uint32 at about 238 million, which no character has and
@@ -369,11 +363,10 @@ namespace Gauntlet
 
         std::string DeathRattle::Describe(AffixInstance const& self) const
         {
-            uint8 const i = RankIndex(&self);
 
             std::string out = "Corpses burst two seconds after they fall, marked by a circle on"
                               " the ground. Standing in one costs "
-                            + std::to_string(SEVERITY_PCT[i])
+                            + std::to_string(SEVERITY_PCT)
                             + "% of your maximum health. Step back after every kill.";
 
             out += BoonClause(self.boon, self.boonMag);

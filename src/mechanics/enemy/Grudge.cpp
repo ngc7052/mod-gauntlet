@@ -46,8 +46,7 @@ namespace Gauntlet
         // The card's ladder: 2 -> 3 -> 5% of maximum health per second, and
         // 7% at rank IV. Walking away still stops it at every rank, so the
         // ladder prices standing on a corpse rather than removing the out.
-        constexpr uint32 DRAIN_PCT[] = { 2, 3, 5, 7 };
-        static_assert(std::size(DRAIN_PCT) >= MAX_RANK, "DRAIN_PCT is short a rank");
+        constexpr uint32 DRAIN_PCT = 3;
 
         // The card's other numbers, which do not ladder: 25 s, 4 yd, and half
         // the healing while inside one.
@@ -67,11 +66,6 @@ namespace Gauntlet
         // a level-10 pool rounds to zero twice as often as a whole one does.
         constexpr uint32 DRAIN_INTERVAL_MS = 1000;
 
-        uint8 RankIndex(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* MechanicName()
         {
@@ -251,7 +245,7 @@ namespace Gauntlet
             if (ctx.run && ctx.run->dead)
                 return;
 
-            uint32 const pct = DRAIN_PCT[RankIndex(ctx.self)];
+            uint32 const pct = DRAIN_PCT;
 
             uint32 damage = static_cast<uint32>(static_cast<uint64>(player->GetMaxHealth()) * pct / 100u);
             if (damage == 0)
@@ -286,7 +280,6 @@ namespace Gauntlet
 
         std::string Grudge::Describe(AffixInstance const& self) const
         {
-            uint8 const i = RankIndex(&self);
 
             // Two words changed in Phase 3, both because a player read them and
             // could not tell what the affix did.
@@ -300,7 +293,7 @@ namespace Gauntlet
             // as the drain healing you -- the opposite of what it does.
             std::string out = "Everything you kill leaves a Restless Spirit standing on its corpse"
                               " for twenty-five seconds. Within four yards of one you take "
-                            + std::to_string(DRAIN_PCT[i])
+                            + std::to_string(DRAIN_PCT)
                             + "% of your maximum health as damage every second, and any healing"
                               " you receive is halved. Fight on fresh ground, and decide when"
                               " to loot.";

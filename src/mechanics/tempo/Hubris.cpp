@@ -60,11 +60,6 @@ namespace Gauntlet
         // deal for a player who picks correctly and a worse one for a player
         // who does not. That asymmetry is the point: the ladder escalates the
         // *stakes* of the choice rather than the size of a tax.
-        uint8 RankIndex(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* MechanicKey()
         {
@@ -101,35 +96,32 @@ namespace Gauntlet
 
             // The whole card. Everything that is not the duel hits harder, and
             // the duel itself hits softer.
-            float DamageTakenMult(Ctx& ctx, Unit* attacker, SpellInfo const*) override
+            float DamageTakenMult(Ctx& /*ctx*/, Unit* attacker, SpellInfo const*) override
             {
                 if (!attacker || _duel.IsEmpty())
                     return 1.f;
 
-                return HubrisTakenMult(ctx.self ? ctx.self->rank : 1,
-                                       attacker->GetGUID() == _duel);
+                return HubrisTakenMult(attacker->GetGUID() == _duel);
             }
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint8 const i = RankIndex(&self);
 
                 std::string out = "The first enemy in a fight becomes your duel: it deals "
-                                + std::to_string(100 - DUEL_TAKEN_PCT[i])
+                                + std::to_string(100 - DUEL_TAKEN_PCT)
                                 + "% less damage to you and everything else deals "
-                                + std::to_string(OTHER_TAKEN_PCT[i] - 100)
+                                + std::to_string(OTHER_TAKEN_PCT - 100)
                                 + "% more. Open on the one that frightens you.";
 
                 out += BoonClause(self.boon, self.boonMag);
                 return out;
             }
 
-            std::string Diagnose(Ctx& ctx) const override
+            std::string Diagnose(Ctx& /*ctx*/) const override
             {
-                uint8 const i = RankIndex(ctx.self);
                 return "hubris: duel " + std::string(_duel.IsEmpty() ? "none" : _duel.ToString())
-                     + ", duel x" + std::to_string(DUEL_TAKEN_PCT[i])
-                     + "%, others x" + std::to_string(OTHER_TAKEN_PCT[i]) + "%";
+                     + ", duel x" + std::to_string(DUEL_TAKEN_PCT)
+                     + "%, others x" + std::to_string(OTHER_TAKEN_PCT) + "%";
             }
 
         private:

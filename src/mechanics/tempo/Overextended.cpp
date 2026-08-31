@@ -69,11 +69,6 @@ namespace Gauntlet
         // pips are worth drawing.
         constexpr uint32 SHOWN_MAX = 5;
 
-        uint8 RankIndex(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* MechanicKey()
         {
@@ -99,7 +94,7 @@ namespace Gauntlet
                 if (!attacker->isInBack(player))
                     return 1.0f;
 
-                return OverextendedTakenMult(ctx.self ? ctx.self->rank : 1, /*behind*/ true);
+                return OverextendedTakenMult(/*behind*/ true);
             }
 
             // BonusHealing. The curse is paid in damage taken while surrounded;
@@ -161,10 +156,9 @@ namespace Gauntlet
 
         std::string Overextended::Describe(AffixInstance const& self) const
         {
-            uint8 const i = RankIndex(&self);
 
             std::string out = "Anything hitting you from behind deals "
-                            + std::to_string(BEHIND_PCT[i])
+                            + std::to_string(BEHIND_PCT)
                             + "% more damage. Keep them in front of you.";
 
             out += BoonClause(self.boon, self.boonMag);

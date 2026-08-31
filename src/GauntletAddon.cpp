@@ -30,13 +30,12 @@ namespace Gauntlet
         constexpr char const* GNT_PREFIX = "GNT";
 
         // The wire spellings of OfferKind. Deliberately not OfferKindName(),
-        // which returns the player-facing "Rank up": these are the tokens
-        // Panel.lua's KIND_COLOR table is keyed by.
+        // which is player-facing: these are the tokens Panel.lua's KIND_COLOR
+        // table is keyed by.
         char const* WireKind(OfferKind kind)
         {
             switch (kind)
             {
-                case OfferKind::RankUp:  return "rankup";
                 case OfferKind::Swap:    return "swap";
                 case OfferKind::Bargain: return "bargain";
                 default:                 return "new";
@@ -332,15 +331,15 @@ namespace Gauntlet
             Frame f("AFFIX");
             f.Num(a.slot);
             f.Num(a.mechanic);
-            f.Num(a.rank);
+            f.Num(static_cast<int64>(a.rarity));
             f.Num(static_cast<int64>(a.condition));
             f.Num(static_cast<int64>(a.boon));
             f.Num(a.boonMag);
             Emit(player, f.Str());
 
-            // The carried affix's own sentence at the rank it is actually at,
-            // keyed by slot. Without it the panel's tooltip draws the registry
-            // blurb, which is the rank I wording for every rank.
+            // The carried affix's own sentence, keyed by slot: Describe() says
+            // what the card does with its live numbers and its boon clause,
+            // where the registry blurb is one static line.
             EmitDescription("ADESC", a.slot, sGauntlet->DescribeOf(a),
                             [this, player](char const* type, int64 key, std::string const& part)
                             {
@@ -385,26 +384,22 @@ namespace Gauntlet
             Frame f("OFFER");
             f.Num(static_cast<int64>(i + 1));
             f.Num(o.mechanic);
-            f.Num(o.rank);
+            // Where the rank was. Data.lua carries the card's rarity too; this
+            // is on the wire so the chooser can colour an offer whose id a
+            // stale Data.lua cannot resolve, and so the wire mirrors Offer
+            // field for field as it always has.
+            f.Num(static_cast<int64>(o.rarity));
             f.Num(static_cast<int64>(o.condition));
             f.Num(static_cast<int64>(o.boon));
             f.Num(o.boonMag);
             f.Text(WireKind(o.kind), 16);
             f.Num(o.swapSlot);
-            // Last, so an addon that predates the field reads every other
-            // one where it always did. Data.lua carries the card's rarity too;
-            // this is here so the chooser can colour an offer whose id a stale
-            // Data.lua cannot resolve, and so the wire mirrors Offer field for
-            // field as it always has.
-            f.Num(static_cast<int64>(o.rarity));
             Emit(player, f.Str());
 
-            // The mechanic's own sentence, at the rank this offer is
-            // promising. Without it the panel can only draw
-            // MechanicDef::blurb, which is one static line per row -- so a
-            // RANK UP offer read exactly like the NEW offer beside it and told
-            // the player nothing about what the rank changed. They are being
-            // asked to accept a permanent number that nothing has shown them.
+            // The mechanic's own sentence for this offer. Without it the panel
+            // can only draw MechanicDef::blurb, which is one static line per
+            // row and carries no boon clause; the player is being asked to
+            // accept a permanent thing and should read exactly what it does.
             //
             // Sent as its own frame rather than a field on OFFER because the
             // sentences run to 250 characters and MaxPayload is 255. Long ones

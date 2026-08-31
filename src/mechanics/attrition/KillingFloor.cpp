@@ -77,11 +77,6 @@ namespace Gauntlet
         // cannot drift from it without RegistryTest noticing the key changed.
         constexpr char const* STAT_KEY = "a05_killing_floor";
 
-        uint8 RankIndexOf(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         Addon* AddonFor(Ctx& ctx) { return ctx.addon ? ctx.addon : sGauntletAddon; }
 
@@ -115,8 +110,7 @@ namespace Gauntlet
         // Rank IV holds it fifteen seconds and gives back 5%: both halves
         // move, so the top rank is a real escalation of the same question --
         // is this fight worth finishing -- rather than only a smaller reward.
-        constexpr uint32 LINGER_MS[] = { 0, 0, 10000, 15000 };
-        static_assert(std::size(LINGER_MS) >= MAX_RANK, "LINGER_MS is short a rank");
+        constexpr uint32 LINGER_MS = 0;
 
         class KillingFloor final : public IMechanic
         {
@@ -195,7 +189,7 @@ namespace Gauntlet
                     return;   // nothing was withheld, so there is nothing to release
 
                 int32 const heal = int32(std::min<uint64>(
-                    KillingFloorPayout(ctx.self ? ctx.self->rank : 1, _bank),
+                    KillingFloorPayout(_bank),
                     std::numeric_limits<int32>::max()));
                 _bank = 0;
                 if (heal <= 0)
@@ -226,7 +220,7 @@ namespace Gauntlet
                     return;
                 }
 
-                uint32 const linger = LINGER_MS[RankIndexOf(ctx.self)];
+                uint32 const linger = LINGER_MS;
                 _lingerMs += diffMs;
                 if (_lingerMs < linger)
                     return;
@@ -237,7 +231,7 @@ namespace Gauntlet
                 if (_bank != 0)
                 {
                     int32 const back = int32(std::min<uint64>(
-                        KillingFloorLeaveBack(ctx.self ? ctx.self->rank : 1, _bank),
+                        KillingFloorLeaveBack(_bank),
                         std::numeric_limits<int32>::max()));
                     _bank = 0;
                     if (back > 0)
@@ -253,23 +247,22 @@ namespace Gauntlet
                 Publish(ctx);
             }
 
-            std::string Describe(AffixInstance const& self) const override
+            std::string Describe(AffixInstance const& /*self*/) const override
             {
-                uint8 const i = RankIndexOf(&self);
 
                 // No BoonClause: the upside is the other half of the same
                 // sentence, not a separate promise. Frenzy and Berserker's
                 // Bargain read the same way and for the same reason.
                 std::string out = "While you are in a fight with something you have wounded, healing"
                                   " does not reach you -- it is held. A kill hands back "
-                                + std::to_string(KILL_PAYOUT_PCT[i]) + "% of what is held.";
+                                + std::to_string(KILL_PAYOUT_PCT) + "% of what is held.";
 
-                if (LEAVE_LOSS_PCT[i] != 0)
-                    out += " Break off instead and " + std::to_string(LEAVE_LOSS_PCT[i])
+                if (LEAVE_LOSS_PCT != 0)
+                    out += " Break off instead and " + std::to_string(LEAVE_LOSS_PCT)
                          + "% of it is lost.";
 
-                if (LINGER_MS[i] != 0)
-                    out += " The block holds for " + std::to_string(LINGER_MS[i] / 1000)
+                if (LINGER_MS != 0)
+                    out += " The block holds for " + std::to_string(LINGER_MS / 1000)
                          + " seconds after the fight ends, so running is no longer an answer.";
                 else
                     out += " Leaving the fight lifts it.";

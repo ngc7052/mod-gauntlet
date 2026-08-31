@@ -42,8 +42,7 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_BOUND_SKIN = 64;
 
         // The card's ladder, in seconds of lockout after any form change.
-        constexpr uint32 SHIFT_LOCK_MS[] = { 4000, 6000, 10000, 15000 };
-        static_assert(std::size(SHIFT_LOCK_MS) >= MAX_RANK, "SHIFT_LOCK_MS is short a rank");
+        constexpr uint32 SHIFT_LOCK_MS = 6000;
 
         // Every form-granting spell, so the cooldown lands on the buttons and
         // not merely on the state. Base ranks; GetFirstSpellInChain is not
@@ -58,11 +57,6 @@ namespace Gauntlet
             33891   // Tree of Life
         } };
 
-        uint8 RankIndexOf(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* KeyOf(uint16 id, char const* fallback)
         {
@@ -105,7 +99,7 @@ namespace Gauntlet
                 if (ctx.run && ctx.run->dead)
                     return;
 
-                uint32 const ms = SHIFT_LOCK_MS[RankIndexOf(ctx.self)];
+                uint32 const ms = SHIFT_LOCK_MS;
 
                 for (uint32 id : FORM_SPELLS)
                     _lock.Lock(player, id, ms);
@@ -132,7 +126,7 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint32 const secs = SHIFT_LOCK_MS[RankIndexOf(&self)] / 1000u;
+                uint32 const secs = SHIFT_LOCK_MS / 1000u;
                 uint32 const pct  = self.boonMag;
 
                 std::string out = "Entering a form locks every form for " + std::to_string(secs)
@@ -147,9 +141,9 @@ namespace Gauntlet
                 return out;
             }
 
-            std::string Diagnose(Ctx& ctx) const override
+            std::string Diagnose(Ctx& /*ctx*/) const override
             {
-                return "bound skin: " + std::to_string(SHIFT_LOCK_MS[RankIndexOf(ctx.self)] / 1000u)
+                return "bound skin: " + std::to_string(SHIFT_LOCK_MS / 1000u)
                      + "s lock, " + std::to_string(_shifts) + " shift(s)";
             }
 
@@ -168,8 +162,7 @@ namespace Gauntlet
         // what it should. The registry makes it exclusive with Bound Skin,
         // because together they would be a tax rather than a rhythm.
         // ==================================================================
-        constexpr uint32 TOLL_PCT[] = { 2, 3, 4, 5 };
-        static_assert(std::size(TOLL_PCT) >= MAX_RANK, "TOLL_PCT is short a rank");
+        constexpr uint32 TOLL_PCT = 3;
 
         class NaturesToll final : public IMechanic
         {
@@ -226,7 +219,7 @@ namespace Gauntlet
                 _sinceMs -= 1000;
 
                 uint32 const want   = uint32(uint64(player->GetMaxHealth())
-                                           * TOLL_PCT[RankIndexOf(ctx.self)] / 100u);
+                                           * TOLL_PCT / 100u);
                 uint32 const health = uint32(player->GetHealth());
                 uint32 const cost   = health > 1 ? std::min(want, health - 1) : 0;
                 if (cost == 0)
@@ -259,7 +252,7 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint32 const pct  = TOLL_PCT[RankIndexOf(&self)];
+                uint32 const pct  = TOLL_PCT;
                 uint32 const boon = self.boonMag;
 
                 std::string out = "A kill made in Cat or Bear form leaves you bleeding "
@@ -296,8 +289,7 @@ namespace Gauntlet
         // The root's own duration is long; this is what the affix holds the
         // druid for, which the card ties to the enemy's. Twelve seconds is
         // Entangling Roots' base at most ranks.
-        constexpr uint32 ROOT_MS[] = { 8000, 10000, 12000, 15000 };   // TODO(design)
-        static_assert(std::size(ROOT_MS) >= MAX_RANK, "ROOT_MS is short a rank");
+        constexpr uint32 ROOT_MS = 10000;   // TODO(design)
 
         class CommitmentOfRoots final : public IMechanic
         {
@@ -323,7 +315,7 @@ namespace Gauntlet
                 if (ctx.run && ctx.run->dead)
                     return;
 
-                uint32 const ms = ROOT_MS[RankIndexOf(ctx.self)];
+                uint32 const ms = ROOT_MS;
                 _control.Apply(player, SelfControl::Kind::Root, ms);
 
                 // The boon: Roots cost half, refunded for the usual reason.
@@ -339,7 +331,7 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint32 const secs = ROOT_MS[RankIndexOf(&self)] / 1000u;
+                uint32 const secs = ROOT_MS / 1000u;
 
                 std::string out = "Casting Entangling Roots roots you for " + std::to_string(secs)
                                 + " seconds too. Nature's Grasp is untouched.";
@@ -369,8 +361,7 @@ namespace Gauntlet
         // module whose state the player cannot change at all -- only work
         // around -- which is why both halves are always paid.
         // ==================================================================
-        constexpr uint32 FACE_PENALTY_PCT[] = { 20, 30, 40, 50 };
-        static_assert(std::size(FACE_PENALTY_PCT) >= MAX_RANK, "FACE_PENALTY_PCT is short a rank");
+        constexpr uint32 FACE_PENALTY_PCT = 30;
         constexpr uint32 FACE_BONUS_PCT = 10;
 
         class TwoFaces final : public IMechanic
@@ -395,14 +386,14 @@ namespace Gauntlet
                 bool const penalised = (day && spell) || (!day && feral);
 
                 if (penalised)
-                    return 1.0f - float(FACE_PENALTY_PCT[RankIndexOf(ctx.self)]) / 100.0f;
+                    return 1.0f - float(FACE_PENALTY_PCT) / 100.0f;
 
                 return 1.0f + float(FACE_BONUS_PCT) / 100.0f;
             }
 
-            std::string Describe(AffixInstance const& self) const override
+            std::string Describe(AffixInstance const& /*self*/) const override
             {
-                uint32 const pct = FACE_PENALTY_PCT[RankIndexOf(&self)];
+                uint32 const pct = FACE_PENALTY_PCT;
 
                 return "By day your spells deal " + std::to_string(pct) + "% less and your claws "
                      + std::to_string(FACE_BONUS_PCT) + "% more. By night it is the other way"

@@ -36,11 +36,6 @@ namespace Gauntlet
         constexpr uint32 SPELL_RENEW         = 139;
         constexpr uint32 SPELL_FEAR_WARD     = 6346;
 
-        uint8 RankIndexOf(AffixInstance const* self)
-        {
-            uint8 const rank = self ? self->rank : 1;
-            return static_cast<uint8>((rank < 1 ? 1 : (rank > MAX_RANK ? MAX_RANK : rank)) - 1);
-        }
 
         char const* KeyOf(uint16 id, char const* fallback)
         {
@@ -63,8 +58,7 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_FRAIL_SOUL = 44;
 
         // The card's ladder: 20 -> 30 -> 45 seconds.
-        constexpr int32 WEAKENED_MS[] = { 20000, 30000, 45000, 60000 };
-        static_assert(std::size(WEAKENED_MS) >= MAX_RANK, "WEAKENED_MS is short a rank");
+        constexpr int32 WEAKENED_MS = 30000;
 
         class FrailSoul final : public IMechanic
         {
@@ -74,11 +68,11 @@ namespace Gauntlet
                 if (!AuraDurationEdit::Matches(target, aura, ctx.player, SPELL_WEAKENED_SOUL))
                     return;
 
-                AuraDurationEdit::Edit(aura, WEAKENED_MS[RankIndexOf(ctx.self)]);
+                AuraDurationEdit::Edit(aura, WEAKENED_MS);
                 ++_stretched;
 
                 AddonFor(ctx)->SendEvent(ctx.player, KeyOf(MECHANIC_FRAIL_SOUL, "c17_frail_soul"),
-                                         uint32(WEAKENED_MS[RankIndexOf(ctx.self)] / 1000),
+                                         uint32(WEAKENED_MS / 1000),
                                          "Weakened Soul");
             }
 
@@ -100,7 +94,7 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint32 const secs = uint32(WEAKENED_MS[RankIndexOf(&self)] / 1000);
+                uint32 const secs = uint32(WEAKENED_MS / 1000);
                 uint32 const pct  = self.boonMag;
 
                 std::string out = "Weakened Soul lasts " + std::to_string(secs)
@@ -139,8 +133,7 @@ namespace Gauntlet
         constexpr uint16 MECHANIC_WHISPERS = 47;
 
         // The card's ladder for the line: 15 -> 20 -> 30% health.
-        constexpr uint32 WHISPER_LINE_PCT[] = { 15, 20, 30, 40 };
-        static_assert(std::size(WHISPER_LINE_PCT) >= MAX_RANK, "WHISPER_LINE_PCT is short a rank");
+        constexpr uint32 WHISPER_LINE_PCT = 20;
 
         constexpr uint32 WHISPER_MS = 3000;
 
@@ -179,7 +172,7 @@ namespace Gauntlet
             std::string Diagnose(Ctx& ctx) const override
             {
                 std::string out = "whispers: line at "
-                                + std::to_string(WHISPER_LINE_PCT[RankIndexOf(ctx.self)]) + "%";
+                                + std::to_string(WHISPER_LINE_PCT) + "%";
                 if (ctx.player)
                     out += ", health " + std::to_string(uint32(ctx.player->GetHealthPct())) + "%";
                 out += _spent ? ", spent this fight" : ", ready";
@@ -210,7 +203,7 @@ namespace Gauntlet
             if (ctx.run && ctx.run->dead)
                 return;
 
-            if (player->GetHealthPct() >= float(WHISPER_LINE_PCT[RankIndexOf(ctx.self)]))
+            if (player->GetHealthPct() >= float(WHISPER_LINE_PCT))
                 return;
 
             // Fear Ward prevents it outright, and the card says so. It is the
@@ -241,7 +234,7 @@ namespace Gauntlet
 
         std::string WhispersOfTheDeep::Describe(AffixInstance const& self) const
         {
-            uint32 const line = WHISPER_LINE_PCT[RankIndexOf(&self)];
+            uint32 const line = WHISPER_LINE_PCT;
             uint32 const pct  = self.boonMag;
 
             std::string out = "The first time your health drops below " + std::to_string(line)
@@ -269,9 +262,8 @@ namespace Gauntlet
 
         // Ninety seconds at rank IV: dropping Shadowform to heal is a decision
         // about the next minute and a half, not about the next global.
-        constexpr uint32 SHADOWFORM_LOCK_MS[] = { 15000, 30000, 60000, 90000 };
+        constexpr uint32 SHADOWFORM_LOCK_MS = 30000;
 
-        static_assert(std::size(SHADOWFORM_LOCK_MS) >= MAX_RANK, "SHADOWFORM_LOCK_MS is short a rank");
 
         class FaithlessForm final : public IMechanic
         {
@@ -300,7 +292,7 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint32 const secs = SHADOWFORM_LOCK_MS[RankIndexOf(&self)] / 1000u;
+                uint32 const secs = SHADOWFORM_LOCK_MS / 1000u;
                 uint32 const pct  = self.boonMag;
 
                 std::string out = "Leaving Shadowform locks it for " + std::to_string(secs)
@@ -339,7 +331,7 @@ namespace Gauntlet
             if (ctx.run && ctx.run->dead)
                 return;
 
-            uint32 const ms = SHADOWFORM_LOCK_MS[RankIndexOf(ctx.self)];
+            uint32 const ms = SHADOWFORM_LOCK_MS;
             _lock.Lock(player, SPELL_SHADOWFORM, ms);
             ++_left;
 
@@ -363,9 +355,8 @@ namespace Gauntlet
         // ==================================================================
         constexpr uint16 MECHANIC_PENANCE = 46;
 
-        constexpr uint32 SILENCE_MS[] = { 2000, 3000, 4000, 5000 };
+        constexpr uint32 SILENCE_MS = 2000;
 
-        static_assert(std::size(SILENCE_MS) >= MAX_RANK, "SILENCE_MS is short a rank");
 
         class PenanceOfSilence final : public IMechanic
         {
@@ -394,14 +385,11 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override
             {
-                uint8 const  i    = RankIndexOf(&self);
-                uint32 const secs = SILENCE_MS[i] / 1000u;
+                uint32 const secs = SILENCE_MS / 1000u;
                 uint32 const pct  = self.boonMag;
 
                 std::string out = "Healing yourself silences you for " + std::to_string(secs)
                                 + " seconds.";
-                if (i == 0)
-                    out += " Renew does not count.";
 
                 if (pct != 0)
                     out += " In exchange your own heals are " + std::to_string(pct) + "% stronger.";
@@ -436,18 +424,13 @@ namespace Gauntlet
             if (target && target != player)
                 return;
 
-            // Rank I exempts Renew, which is the card's "free before the pull".
-            if (RankIndexOf(ctx.self) == 0
-                && sSpellMgr->GetFirstSpellInChain(info->Id) == SPELL_RENEW)
-                return;
-
             // A silence, expressed as the closest thing SelfControl has. There
             // is no UNIT_STATE for silence -- it is an aura mechanic -- and
             // applying one would need a spell id whose tooltip would then
             // describe something else, so this is a stun of the same length.
             // It is a heavier price than the card asks for and Describe() does
             // not pretend otherwise. TODO(design)
-            uint32 const ms = SILENCE_MS[RankIndexOf(ctx.self)];
+            uint32 const ms = SILENCE_MS;
             _control.Apply(player, SelfControl::Kind::Stun, ms);
 
             AddonFor(ctx)->SendEvent(player, KeyOf(MECHANIC_PENANCE, "c19_penance_of_silence"),

@@ -45,21 +45,24 @@ OBJ_PREFIX=modules/CMakeFiles/modules.dir/mod-gauntlet
 # ---------------------------------------------------------------------------
 # The ladder audit.
 #
-# A rank table is `constexpr T X[] = { a, b, c, d }` with a static_assert on its
+# A ladder is `constexpr T X[] = { a, b, c, d }` with a static_assert on its
 # length beside it. The compiler checks the length. Nothing checks the values,
-# and the values are where the mistakes are: Phase 6 hand-wrote eighty fourth
-# ranks across thirty-four files, and a transposed digit -- 1.15 where 1.55 was
-# meant -- compiles, links, passes every test, and ships a rank IV weaker than
-# its rank III.
+# and the values are where the mistakes are: under the rank system Phase 6
+# hand-wrote eighty fourth ranks across thirty-four files, and a transposed
+# digit -- 1.15 where 1.55 was meant -- compiled, linked, passed every test, and
+# shipped a rank IV weaker than its rank III. The ranks are gone (rarity plan
+# step 4) and four ladders remain, the per-tier rarity weights; the audit stays,
+# because the next table someone writes gets the same nothing-checks-the-values
+# treatment.
 #
 # So every ladder must be monotonic. Going up or going down are both fine; a
 # ladder that changes direction part-way is a typo unless it is deliberate, and
 # a deliberate one says so with LADDER-SENTINEL on the line above.
 #
-# Three tables are deliberate today, all the same shape: 0 is not a smaller
-# number on those ladders, it is "denied outright" -- Feign Death, Vanish and
-# Blink at their top rank. That is a sentinel, and a sentinel has to be marked
-# rather than tolerated, or the next real inversion hides among them.
+# One table is deliberate today: the uncommon weight column rises and then
+# falls, because uncommons are the mid-run's texture (rarity plan section 2).
+# That is a sentinel, and a sentinel has to be marked rather than tolerated, or
+# the next real inversion hides among them.
 #
 # No Docker, no build. Runs with the anchor audit.
 # ---------------------------------------------------------------------------
@@ -111,11 +114,11 @@ if bad:
     print(f"LADDER  FAIL  {len(bad)} ladder(s) change direction part-way:")
     for b in bad:
         print(f"              {b}")
-    print("              A rank that is weaker than the one below it is a typo. If it is")
+    print("              A step that goes the wrong way is a typo. If it is")
     print(f"              deliberate, say so with {SENTINEL} in the comment above the table.")
     sys.exit(1)
 
-print(f"LADDER  PASS  {checked} rank ladder(s), every one monotonic")
+print(f"LADDER  PASS  {checked} ladder(s), every one monotonic")
 PYEOF
 }
 

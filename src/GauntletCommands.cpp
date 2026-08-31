@@ -487,7 +487,7 @@ namespace Gauntlet
         //
         // Returns the slot it used, or 0 if the run had none free.
         uint8 AttachCheat(ChatHandler* handler, Player* p, RunState* st,
-                          MechanicDef const* def, uint32 rank, Condition condition)
+                          MechanicDef const* def, Condition condition)
         {
             uint8 const slot = LowestFreeSlot(*st);
             if (slot == 0)
@@ -495,7 +495,7 @@ namespace Gauntlet
 
             AffixInstance instance;
             instance.mechanic   = def->id;
-            instance.rank       = static_cast<uint8>(rank);
+            instance.rarity     = def->rarity;
             instance.condition  = condition;
 
             // The registry's boon, at the magnitude an offer would pay for it.
@@ -511,7 +511,7 @@ namespace Gauntlet
             // BoonMagnitude is exported for exactly this, so the affix the
             // audits attach is now the affix an offer would build.
             instance.boon       = def->boon;
-            instance.boonMag    = static_cast<uint16>(BoonMagnitude(def->id, def->boon, rank));
+            instance.boonMag    = static_cast<uint16>(BoonMagnitude(def->id, def->boon));
             instance.slot       = slot;
             instance.genVersion = GeneratorVersion;
 
@@ -532,15 +532,15 @@ namespace Gauntlet
                 "REPLACE INTO `gauntlet_affix` "
                 "(`guid`, `slot`, `mechanic`, `rank`, `cond`, `boon`, `boon_mag`, `gen_version`) "
                 "VALUES ({}, {}, {}, {}, {}, 0, 0, {})",
-                low, static_cast<uint32>(slot), static_cast<uint32>(def->id), rank,
+                low, static_cast<uint32>(slot), static_cast<uint32>(def->id), static_cast<uint32>(def->rarity),
                 static_cast<uint32>(condition), static_cast<uint32>(GeneratorVersion));
 
             // Deliberately not written to gauntlet_affix_log. Its `action`
             // column is an ENUM of the five things a run can legitimately do to
             // an affix, so a cheat goes to the server log instead of being
             // disguised as a pick.
-            LOG_INFO("module", "Gauntlet: {} gave {} (id {}) rank {} condition {} to {} (guid {}) in slot {}.",
-                     Actor(handler), def->name, static_cast<uint32>(def->id), rank,
+            LOG_INFO("module", "Gauntlet: {} gave {} (id {}) condition {} to {} (guid {}) in slot {}.",
+                     Actor(handler), def->name, static_cast<uint32>(def->id),
                      ConditionName(condition), p->GetName(), low, static_cast<uint32>(slot));
 
             return slot;
@@ -563,7 +563,7 @@ namespace Gauntlet
         // makes the scheduler's budget right before a mechanic arms anything,
         // and an audit that attached differently from the real path would be
         // auditing a path nothing takes.
-        AffixInstance* AuditAttach(Player* p, RunState* st, MechanicDef const& def, uint32 rank)
+        AffixInstance* AuditAttach(Player* p, RunState* st, MechanicDef const& def)
         {
             uint8 const slot = LowestFreeSlot(*st);
             if (slot == 0)
@@ -571,7 +571,7 @@ namespace Gauntlet
 
             AffixInstance instance;
             instance.mechanic   = def.id;
-            instance.rank       = static_cast<uint8>(rank);
+            instance.rarity     = def.rarity;
 
             // Always, not a rolled condition: a gated affix whose condition is
             // false does nothing on attach and would be indistinguishable from
@@ -591,7 +591,7 @@ namespace Gauntlet
             // An affix a player carries has a boon, so the affix the audits
             // attach has one too.
             instance.boon       = def.boon;
-            instance.boonMag    = static_cast<uint16>(BoonMagnitude(def.id, def.boon, rank));
+            instance.boonMag    = static_cast<uint16>(BoonMagnitude(def.id, def.boon));
             instance.slot       = slot;
             instance.genVersion = GeneratorVersion;
 
@@ -738,7 +738,6 @@ public:
             { "give",         HandleDebugGive,        SEC_GAMEMASTER, Console::No },
             { "give-class",   HandleDebugGiveClass,   SEC_GAMEMASTER, Console::No },
             { "remove",       HandleDebugRemove,      SEC_GAMEMASTER, Console::No },
-            { "rank",         HandleDebugRank,        SEC_GAMEMASTER, Console::No },
             // Console::Yes: it reads the registry and builds throwaway
             // instances. It needs no character and no run, and requiring a
             // logged-in game master to audit the offer text would mean the
@@ -933,7 +932,7 @@ public:
     // ------------------------------------------------------------------
 
     static bool HandleDebugGive(ChatHandler* handler, std::string_view keyOrId,
-                                Optional<uint32> rankArg, Optional<std::string_view> condArg)
+                                Optional<std::string_view> condArg)
     {
         if (!DebugAllowed(handler))
             return false;
@@ -953,17 +952,8 @@ public:
 
         if (st->Find(def->id))
         {
-            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r {} is already carried. Use .gauntlet debug rank to "
-                                      "change it, or .gauntlet debug remove first.", def->name);
-            return false;
-        }
-
-        uint32 const ceiling = std::min<uint32>(def->maxRank, MAX_RANK);
-        uint32 const rank    = rankArg ? *rankArg : 1u;
-        if (rank < 1 || rank > ceiling)
-        {
-            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Rank {} is out of range for {}: 1 to {}.",
-                                      rank, def->name, ceiling);
+            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r {} is already carried. "
+                                      ".gauntlet debug remove it first.", def->name);
             return false;
         }
 
@@ -976,7 +966,7 @@ public:
             return false;
         }
 
-        uint8 const slot = AttachCheat(handler, p, st, def, rank, condition);
+        uint8 const slot = AttachCheat(handler, p, st, def, condition);
         if (slot == 0)
         {
             handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r This run has no free affix slot.");
@@ -1001,10 +991,9 @@ public:
     // four. This takes the question the tester actually has -- "what can a
     // paladin get, and what does it do to me" -- and answers it in one line.
     //
-    //   .gauntlet debug give-class              the Class family, at rank 1
-    //   .gauntlet debug give-class 4            the Class family, at rank IV
-    //   .gauntlet debug give-class 3 all        everything relevant, rank III
-    //   .gauntlet debug give-class 1 spawn      one family
+    //   .gauntlet debug give-class              the Class family
+    //   .gauntlet debug give-class all          everything relevant
+    //   .gauntlet debug give-class spawn        one family
     //
     // Relevance is the generator's own, through LivePlayerView, so what lands
     // is exactly what this character could be offered -- including the spell
@@ -1015,8 +1004,7 @@ public:
     //
     // MAX_CARRIED is deliberately not enforced. It is what makes a *run* a set
     // of choices, and this is not a run.
-    static bool HandleDebugGiveClass(ChatHandler* handler, Optional<uint32> rankArg,
-                                     Optional<std::string_view> familyArg)
+    static bool HandleDebugGiveClass(ChatHandler* handler, Optional<std::string_view> familyArg)
     {
         if (!DebugAllowed(handler))
             return false;
@@ -1025,14 +1013,6 @@ public:
         RunState* st = MutableRun(handler, p);
         if (!st)
             return false;
-
-        uint32 const rank = rankArg ? *rankArg : 1u;
-        if (rank < 1 || rank > MAX_RANK)
-        {
-            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Rank {} is out of range: 1 to {}.",
-                                      rank, static_cast<uint32>(MAX_RANK));
-            return false;
-        }
 
         // Default to the Class family, because that is the question the command
         // was asked for. "all" is every family.
@@ -1087,8 +1067,7 @@ public:
             bool const needsSpell = def.requiresSpell != 0 && !view.HasSpell(def.requiresSpell);
             bool const needsTree  = def.requiresTree  != 0 && def.requiresTree != view.GetTalentTree();
 
-            uint32 const capped = std::min<uint32>(rank, std::min<uint8>(def.maxRank, MAX_RANK));
-            uint8 const slot = AttachCheat(handler, p, st, &def, capped, Gauntlet::Condition::Always);
+            uint8 const slot = AttachCheat(handler, p, st, &def, Gauntlet::Condition::Always);
             if (slot == 0)
             {
                 handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Ran out of affix slots.");
@@ -1096,9 +1075,8 @@ public:
             }
 
             ++attached;
-            handler->PSendSysMessage("  |cffffff00{}|r  slot {}  rank {}{}", def.name,
-                                     static_cast<uint32>(slot), capped,
-                                     capped < rank ? " (its ceiling)" : "");
+            handler->PSendSysMessage("  |cffffff00{}|r  slot {}  {}", def.name,
+                                     static_cast<uint32>(slot), RarityName(def.rarity));
 
             if (needsSpell || needsTree)
             {
@@ -1110,8 +1088,8 @@ public:
         }
 
         handler->PSendSysMessage(
-            "|cffff2020[Gauntlet debug]|r CHEAT: attached {} affix(es) at rank {}{}.",
-            attached, rank, already ? Acore::StringFormat(", {} already carried", already) : "");
+            "|cffff2020[Gauntlet debug]|r CHEAT: attached {} affix(es){}.",
+            attached, already ? Acore::StringFormat(", {} already carried", already) : "");
 
         if (gated != 0)
             handler->PSendSysMessage(
@@ -1169,57 +1147,6 @@ public:
 
         handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r CHEAT: detached slot {} - {}",
                                  static_cast<uint32>(slot), name);
-        return true;
-    }
-
-    static bool HandleDebugRank(ChatHandler* handler, uint32 slotArg, uint32 rankArg)
-    {
-        if (!DebugAllowed(handler))
-            return false;
-
-        Player* p = handler->GetPlayer();
-        RunState* st = MutableRun(handler, p);
-        if (!st)
-            return false;
-
-        AffixInstance* a = slotArg <= 255 ? st->AtSlot(static_cast<uint8>(slotArg)) : nullptr;
-        if (!a)
-        {
-            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Nothing is carried in slot {}. "
-                                      ".gauntlet debug dump lists the slots.", slotArg);
-            return false;
-        }
-
-        // A mechanic this build has no registry row for still has to be
-        // rankable: the affix is on a live character either way.
-        MechanicDef const* def = FindMechanic(a->mechanic);
-        uint32 const ceiling = def ? std::min<uint32>(def->maxRank, MAX_RANK) : MAX_RANK;
-        if (rankArg < 1 || rankArg > ceiling)
-        {
-            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Rank {} is out of range for that affix: 1 to {}.",
-                                      rankArg, ceiling);
-            return false;
-        }
-
-        uint8 const was = a->rank;
-        a->rank = static_cast<uint8>(rankArg);
-
-        // In place and in the same slot, which is what Mgr::Pick's rank-up
-        // path does; no detach and no re-attach, because a rank is a number
-        // the implementation reads rather than state it holds.
-        uint32 const low = p->GetGUID().GetCounter();
-        CharacterDatabase.Execute("UPDATE `gauntlet_affix` SET `rank` = {} WHERE `guid` = {} AND `slot` = {}",
-                                  rankArg, low, slotArg);
-
-        LOG_INFO("module", "Gauntlet: {} set slot {} of {} (guid {}) from rank {} to rank {}.",
-                 Actor(handler), slotArg, p->GetName(), low, static_cast<uint32>(was), rankArg);
-
-        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r CHEAT: slot {} rank {} -> {}",
-                                 slotArg, static_cast<uint32>(was), rankArg);
-        handler->PSendSysMessage("  {}", sGauntlet->DescribeOf(*a));
-
-        // A rank moves every product the affix contributes to.
-        PrintProducts(handler, p);
         return true;
     }
 
@@ -1322,25 +1249,19 @@ public:
         } while (r->NextRow());
     }
 
-    // Every card at every rank, and a shout when two of them are the same.
+    // Every card's own sentence, and a shout for a word the wire cannot carry.
     //
-    // This exists because Half-Tamed shipped with rank I and rank II identical
-    // -- same happiness threshold, same hostile duration, and Describe() reads
-    // only those two arrays, so the offer card for rank II was the same *string*
-    // as rank I. A player taking that rank-up spent a tier on nothing and the
-    // card told them nothing had changed.
-    //
-    // Nothing could have caught it off-line: Describe() is a method on the
-    // mechanic, the mechanics need a Player, and the unit-test harness compiles
-    // neither. So the check lives where the mechanics do. It reads the registry
-    // and builds one throwaway instance per rank; it commits nothing and needs
-    // no run.
+    // This used to print every rank of every card and shout when two ranks
+    // read the same -- which is how Half-Tamed was found shipping rank I and
+    // rank II identical. With the ranks gone there is one sentence per card;
+    // what stays is the reading itself and the wire check, because Describe()
+    // is a method on the mechanic, the mechanics need a Player, and the
+    // unit-test harness compiles neither. It commits nothing and needs no run.
     static bool HandleDebugCards(ChatHandler* handler, Optional<std::string_view> keyArg)
     {
         if (!DebugAllowed(handler))
             return false;
 
-        uint32 dead = 0;
         uint32 wide = 0;
         uint32 shown = 0;
 
@@ -1349,60 +1270,37 @@ public:
             if (keyArg && *keyArg != def.key)
                 continue;
 
-            uint8 const top = std::min<uint8>(def.maxRank, MAX_RANK);
-            handler->PSendSysMessage("|cffff2020[{}]|r {} - {}, ranks 1..{}", def.key, def.name,
-                                     RarityName(def.rarity), top);
+            AffixInstance preview;
+            preview.mechanic = def.id;
+            preview.rarity   = def.rarity;
+            preview.boon     = def.boon;
+            preview.boonMag  = static_cast<uint8>(BoonMagnitude(def.id, def.boon));
 
-            std::string previous;
-            for (uint8 rank = 1; rank <= top; ++rank)
+            std::unique_ptr<IMechanic> const impl(MakeMechanic(def.id));
+            preview.impl = impl.get();
+
+            std::string const text = sGauntlet->DescribeOf(preview);
+            handler->PSendSysMessage("|cffff2020[{}]|r {} - {}", def.key, def.name, RarityName(def.rarity));
+            handler->PSendSysMessage("  {}", text);
+
+            // The one shape the addon's split/rejoin cannot survive: a single
+            // word longer than a chunk has no space to cut at, so the cut is
+            // hard and the rejoin inserts a space that was never there.
+            // tests/WireTest.cpp proves the round trip for everything else;
+            // this is the live half of that guard, over every card, because
+            // Describe() needs a Player and the test harness cannot build one.
+            std::size_t longest = 0, run = 0;
+            for (char c : text)
             {
-                AffixInstance preview;
-                preview.mechanic = def.id;
-                preview.rank     = rank;
-                preview.boon     = def.boon;
-
-                // Magnitude deliberately left at zero, which suppresses the
-                // boon clause. The boon ladders by rank on its own, so leaving
-                // it in would make two otherwise identical cards read
-                // differently and hide exactly the fault this is looking for.
-                // What is compared here is the curse.
-                preview.boonMag  = 0;
-
-                std::unique_ptr<IMechanic> const impl(MakeMechanic(def.id));
-                preview.impl = impl.get();
-
-                std::string const text = sGauntlet->DescribeOf(preview);
-                handler->PSendSysMessage("  rank {}: {}", rank, text);
-
-                // The one shape the addon's split/rejoin cannot survive: a
-                // single word longer than a chunk has no space to cut at, so
-                // the cut is hard and the rejoin inserts a space that was never
-                // there. tests/WireTest.cpp proves the round trip for
-                // everything else; this is the live half of that guard, over
-                // all sixty-nine mechanics at every rank, because Describe()
-                // needs a Player and the test harness cannot build one.
-                std::size_t longest = 0, run = 0;
-                for (char c : text)
-                {
-                    if (c == ' ') { run = 0; continue; }
-                    longest = std::max<std::size_t>(longest, ++run);
-                }
-                if (longest >= DESC_CHUNK)
-                {
-                    ++wide;
-                    handler->PSendSysMessage(
-                        "  |cffff2020^ a {}-character word: the addon splits this mid-word and "
-                        "rejoins it with a space that was not there|r", longest);
-                }
-
-                if (rank > 1 && text == previous)
-                {
-                    ++dead;
-                    handler->PSendSysMessage(
-                        "  |cffff2020^ rank {} reads exactly as rank {}: this rank-up costs a tier "
-                        "and changes nothing|r", rank, rank - 1);
-                }
-                previous = text;
+                if (c == ' ') { run = 0; continue; }
+                longest = std::max<std::size_t>(longest, ++run);
+            }
+            if (longest >= DESC_CHUNK)
+            {
+                ++wide;
+                handler->PSendSysMessage(
+                    "  |cffff2020^ a {}-character word: the addon splits this mid-word and "
+                    "rejoins it with a space that was not there|r", longest);
             }
             ++shown;
         }
@@ -1414,8 +1312,7 @@ public:
         }
 
         handler->PSendSysMessage(
-            "|cffff2020[Gauntlet debug]|r {} mechanic(s), {} dead rank(s), {} unsplittable word(s).",
-            shown, dead, wide);
+            "|cffff2020[Gauntlet debug]|r {} mechanic(s), {} unsplittable word(s).", shown, wide);
         return true;
     }
 
@@ -1537,8 +1434,7 @@ public:
     // The body behind both `leaks` and `soak`. They differ in one bool: whether
     // the mechanic is made to act between the attach and the detach.
     static bool RunLeakAudit(ChatHandler* handler, Optional<PlayerIdentifier> whoArg,
-                             Optional<std::string_view> whatArg, Optional<uint32> rankArg,
-                             bool exercise)
+                             Optional<std::string_view> whatArg, bool exercise)
     {
         if (!DebugAllowed(handler))
             return false;
@@ -1562,7 +1458,7 @@ public:
         {
             handler->SendErrorMessage(
                 "|cffff2020[Gauntlet debug]|r No character to audit. From the console or SOAP, name one "
-                "who is online: .gauntlet debug {} <name> [what] [rank]", exercise ? "soak" : "leaks");
+                "who is online: .gauntlet debug {} <name> [what]", exercise ? "soak" : "leaks");
             return false;
         }
 
@@ -1605,17 +1501,6 @@ public:
                     return false;
                 }
             }
-        }
-
-        // The top rank by default: a leak that only exists at rank IV is still
-        // a leak, and the ranks below it are the ones a hand-read is most
-        // likely to have got right.
-        uint32 const askedRank = rankArg ? *rankArg : uint32(MAX_RANK);
-        if (askedRank < 1 || askedRank > MAX_RANK)
-        {
-            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Rank {} is out of range: 1 to {}.",
-                                      askedRank, static_cast<uint32>(MAX_RANK));
-            return false;
         }
 
         uint32 audited = 0, leaked = 0, clean = 0, inert = 0, skipped = 0, offClass = 0;
@@ -1665,11 +1550,9 @@ public:
                 continue;
             }
 
-            uint32 const rank = std::min<uint32>(askedRank, std::min<uint8>(def.maxRank, MAX_RANK));
-
             Footprint const before = Capture(p, st);
 
-            AffixInstance* attached = AuditAttach(p, st, def, rank);
+            AffixInstance* attached = AuditAttach(p, st, def);
             if (!attached)
             {
                 handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Ran out of affix slots.");
@@ -1738,7 +1621,7 @@ public:
             if (!lines.empty())
             {
                 ++leaked;
-                handler->PSendSysMessage("|cffff2020LEAK|r {} (rank {})", def.name, rank);
+                handler->PSendSysMessage("|cffff2020LEAK|r {}", def.name);
                 for (std::string const& line : lines)
                     handler->PSendSysMessage("    {}", line);
             }
@@ -1797,10 +1680,10 @@ public:
         }
 
         handler->PSendSysMessage(
-            "|cffff2020[Gauntlet debug]|r {} at rank {}: {} audited, "
+            "|cffff2020[Gauntlet debug]|r {}: {} audited, "
             "|cffff2020{} leaked|r, {} clean, {} inert{}.",
             exercise ? "soak" : "attach/detach audit",
-            askedRank, audited, leaked, clean, inert,
+            audited, leaked, clean, inert,
             skipped ? Acore::StringFormat(", {} skipped as already carried", skipped) : "");
 
         if (offClass != 0)
@@ -1834,18 +1717,18 @@ public:
 
     // Attach and detach, and nothing in between.
     static bool HandleDebugLeaks(ChatHandler* handler, Optional<PlayerIdentifier> whoArg,
-                                 Optional<std::string_view> whatArg, Optional<uint32> rankArg)
+                                 Optional<std::string_view> whatArg)
     {
-        return RunLeakAudit(handler, whoArg, whatArg, rankArg, /*exercise*/ false);
+        return RunLeakAudit(handler, whoArg, whatArg, /*exercise*/ false);
     }
 
     // The same audit, with the mechanic driven in between: ticked, and its own
     // events released. Slower, noisier, and the only one of the two that can
     // see what a hook-driven curse leaves behind.
     static bool HandleDebugSoak(ChatHandler* handler, Optional<PlayerIdentifier> whoArg,
-                                Optional<std::string_view> whatArg, Optional<uint32> rankArg)
+                                Optional<std::string_view> whatArg)
     {
-        return RunLeakAudit(handler, whoArg, whatArg, rankArg, /*exercise*/ true);
+        return RunLeakAudit(handler, whoArg, whatArg, /*exercise*/ true);
     }
 
     // Every card, through every hook, with the answer derived rather than
@@ -1874,7 +1757,7 @@ public:
     // produce, or a card that does nothing at all, and both are worth knowing
     // before a player finds out.
     static bool HandleDebugBench(ChatHandler* handler, Optional<PlayerIdentifier> whoArg,
-                                 Optional<std::string_view> whatArg, Optional<uint32> rankArg)
+                                 Optional<std::string_view> whatArg)
     {
         if (!DebugAllowed(handler))
             return false;
@@ -1884,7 +1767,7 @@ public:
         {
             handler->SendErrorMessage(
                 "|cffff2020[Gauntlet debug]|r No character to bench. From the console, name one who is "
-                "online: .gauntlet debug bench <name> [what] [rank]");
+                "online: .gauntlet debug bench <name> [what]");
             return false;
         }
 
@@ -1916,14 +1799,6 @@ public:
                     return false;
                 }
             }
-        }
-
-        uint32 const askedRank = rankArg ? *rankArg : uint32(MAX_RANK);
-        if (askedRank < 1 || askedRank > MAX_RANK)
-        {
-            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Rank {} is out of range: 1 to {}.",
-                                      askedRank, static_cast<uint32>(MAX_RANK));
-            return false;
         }
 
         LivePlayerView const view(p);
@@ -1960,11 +1835,9 @@ public:
                 continue;
             }
 
-            uint32 const rank = std::min<uint32>(askedRank, std::min<uint8>(def.maxRank, MAX_RANK));
-
             Footprint const before = Capture(p, st);
 
-            AffixInstance* attached = AuditAttach(p, st, def, rank);
+            AffixInstance* attached = AuditAttach(p, st, def);
             if (!attached)
             {
                 handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r Ran out of affix slots.");
@@ -2012,7 +1885,7 @@ public:
             if (!lines.empty())
             {
                 ++leaked;
-                handler->PSendSysMessage("|cffff2020LEAK|r {} (rank {})", def.name, rank);
+                handler->PSendSysMessage("|cffff2020LEAK|r {}", def.name);
                 for (std::string const& line : lines)
                     handler->PSendSysMessage("    {}", line);
                 if (!leakedNames.empty())
@@ -2046,7 +1919,7 @@ public:
 
             if (onlyOne)
             {
-                handler->PSendSysMessage("|cffff2020[{}]|r {} at rank {}", def.key, def.name, rank);
+                handler->PSendSysMessage("|cffff2020[{}]|r {} ({})", def.key, def.name, RarityName(def.rarity));
                 if (probe.Reached())
                     for (std::string const& r : probe.reached)
                         handler->PSendSysMessage("    answered: {}", r);
@@ -2073,9 +1946,9 @@ public:
         }
 
         handler->PSendSysMessage(
-            "|cffff2020[Gauntlet debug]|r bench at rank {}: {} card(s), |cff60c060{} answered a probe|r, "
+            "|cffff2020[Gauntlet debug]|r bench: {} card(s), |cff60c060{} answered a probe|r, "
             "{} answered nothing, |cffff2020{} leaked|r.",
-            askedRank, benched, reached, benched - reached, leaked);
+            benched, reached, benched - reached, leaked);
 
         if (offClass != 0)
             handler->PSendSysMessage("  {} class curse(s) are not for this class and were not benched.",
@@ -2132,10 +2005,10 @@ public:
         for (AffixInstance const& a : st->affixes)
         {
             MechanicDef const* def = FindMechanic(a.mechanic);
-            handler->PSendSysMessage("    slot {} | id {} {} | rank {} | {} | cond {} ({}) | boon {} ({}) mag {}",
+            handler->PSendSysMessage("    slot {} | id {} {} | {} | cond {} ({}) | boon {} ({}) mag {}",
                                      static_cast<uint32>(a.slot), static_cast<uint32>(a.mechanic),
                                      def ? def->key : "<not in this registry>",
-                                     static_cast<uint32>(a.rank), def ? RarityName(def->rarity) : std::string("?"),
+                                     RarityName(a.rarity),
                                      static_cast<uint32>(a.condition),
                                      ConditionName(a.condition), static_cast<uint32>(a.boon),
                                      BoonName(a.boon), static_cast<uint32>(a.boonMag));
@@ -2280,7 +2153,7 @@ public:
             // describe a line that no RunState owns; it lives for one message.
             AffixInstance preview;
             preview.mechanic  = o.mechanic;
-            preview.rank      = o.rank;
+            preview.rarity    = o.rarity;
             preview.condition = o.condition;
             preview.boon      = o.boon;
             preview.boonMag   = o.boonMag;
@@ -2293,8 +2166,8 @@ public:
             handler->PSendSysMessage("  [{}] {} - {}", i + 1,
                                      sGauntlet->NameOf(o.mechanic, o.condition, o.boon),
                                      sGauntlet->DescribeOf(preview));
-            handler->PSendSysMessage("     id {} | rank {} | {} | {} | boon mag {}{}",
-                                     static_cast<uint32>(o.mechanic), static_cast<uint32>(o.rank),
+            handler->PSendSysMessage("     id {} | {} | {} | boon mag {}{}",
+                                     static_cast<uint32>(o.mechanic),
                                      RarityName(o.rarity), OfferKindName(o.kind), static_cast<uint32>(o.boonMag),
                                      o.kind == OfferKind::Swap
                                          ? Acore::StringFormat(" | swaps out slot {}",
