@@ -292,9 +292,10 @@ TEST(GeneratorDeterminism, GeneratorVersionIsFoldedIntoTheStream)
     // here: it is that every offer in the game moves, which the sweep in
     // OfferInvariantsTest.cpp will show and no committed run will feel,
     // because a pick is stored in columns and never regenerated.
-    auto streamSeed = [](uint32 seed, uint8 tier, uint16 version)
+    auto streamSeed = [](uint32 seed, uint8 tier, uint16 version, uint8 rerolls = 0)
     {
         return Stream::Mix((static_cast<uint64>(seed) << 32)
+                         ^ (static_cast<uint64>(rerolls) << 16)
                          ^ (static_cast<uint64>(tier) << 8)
                          ^ static_cast<uint64>(version));
     };
@@ -313,13 +314,84 @@ TEST(GeneratorDeterminism, GeneratorVersionIsFoldedIntoTheStream)
             }
         }
 
-    // The version occupies the low byte and the tier the next one up, so no
-    // version below 256 can be mistaken for a tier. That is the property that
-    // makes the XOR above safe; a version of 256 would silently collide with
-    // tier 1 and this is where that would be noticed.
+    // The version occupies the low byte, the tier the next one up and the
+    // reroll count the one above that, so no value below 256 can be mistaken
+    // for a neighbour. That is the property that makes the XOR above safe; a
+    // version of 256 would silently collide with tier 1 and this is where
+    // that would be noticed.
     EXPECT_LT(GeneratorVersion, 256)
         << "GeneratorVersion has grown past the byte the stream seed gives it and now overlaps "
            "the tier";
+
+    // And the reroll byte is genuinely its own: every count gets its own
+    // stream, and no count collides with any (tier, version) pair below 256.
+    for (uint32 seed : { 1u, 1337u })
+        for (uint8 tier : { uint8(1), uint8(40), uint8(80) })
+            for (uint8 a = 0; a < 8; ++a)
+                for (uint8 b = uint8(a + 1); b < 8; ++b)
+                    EXPECT_NE(streamSeed(seed, tier, GeneratorVersion, a),
+                              streamSeed(seed, tier, GeneratorVersion, b))
+                        << "rerolls " << unsigned(a) << " and " << unsigned(b)
+                        << " share a stream at seed=" << seed << " tier=" << unsigned(tier);
+}
+
+// ---------------------------------------------------------------------------
+// Rerolls (docs/rarity-plan.md section 4): the counter folded into the stream
+// must buy a different set, deterministically -- the same reroll twice is the
+// same set, because a relog rebuilds the offers and must show the player what
+// the charge bought rather than what it replaced.
+// ---------------------------------------------------------------------------
+
+TEST(GeneratorRerolls, ARerollBuysADifferentSetAndTheSameRerollBuysTheSameOne)
+{
+    RegistryView full;
+    full.includeUnimplemented = true;
+
+    size_t pairs = 0;
+    size_t identical = 0;
+
+    for (uint32 seed = 1; seed <= 200; ++seed)
+        for (size_t ci = 0; ci < CLASSES.size(); ++ci)
+        {
+            StubView const view(CLASSES[ci], static_cast<uint8>(1 + (ci % 3)));
+            for (uint8 tier = 5; tier <= 80; tier += 5)
+            {
+                std::vector<AffixInstance> const carried = CarriedFor(seed, tier);
+
+                OfferSet const plain    = BuildOffers(seed, tier, view, carried, 3, full,
+                                                      MAX_CARRIED, 0);
+                OfferSet const rerolled = BuildOffers(seed, tier, view, carried, 3, full,
+                                                      MAX_CARRIED, 1);
+                OfferSet const again    = BuildOffers(seed, tier, view, carried, 3, full,
+                                                      MAX_CARRIED, 1);
+
+                // Deterministic: the rerolled set is a set, not a shuffle.
+                ASSERT_TRUE(SameSet(rerolled, again))
+                    << "seed=" << seed << " tier=" << unsigned(tier)
+                    << "\n  first:  " << Describe(rerolled)
+                    << "\n  second: " << Describe(again);
+
+                // And the default is spelled zero: the parameter's absence and
+                // its zero are the same stream, or every set in the game moved.
+                OfferSet const defaulted = BuildOffers(seed, tier, view, carried, 3, full);
+                ASSERT_TRUE(SameSet(plain, defaulted))
+                    << "seed=" << seed << " tier=" << unsigned(tier);
+
+                ++pairs;
+                if (SameSet(plain, rerolled))
+                    ++identical;
+            }
+        }
+
+    // A reroll that hands back the same three cards is legal -- the pools are
+    // finite and thin tiers are thin -- but it must be the exception, or the
+    // charge buys nothing. The ceiling is the seed-collision test's shape: a
+    // generator that stopped folding the counter lands at 100% and fails
+    // loudly.
+    double const rate = 100.0 * double(identical) / double(pairs);
+    EXPECT_LE(rate, 10.0)
+        << identical << " of " << pairs << " rerolls (" << rate
+        << "%) handed back the identical offer set";
 }
 
 TEST(GeneratorDeterminism, CountIsHonoured)

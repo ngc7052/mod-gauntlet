@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS `gauntlet_affix_log` (
     `id`          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     `guid`        INT UNSIGNED NOT NULL,
     `tier`        TINYINT UNSIGNED NOT NULL,
-    `action`      ENUM('pick', 'rankup', 'swap_out', 'swap_in', 'bargain') NOT NULL,
+    `action`      ENUM('pick', 'rankup', 'swap_out', 'swap_in', 'bargain', 'skip', 'reroll') NOT NULL,
     `mechanic`    SMALLINT UNSIGNED NOT NULL,
     `rank`        TINYINT UNSIGNED NOT NULL DEFAULT 1,
     `gen_version` SMALLINT UNSIGNED NOT NULL DEFAULT 1,

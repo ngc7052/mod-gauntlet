@@ -108,6 +108,31 @@ namespace Rules
     }
 
     // ------------------------------------------------------------------
+    // The reroll purse (docs/rarity-plan.md section 4).
+    //
+    // A reroll rebuilds the pending tier's three offers; a skip declines the
+    // tier outright and banks a charge, which is what makes skipping a real
+    // choice rather than a trap. The plan's section 7.5 says plainly that
+    // these numbers have no evidence behind them at all -- they are the shape
+    // to start arguing from, and the sweep and play are the argument.
+    // ------------------------------------------------------------------
+
+    constexpr uint8 REROLL_STARTING_CHARGES = 2;    // TODO(design): "two or three", section 4
+    constexpr uint8 SKIP_EARNS_CHARGES      = 1;    // TODO(design): section 7.5's open number
+
+    // A bound, not a design: the purse travels as one byte on the wire and in
+    // the state store's int32, and eighty tiers of skipping should not be able
+    // to wrap either. Reaching it means a run declined most of its picks,
+    // which is a stranger problem than a full purse.
+    constexpr uint8 REROLL_MAX_CHARGES      = 250;
+
+    constexpr uint8 ChargesAfterSkip(uint8 held)
+    {
+        uint32 const next = static_cast<uint32>(held) + SKIP_EARNS_CHARGES;
+        return next > REROLL_MAX_CHARGES ? REROLL_MAX_CHARGES : static_cast<uint8>(next);
+    }
+
+    // ------------------------------------------------------------------
     // Hubris (18) -- the first enemy in a fight is your duel.
     // ------------------------------------------------------------------
 

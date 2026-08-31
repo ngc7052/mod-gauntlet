@@ -8,6 +8,7 @@
 #include "mechanics/BoonSpeed.h"
 #include "GauntletAddon.h"
 #include "GauntletGenerator.h"
+#include "GauntletRules.h"
 #include "GauntletMechanic.h"
 #include "GauntletRegistry.h"
 #include "GauntletSummons.h"
@@ -770,8 +771,13 @@ namespace Gauntlet
         uint8 const genTier = static_cast<uint8>(std::min<uint32>(tier, 255u));
 
         LivePlayerView view(player);
+        // The pending tier's reroll count rides into the stream, so the set a
+        // relog rebuilds is the set the last reroll bought. A tier that was
+        // never rerolled -- including every tier under RunKeys::RerollTier's
+        // stale pair from an earlier one -- folds a zero and draws exactly
+        // what it always did.
         OfferSet const set = BuildOffers(st->seed, genTier, view, st->affixes, _choices,
-                                         OfferView(), _maxAffixes);
+                                         OfferView(), _maxAffixes, PendingRerolls(*st, tier));
 
         // Nothing at all fits this character at this tier, so there is nothing
         // to choose and no window to raise. The tier still advances -- the run
@@ -837,6 +843,119 @@ namespace Gauntlet
                                NameOf(o.mechanic, o.condition, o.boon), DescribeOf(preview));
         }
         ch.PSendSysMessage("Use |cff00ff00.gauntlet pick <number>|r to commit. It cannot be undone.");
+
+        // The other two answers a tier takes, said where the choice is made:
+        // the addon draws them as buttons, and a chat-only player has no other
+        // way to learn they exist.
+        uint8 const charges = RerollCharges(*st);
+        ch.PSendSysMessage("Or |cff00ff00.gauntlet reroll|r these three ({} charge{} left), or "
+                           "|cff00ff00.gauntlet skip|r the tier and bank a charge.",
+                           static_cast<uint32>(charges), charges == 1 ? "" : "s");
+    }
+
+    uint8 Mgr::RerollCharges(RunState const& st)
+    {
+        int32 const held = st.state.Get(RunKeys::RerollCharges, Rules::REROLL_STARTING_CHARGES);
+        return static_cast<uint8>(std::clamp<int32>(held, 0, Rules::REROLL_MAX_CHARGES));
+    }
+
+    uint8 Mgr::PendingRerolls(RunState const& st, uint32 tier)
+    {
+        if (st.state.Get(RunKeys::RerollTier, 0) != static_cast<int32>(tier))
+            return 0;
+        return static_cast<uint8>(std::clamp<int32>(st.state.Get(RunKeys::Rerolls, 0), 0, 255));
+    }
+
+    bool Mgr::Reroll(Player* player)
+    {
+        RunState* st = Get(player);
+        if (!st || st->dead || !player)
+            return false;
+
+        ChatHandler ch(player->GetSession());
+        if (st->pending.empty())
+        {
+            ch.PSendSysMessage("|cffff2020[Gauntlet]|r There is no offer on the table to reroll.");
+            return false;
+        }
+
+        uint8 const charges = RerollCharges(*st);
+        if (charges == 0)
+        {
+            ch.PSendSysMessage("|cffff2020[Gauntlet]|r No reroll charges left. Skipping a tier banks one.");
+            return false;
+        }
+
+        uint32 const tier = st->pendingTier != 0 ? st->pendingTier : st->tier + 1;
+        uint8 const  rerolls = PendingRerolls(*st, tier);
+
+        st->state.Set(RunKeys::RerollTier, static_cast<int32>(tier));
+        st->state.Set(RunKeys::Rerolls, static_cast<int32>(rerolls) + 1);
+        st->state.Set(RunKeys::RerollCharges, static_cast<int32>(charges) - 1);
+
+        uint32 const low = player->GetGUID().GetCounter();
+
+        // The run's story, like a pick's: which tiers were rebuilt and how
+        // often is exactly what a "why did this run get these offers" question
+        // needs. Mechanic 0 and rank 0, because no card was involved.
+        CharacterDatabase.Execute(
+            "INSERT INTO `gauntlet_affix_log` (`guid`, `tier`, `action`, `mechanic`, `rank`, `gen_version`) "
+            "VALUES ({}, {}, 'reroll', 0, 0, {})",
+            low, std::min<uint32>(tier, 255u), static_cast<uint32>(GeneratorVersion));
+
+        ch.PSendSysMessage("|cffff2020[Gauntlet]|r Rerolled. {} charge{} left.",
+                           static_cast<uint32>(charges - 1), charges - 1 == 1 ? "" : "s");
+
+        // Rebuilds with the new counter and reprints -- the same lines, so the
+        // addon's chat fallback re-scrapes the fresh set the way it scraped
+        // the first one.
+        OfferTier(player, tier);
+
+        // A spent charge must not wait for the sixty-second save.
+        st->state.SaveTo(low);
+        return true;
+    }
+
+    bool Mgr::Skip(Player* player)
+    {
+        RunState* st = Get(player);
+        if (!st || st->dead || !player)
+            return false;
+
+        ChatHandler ch(player->GetSession());
+        if (st->pending.empty())
+        {
+            ch.PSendSysMessage("|cffff2020[Gauntlet]|r There is no offer on the table to skip.");
+            return false;
+        }
+
+        uint32 const tier = st->pendingTier != 0 ? st->pendingTier : st->tier + 1;
+
+        // The tier is declined, not postponed: it advances exactly as a pick
+        // advances it, and the next level asks the next question. Design
+        // section 4 of the rarity plan -- skipping is "give up a pick now to
+        // get a better one later", and the banked charge is the later.
+        st->tier  = tier;
+        st->dirty = true;
+        st->pending.clear();
+        st->pendingTier = 0;
+        st->offerMs     = 0;
+
+        uint8 const banked = Rules::ChargesAfterSkip(RerollCharges(*st));
+        st->state.Set(RunKeys::RerollCharges, static_cast<int32>(banked));
+
+        uint32 const low = player->GetGUID().GetCounter();
+        CharacterDatabase.Execute(
+            "INSERT INTO `gauntlet_affix_log` (`guid`, `tier`, `action`, `mechanic`, `rank`, `gen_version`) "
+            "VALUES ({}, {}, 'skip', 0, 0, {})",
+            low, std::min<uint32>(tier, 255u), static_cast<uint32>(GeneratorVersion));
+
+        // Save writes the run row's tier and the state store together.
+        Save(player);
+
+        ch.PSendSysMessage("|cffff2020[Gauntlet]|r Tier {} declined. You bank a reroll charge ({} held).",
+                           tier, static_cast<uint32>(banked));
+        return true;
     }
 
     bool Mgr::Pick(Player* player, uint32 index)

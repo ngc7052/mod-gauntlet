@@ -282,6 +282,27 @@ namespace
     }
 
     // ------------------------------------------------------------------
+    // The reroll purse. Section 7.5 of the plan owns the numbers; what is
+    // held here is that the economy is one at all.
+    // ------------------------------------------------------------------
+
+    TEST(Rules, TheRerollPurseIsWorthHaving)
+    {
+        // A fresh run can afford the button, or it is decoration on every
+        // chooser until the first skip.
+        EXPECT_GT(REROLL_STARTING_CHARGES, 0u);
+
+        // Skipping pays, or it is a trap: a tier given up for nothing.
+        EXPECT_GT(SKIP_EARNS_CHARGES, 0u);
+        EXPECT_EQ(ChargesAfterSkip(0), SKIP_EARNS_CHARGES);
+        EXPECT_GT(ChargesAfterSkip(REROLL_STARTING_CHARGES), REROLL_STARTING_CHARGES);
+
+        // The purse travels as one byte; hoarding saturates rather than wraps.
+        EXPECT_EQ(ChargesAfterSkip(REROLL_MAX_CHARGES), REROLL_MAX_CHARGES);
+        EXPECT_EQ(ChargesAfterSkip(255), REROLL_MAX_CHARGES);
+    }
+
+    // ------------------------------------------------------------------
     // Rarity weights. The plan calls the numbers invented; what is held here
     // is the shape they must keep whatever they are tuned to.
     // ------------------------------------------------------------------

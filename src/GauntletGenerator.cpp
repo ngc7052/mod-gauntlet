@@ -703,7 +703,7 @@ namespace Gauntlet
 
     OfferSet BuildOffers(uint32 seed, uint8 tier, IPlayerView const& view,
                          std::vector<AffixInstance> const& carried,
-                         uint32 count, RegistryView reg, uint8 maxCarried)
+                         uint32 count, RegistryView reg, uint8 maxCarried, uint8 rerolls)
     {
         OfferSet result;
         if (count == 0)
@@ -711,7 +711,11 @@ namespace Gauntlet
 
         // Plan §2.4. GeneratorVersion is in the seed, so a bump moves every
         // offer in the game and no old run is touched: picks live in columns.
+        // The reroll count takes bits 16-23 -- the seed owns 32 and up, the
+        // tier 8-15, the version 0-7 -- so no count below 256 can be mistaken
+        // for either neighbour, and zero folds to nothing at all.
         uint64 state = Mix((static_cast<uint64>(seed) << 32)
+                         ^ (static_cast<uint64>(rerolls) << 16)
                          ^ (static_cast<uint64>(tier) << 8)
                          ^ static_cast<uint64>(GeneratorVersion));
 

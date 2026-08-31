@@ -516,8 +516,10 @@ main.count:SetJustifyH("RIGHT")
 
 local function RefreshMain()
     local live = (run.state == "alive")
-    main.head:SetText(("Tier |cffffd100%d|r   %s   |cff808080seed %s|r"):format(
-        run.tier, live and "|cff40e040alive|r" or "|cffff4040retired|r", run.seed))
+    local purse = run.charges and ("   |cff808080%d reroll%s|r"):format(
+        run.charges, run.charges == 1 and "" or "s") or ""
+    main.head:SetText(("Tier |cffffd100%d|r   %s   |cff808080seed %s|r%s"):format(
+        run.tier, live and "|cff40e040alive|r" or "|cffff4040retired|r", run.seed, purse))
 
     RefreshTotals()
 
@@ -690,6 +692,53 @@ for i = 1, 3 do
     cards[i] = b
 end
 
+-- Reroll and skip (docs/rarity-plan.md section 4). Two buttons under the
+-- cards: reroll rebuilds these three for a charge, skip declines the tier and
+-- banks one. Both close the chooser the way picking does; a reroll's
+-- replacement offers re-raise it when the server answers.
+local rerollBtn = CreateFrame("Button", nil, chooser, "UIPanelButtonTemplate")
+rerollBtn:SetWidth(120); rerollBtn:SetHeight(22)
+rerollBtn:SetPoint("BOTTOMLEFT", chooser, "BOTTOMLEFT", 14, 10)
+rerollBtn:SetScript("OnClick", function()
+    PlaySound("igMainMenuOptionCheckBoxOn")
+    if GauntletProtocol.mode == "protocol" then
+        GauntletProtocol.SendReroll()
+    else
+        SendChatMessage(".gauntlet reroll", "SAY")
+    end
+    chooser:Hide(); offers = {}; pendingOffer = false
+end)
+rerollBtn:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText("Reroll", 1, 0.82, 0)
+    GameTooltip:AddLine("Rebuild these three offers for one charge. Skipping a tier banks a charge.",
+                        0.8, 0.8, 0.8, true)
+    GameTooltip:Show()
+end)
+rerollBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+local skipBtn = CreateFrame("Button", nil, chooser, "UIPanelButtonTemplate")
+skipBtn:SetWidth(150); skipBtn:SetHeight(22)
+skipBtn:SetPoint("BOTTOMRIGHT", chooser, "BOTTOMRIGHT", -14, 10)
+skipBtn:SetText("Skip (+1 reroll)")
+skipBtn:SetScript("OnClick", function()
+    PlaySound("igMainMenuOptionCheckBoxOn")
+    if GauntletProtocol.mode == "protocol" then
+        GauntletProtocol.SendSkip()
+    else
+        SendChatMessage(".gauntlet skip", "SAY")
+    end
+    chooser:Hide(); offers = {}; pendingOffer = false
+end)
+skipBtn:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText("Skip", 1, 0.82, 0)
+    GameTooltip:AddLine("Decline this tier -- no affix, no offer -- and bank a reroll charge for a later one.",
+                        0.8, 0.8, 0.8, true)
+    GameTooltip:Show()
+end)
+skipBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
 local function ShowChooser()
     if InCombatLockdown() then pendingOffer = true; RefreshMain() return end
     local n = 0
@@ -792,7 +841,13 @@ local function ShowChooser()
     end
 
     chooser.title:SetText("Tier " .. run.tier .. " - Choose Your Affix")
-    chooser:SetHeight(top + 12)
+
+    -- The purse count is the server's, off the RUN frame; nil (fallback mode)
+    -- shows a bare label and lets the server be the judge of affording it.
+    rerollBtn:SetText(run.charges and ("Reroll (%d)"):format(run.charges) or "Reroll")
+    if run.charges == 0 then rerollBtn:Disable() else rerollBtn:Enable() end
+
+    chooser:SetHeight(top + 44)
     chooser:Show()
     PlaySound("igQuestListOpen")
     pendingOffer = false
@@ -831,6 +886,14 @@ local function OnSystem(raw)
             affixes[idx] = { name = name, desc = desc }
             if main:IsShown() then RefreshMain() end
         end
+        return
+    end
+
+    -- A declined tier closes the scraped chooser the way a pick does; the
+    -- protocol path closes it on the button click itself.
+    if msg:match("Tier %d+ declined") then
+        chooser:Hide(); offers, pendingOffer = {}, false
+        RefreshMain()
         return
     end
 
@@ -874,11 +937,15 @@ end
 -- into the same { name, desc, icon, family, ... } shape the renderers above
 -- already understand.
 
-GauntletProtocol.On("RUN", function(seed, tier, state, class)
+GauntletProtocol.On("RUN", function(seed, tier, state, class, charges)
     run.seed = seed
     run.tier = tonumber(tier) or run.tier
     run.state = (state or run.state):lower()
     run.class = class
+    -- nil in chat-fallback mode and against a server that predates the field;
+    -- the chooser's reroll button shows no count and never greys out, and the
+    -- server refuses an unaffordable reroll itself.
+    run.charges = tonumber(charges)
     if main:IsShown() then RefreshMain() end
 end)
 

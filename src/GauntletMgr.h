@@ -239,6 +239,25 @@ namespace Gauntlet
 
         void OfferTier(Player* player, uint32 tier);
         bool Pick(Player* player, uint32 index);
+
+        // Reroll and skip (docs/rarity-plan.md section 4). Both answer false
+        // -- after telling the player why -- when there is nothing pending or
+        // nothing to pay with, so a caller resends the snapshot only when the
+        // run actually moved. Reroll rebuilds the pending tier's offers with
+        // the counter folded into the stream; Skip declines the tier outright
+        // and banks a charge.
+        bool Reroll(Player* player);
+        bool Skip(Player* player);
+
+        // The purse and the pending tier's reroll count, read out of the run's
+        // key/value store (RunKeys in Gauntlet.h). Static because they are
+        // pure reads: the Addon's RUN frame and the debug commands want them
+        // without a dispatch. A purse never written reads as the starting
+        // charges, which is what hands a run from before rerolls existed its
+        // purse retroactively.
+        static uint8 RerollCharges(RunState const& st);
+        static uint8 PendingRerolls(RunState const& st, uint32 tier);
+
         void EndRun(Player* player, std::string const& cause);
 
         // Fires IMechanic::OnDetach over the carried set without destroying

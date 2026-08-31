@@ -199,6 +199,13 @@ namespace Gauntlet
     // that moves a mechanic id is exactly the change that must invalidate the
     // addon's table.
     //
+    // 15 is step 3 of docs/rarity-plan.md: reroll and skip. The reroll count
+    // is folded into the stream seed -- bits 16-23, between the tier and the
+    // seed -- so a rerolled tier is a different, reproducible set; the RUN
+    // frame grows the charge count, OFFER_END stays bare, and the inbound
+    // verbs REROLL and SKIP join PICK. A count of zero folds to nothing, so
+    // every unrerolled offer set is exactly version 14's.
+    //
     // 14 is step 2 of docs/rarity-plan.md: the first ten commons, ids 75-84,
     // join the table. Ten new rows move every offer set that could draw them
     // -- which at tier 1 is all of them -- and Data.lua grows the rows.
@@ -253,7 +260,7 @@ namespace Gauntlet
     // with one test froze an affix taken near the end of its window at whatever
     // rank it happened to get. Every offer set that could contain a rank-up of
     // an out-of-window mechanic moves.
-    constexpr uint16 GeneratorVersion = 14;
+    constexpr uint16 GeneratorVersion = 15;
 
     constexpr uint8 MAX_RANK = 4;
 
@@ -305,6 +312,28 @@ namespace Gauntlet
     // read three cards, short enough that forgetting to pick does not stop the
     // run.
     constexpr uint32 OFFER_QUIET_MS = 20000;   // TODO(design)
+
+    // The offer economy's rows in the run's key/value store (GauntletState.h):
+    // the reroll purse, and how many times the pending tier's offers have been
+    // rerolled -- which must survive a logout, or a relog would quietly hand
+    // back the pre-reroll set and the charge would have bought nothing.
+    //
+    // The store's convention is "<mechanic key>.<field>" and no registry key
+    // is "run", so the prefix cannot collide with a mechanic's counters. The
+    // purse deliberately has no initialiser anywhere: a key never written
+    // reads as Rules::REROLL_STARTING_CHARGES through Mgr::RerollCharges'
+    // fallback, which is also what hands every run started before rerolls
+    // existed its starting charges.
+    //
+    // Rerolls is only meaningful beside RerollTier: the pair says "the offers
+    // of tier N have been rebuilt K times". A stale pair from an older tier is
+    // ignored by the tier comparison rather than cleaned up.
+    namespace RunKeys
+    {
+        constexpr char const* RerollCharges = "run.reroll_charges";
+        constexpr char const* Rerolls       = "run.rerolls";
+        constexpr char const* RerollTier    = "run.reroll_tier";
+    }
 
     struct RunState
     {

@@ -288,6 +288,12 @@ namespace Gauntlet
         // fallback it replaces reads the same two words off `.gauntlet status`.
         f.Text(st->dead ? "retired" : "alive", 16);
         f.Num(st->playerClass);
+        // The reroll purse, last so an addon that predates the field reads the
+        // run line it always did. On the RUN frame rather than OFFER_END
+        // because it is run state -- the panel header wants it with no offer
+        // on the table -- and RUN precedes the offers in every snapshot, so
+        // the chooser's buttons are current when OFFER_END raises them.
+        f.Num(Mgr::RerollCharges(*st));
         Emit(player, f.Str());
     }
 
@@ -693,6 +699,23 @@ namespace Gauntlet
         if (verb == "PICK")
         {
             HandlePick(player, session, rest.substr(0, rest.find('\t')));
+            return true;
+        }
+
+        // The other two answers a tier takes. Mgr validates and answers the
+        // player in chat either way; the snapshot is resent only when the run
+        // moved, and a refusal corrects a stale client under the floor, as a
+        // refused PICK does.
+        if (verb == "REROLL" || verb == "SKIP")
+        {
+            bool const moved = verb == "REROLL" ? sGauntlet->Reroll(player) : sGauntlet->Skip(player);
+            if (moved)
+            {
+                session.lastSnapshotMs = static_cast<uint64>(GameTime::GetGameTimeMS().count());
+                SendSnapshot(player);
+            }
+            else
+                RequestedSnapshot(player, session);
             return true;
         }
 

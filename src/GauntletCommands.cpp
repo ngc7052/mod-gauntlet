@@ -784,10 +784,19 @@ public:
             // through the real damage pipeline, which is the only way to
             // exercise Last Rites without dying for it.
             { "hurt",         HandleDebugHurt,        SEC_GAMEMASTER, Console::No },
+
+            // The player commands with a name in front, for the audits'
+            // reason: reroll and skip need a Player with an offer pending, and
+            // on the test realm the Player is a bot with no client. Mgr's own
+            // chat answers go to the bot; the console gets the verdict.
+            { "reroll",       HandleDebugReroll,      SEC_GAMEMASTER, Console::Yes },
+            { "skip",         HandleDebugSkip,        SEC_GAMEMASTER, Console::Yes },
         };
         static ChatCommandTable sub =
         {
             { "pick",   HandlePick,   SEC_PLAYER, Console::No },
+            { "reroll", HandleReroll, SEC_PLAYER, Console::No },
+            { "skip",   HandleSkip,   SEC_PLAYER, Console::No },
             { "status", HandleStatus, SEC_PLAYER, Console::No },
             { "top",    HandleTop,    SEC_PLAYER, Console::No },
             { "debug",  debug },
@@ -819,6 +828,30 @@ public:
         // same way whether the pick came from this command or from its own
         // button.
         sGauntletAddon->SendSnapshot(p);
+        return true;
+    }
+
+    static bool HandleReroll(ChatHandler* handler)
+    {
+        Player* p = handler->GetPlayer();
+        if (!p)
+            return false;
+
+        // Mgr says why when it refuses; the snapshot moves the addon's chooser
+        // onto the new set only when there is one.
+        if (sGauntlet->Reroll(p))
+            sGauntletAddon->SendSnapshot(p);
+        return true;
+    }
+
+    static bool HandleSkip(ChatHandler* handler)
+    {
+        Player* p = handler->GetPlayer();
+        if (!p)
+            return false;
+
+        if (sGauntlet->Skip(p))
+            sGauntletAddon->SendSnapshot(p);
         return true;
     }
 
@@ -2090,6 +2123,9 @@ public:
                                  : std::string("not armed"));
         handler->PSendSysMessage("  offers on the table: {} (built for tier {})",
                                  static_cast<uint32>(st->pending.size()), st->pendingTier);
+        handler->PSendSysMessage("  reroll charges: {} | pending tier rerolled {} time(s)",
+                                 static_cast<uint32>(Mgr::RerollCharges(*st)),
+                                 static_cast<uint32>(Mgr::PendingRerolls(*st, st->pendingTier)));
         handler->PSendSysMessage("  unsaved changes to gauntlet_run: {}", st->dirty ? "yes" : "no");
 
         handler->PSendSysMessage("  affixes ({}):", static_cast<uint32>(st->affixes.size()));
@@ -2122,6 +2158,59 @@ public:
         PrintScheduler(handler, p, *st);
         PrintSummons(handler, p);
         PrintState(handler, p, *st);
+        return true;
+    }
+
+    static bool HandleDebugReroll(ChatHandler* handler, Optional<PlayerIdentifier> whoArg)
+    {
+        if (!DebugAllowed(handler))
+            return false;
+
+        Player* p = whoArg ? whoArg->GetConnectedPlayer() : handler->GetPlayer();
+        if (!p)
+        {
+            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r No character. From the console, name one "
+                                      "who is online: .gauntlet debug reroll <name>");
+            return false;
+        }
+
+        bool const moved = sGauntlet->Reroll(p);
+        if (moved)
+            sGauntletAddon->SendSnapshot(p);
+
+        RunState* st = sGauntlet->Get(p);
+        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r reroll for {}: {}{}", p->GetName(),
+                                 moved ? "done" : "refused",
+                                 st ? Acore::StringFormat(" ({} charge(s) left, pending tier {} rerolled {} time(s))",
+                                                          static_cast<uint32>(Mgr::RerollCharges(*st)), st->pendingTier,
+                                                          static_cast<uint32>(Mgr::PendingRerolls(*st, st->pendingTier)))
+                                    : std::string());
+        return true;
+    }
+
+    static bool HandleDebugSkip(ChatHandler* handler, Optional<PlayerIdentifier> whoArg)
+    {
+        if (!DebugAllowed(handler))
+            return false;
+
+        Player* p = whoArg ? whoArg->GetConnectedPlayer() : handler->GetPlayer();
+        if (!p)
+        {
+            handler->SendErrorMessage("|cffff2020[Gauntlet debug]|r No character. From the console, name one "
+                                      "who is online: .gauntlet debug skip <name>");
+            return false;
+        }
+
+        bool const moved = sGauntlet->Skip(p);
+        if (moved)
+            sGauntletAddon->SendSnapshot(p);
+
+        RunState* st = sGauntlet->Get(p);
+        handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r skip for {}: {}{}", p->GetName(),
+                                 moved ? "done" : "refused",
+                                 st ? Acore::StringFormat(" (tier {}, {} charge(s) held)", st->tier,
+                                                          static_cast<uint32>(Mgr::RerollCharges(*st)))
+                                    : std::string());
         return true;
     }
 
@@ -2162,14 +2251,20 @@ public:
         // switched off by Gauntlet.Family.<X>.Enable must be as absent here as
         // it is in the chooser, or this command answers a question nobody
         // asked.
+        // The pending tier's reroll count rides along, so what this prints for
+        // that tier is what the player's chooser is actually showing.
+        uint8 const rerolls = Mgr::PendingRerolls(*st, tierArg);
         OfferSet const set = BuildOffers(st->seed, static_cast<uint8>(tierArg), view, st->affixes,
                                          sGauntlet->Choices(), sGauntlet->OfferView(),
-                                         sGauntlet->MaxAffixes());
+                                         sGauntlet->MaxAffixes(), rerolls);
 
         handler->PSendSysMessage("|cffff2020[Gauntlet debug]|r would offer {} at tier {} - seed {}, class {}, level {}, "
-                                 "{} carried (nothing is committed):",
+                                 "{} carried{} (nothing is committed):",
                                  p->GetName(), tierArg, st->seed, static_cast<uint32>(p->getClass()),
-                                 static_cast<uint32>(p->GetLevel()), static_cast<uint32>(st->affixes.size()));
+                                 static_cast<uint32>(p->GetLevel()), static_cast<uint32>(st->affixes.size()),
+                                 rerolls != 0 ? Acore::StringFormat(", {} reroll(s) folded in",
+                                                                    static_cast<uint32>(rerolls))
+                                              : std::string());
 
         for (uint32 i = 0; i < set.offers.size(); ++i)
         {

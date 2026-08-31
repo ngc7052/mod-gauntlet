@@ -209,17 +209,24 @@ namespace Gauntlet
     // table Rare the sweep cannot yet show the weights doing anything.
     Rarity RollRarity(uint64& state, uint8 tier, uint8 availableMask);
 
-    // Deterministic in (seed, tier, view, carried, count, reg,
+    // Deterministic in (seed, tier, view, carried, count, reg, rerolls,
     // GeneratorVersion) and in nothing else: no clock, no rand(), no pointer
     // value, no unordered container on a path that feeds a roll. The offers
     // are never stored -- they are rebuilt from the seed every time the tier
     // prompt is shown -- so anything that changes the table, the weights or
     // this algorithm must bump GeneratorVersion, which is folded into the
     // stream. A pick, once taken, is stored in columns and never regenerated.
+    //
+    // `rerolls` is how many times this tier's offers have been rebuilt
+    // (docs/rarity-plan.md section 4): folded into the stream seed, so a
+    // reroll is a different set and the same reroll is the same set -- a
+    // relog shows the offers the charge bought, not the ones it replaced.
+    // Zero folds to nothing, which is what keeps every unrerolled set
+    // identical to what the previous version produced.
     OfferSet BuildOffers(uint32 seed, uint8 tier, IPlayerView const& view,
                          std::vector<AffixInstance> const& carried,
                          uint32 count = 3, RegistryView reg = {},
-                         uint8 maxCarried = MAX_CARRIED);
+                         uint8 maxCarried = MAX_CARRIED, uint8 rerolls = 0);
 }
 
 #endif // MOD_GAUNTLET_GENERATOR_H

@@ -94,7 +94,7 @@ namespace Gauntlet
 
         void SendHello(Player* player);
 
-        // RUN seed tier state class
+        // RUN seed tier state class rerollCharges
         void SendRun(Player* player);
 
         // AFFIX slot id rank cond boon boonMag, one per carried affix, then
