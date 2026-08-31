@@ -122,9 +122,17 @@ namespace
             case 15:
                 return boon == Boon::BonusDamage ? 2u + 2u * step : 0u;
 
-            // T5 Hubris: "enemies above give 40% more", 20/30/40 on the ladder.
+            // T5 Hubris. The override used to key on Boon::BonusExperience,
+            // back when the card was an experience rule; the redesign moved it
+            // to Boon::BonusDamage and left this behind, so the row silently
+            // paid a magnitude of zero -- an offer card promising nothing.
+            //
+            // There is no bespoke number to promise any more: the duel's
+            // shelter is the card's own upside and is described in its text, so
+            // the boon is an ordinary damage boon and takes the category's
+            // ladder. Falling through is the fix.
             case 18:
-                return boon == Boon::BonusExperience ? 10u * (step + 1u) : 0u;
+                break;
 
             // C2 Berserker's Bargain: "below 35% health you deal 25% more
             // damage". The rank moves the health line, not the damage, so the

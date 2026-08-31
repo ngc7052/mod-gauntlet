@@ -4,6 +4,8 @@
  */
 
 #include "GauntletMgr.h"
+
+#include "mechanics/BoonSpeed.h"
 #include "GauntletAddon.h"
 #include "GauntletGenerator.h"
 #include "GauntletMechanic.h"
@@ -1111,6 +1113,15 @@ namespace Gauntlet
         // contribution goes on. Nothing here compounds: the value it hands the
         // hook has none of ours in it.
         player->UpdateMaxHealth();
+
+        // Movement speed is not an AggregateKind and never was, so
+        // Boon::BonusMoveSpeed had no delivery at all outside the one card that
+        // implemented it for itself. Every other row that named the boon
+        // printed the promise on the offer card and did nothing. Hooked here
+        // rather than into each card because this already runs on attach, pick,
+        // detach and login -- so a card added later that declares the boon is
+        // paid without any code being written for it.
+        BoonSpeed::Sync(player, Get(player));
     }
 
     void Mgr::DetachAll(Player* player)
@@ -1412,6 +1423,12 @@ namespace Gauntlet
         // off this tick without ever arming an event.
         ForEachMechanic(player, st,
                         [elapsed](Ctx& ctx, AffixInstance& a) { a.impl->OnTick(ctx, elapsed); });
+
+        // The speed boon is a short aura on purpose -- a long one would be
+        // saved to character_aura and outlive the run -- so it has to be
+        // re-asserted. Sync is idempotent and returns on a field read in the
+        // ordinary case, which is what makes it cheap enough to sit here.
+        BoonSpeed::Sync(player, st);
 
         // Gauntlet.Events.Enable = 0 means no event is armed and none is
         // delivered. The scheduler has no opinion about it; this is the gate.

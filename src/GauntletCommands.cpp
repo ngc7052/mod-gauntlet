@@ -487,14 +487,20 @@ namespace Gauntlet
             instance.rank       = static_cast<uint8>(rank);
             instance.condition  = condition;
 
-            // No boon, and not the registry's. The magnitude that pairs with
-            // one is the offer builder's -- the table is private to
-            // GauntletGenerator.cpp and nothing exports it -- and a boon
-            // adjective in the affix's name with a zero magnitude behind it
-            // would be a lie in the one place a player reads the affix. The
-            // cheat attaches the curse; the boon is what an offer pays for it.
-            instance.boon       = Boon::None;
-            instance.boonMag    = 0;
+            // The registry's boon, at the magnitude an offer would pay for it.
+            //
+            // This used to attach Boon::None with a zero magnitude, on the
+            // reasoning that the cheat hands over the curse and the boon is
+            // what an offer pays for it. The cost of that was invisible and
+            // large: no boon has ever been exercised by any audit, so
+            // Boon::BonusMoveSpeed could sit in the registry on three rows with
+            // no implementation behind it at all, printing "you move 5% faster"
+            // on the offer card and doing nothing. It took a player to notice.
+            //
+            // BoonMagnitude is exported for exactly this, so the affix the
+            // audits attach is now the affix an offer would build.
+            instance.boon       = def->boon;
+            instance.boonMag    = static_cast<uint16>(BoonMagnitude(def->id, def->boon, rank));
             instance.slot       = slot;
             instance.genVersion = GeneratorVersion;
 
@@ -560,8 +566,21 @@ namespace Gauntlet
             // false does nothing on attach and would be indistinguishable from
             // a mechanic that leaks nothing. The audit wants the affix awake.
             instance.condition  = Gauntlet::Condition::Always;
-            instance.boon       = Boon::None;
-            instance.boonMag    = 0;
+
+            // The registry's boon, at the magnitude an offer would pay.
+            //
+            // The audits attached Boon::None with a zero magnitude, and the
+            // cost of that was invisible and large: no boon has ever been
+            // exercised by leaks, soak or bench. Boon::BonusMoveSpeed could sit
+            // on three registry rows with no implementation anywhere behind it,
+            // printing "you move 5% faster" on the offer card and doing
+            // nothing at all, and every audit called those cards clean. It took
+            // a player to notice.
+            //
+            // An affix a player carries has a boon, so the affix the audits
+            // attach has one too.
+            instance.boon       = def.boon;
+            instance.boonMag    = static_cast<uint16>(BoonMagnitude(def.id, def.boon, rank));
             instance.slot       = slot;
             instance.genVersion = GeneratorVersion;
 
