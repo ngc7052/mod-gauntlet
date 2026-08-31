@@ -9,8 +9,9 @@ and §4 before trusting any test.
 
 `mod-gauntlet`, an AzerothCore (WotLK 3.3.5a) module: a procedurally generated
 hardcore affix challenge. A run offers three "affix" cards per tier, the player
-picks one, and the curses accumulate. 69 mechanics, all implemented, all
-marked rare: step 1 of `docs/rarity-plan.md` has landed and step 2 is next.
+picks one, and the curses accumulate. 79 mechanics, all implemented: 69 rares
+and the first ten commons. Steps 1 and 2 of `docs/rarity-plan.md` have landed
+and step 3 is next.
 
 Working directory `/home/nero/projects/mod-gauntlet`, on **`master`**, clean,
 level with `origin/master`.
@@ -38,7 +39,7 @@ level with `origin/master`.
 ```bash
 ./tests/compile-check.sh --anchors   # anchors + ladder audit, seconds, no Docker
 ./tests/compile-check.sh             # full compile + link in the build container
-./tests/run-tests.sh                 # 189 unit tests
+./tests/run-tests.sh                 # 198 unit tests
 ./sync-to-server.sh                  # rsync the module into the core tree
 docker compose -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.yml \
   -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.override.yml \
@@ -47,7 +48,7 @@ docker compose -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.yml \
 ```
 
 Gate before every commit: anchors, ladders, compile, link, tests. All green
-today — 69 anchors, 83 ladders, 63 objects, 189 tests.
+today — 79 anchors, 83 ladders, 64 objects, 198 tests.
 
 ## 4. The testing rig, and what it cannot see
 
@@ -62,9 +63,9 @@ character name so they can be driven from the server console:
 
 | Command | What it does |
 |---|---|
-| `.gauntlet debug leaks [name] [what] [rank]` | attach → detach, report what did not come back |
+| `.gauntlet debug leaks [name] [what] [rank]` | attach → detach, report what did not come back; for one card, its own counters both before and after `OnDetach` |
 | `.gauntlet debug soak` | the same, with the card ticked and its own events fired first |
-| `.gauntlet debug bench` | every hook driven at every card; ends with the list of cards **no probe reached** |
+| `.gauntlet debug bench` | every hook driven at every card, plus what attaching alone changed and whether any item in the world is refused; ends with the list of cards **no probe reached** |
 | `.gauntlet debug offers <tier> [name]` | what the builder would put in front of that character at that tier, rarity and kind per line; the only way to watch the roll without a client. Name *after* the tier. |
 
 **Run `.gauntlet debug leaks self` first.** It checks the audit can see the
@@ -78,14 +79,29 @@ distrust a green result:
 - **`BenchQuiet` clears the scheduler's suppression** so cards can be probed. So
   the bench structurally **cannot** see any bug of the form "the run is being
   held back" — it would have passed all ten offer-gated cards forever.
-- **The bench captures its baseline *after* attach**, so attach-time effects are
-  invisible to its "answered" list. Use `leaks`, which prints them.
+- **`Probe`'s own baseline is read *after* attach.** The bench command now reads
+  the footprint before and after `AuditAttach` as well and reports the
+  difference as "on attach: ...", so a standing aura or a stripped helm counts
+  as reached — but only through that command; anything else calling `Probe`
+  directly is still blind to attach-time effects.
 - **A harness that skips a step the live code takes will blame the code.** The
   audits did not call `RefreshStats` and duly reported Arcane Frailty halving a
   mage's max health and Faint leaking the restore. An inverse pair on adjacent
   cards is the signature.
 - **Weapon passives re-apply asynchronously** after a disarm lifts, so they read
   as "removed and not restored" in a synchronous capture. A second pass is clean.
+  The same happens on *any* equipment change: a common that puts a helm into
+  the bags and back on leaves the racial weapon specialisations (human 20597/
+  20864, troll 20558/26290) reading as removed until the next world update.
+- **Re-equipping an item restarts its equip cooldown** (the core's 30-second
+  anti-swap rule, `Player::ApplyEquipCooldown`), so a trinket a denial put back
+  on reads as "spell N still on cooldown". That is the proof the return
+  happened, not a leak.
+- **Armour cannot be equipped in combat** (`EQUIP_ERR_NOT_IN_COMBAT`), so a
+  denial's return is refused on a fighting bot. `leaks` does not stop combat;
+  `bench` does. Queue `.combatstop <name>` in the same append as the audit --
+  console commands appended together run in one world update, so the bot's AI
+  cannot re-engage between them.
 - **A leak can consume the condition that reveals it.** Berserker's Bargain
   appeared on the first pass and not the second. Run twice, against a bot that
   has been fighting.
@@ -137,7 +153,7 @@ card.
 judgement. The two most likely to be wrong are named at the end of
 `docs/tempo-redesign.md`.
 
-## 7. The rarity plan: step 1 landed, step 2 next
+## 7. The rarity plan: steps 1 and 2 landed, step 3 next
 
 `docs/rarity-plan.md` is decided, not a proposal. Ranks are being removed and
 replaced with a rarity ladder (common → legendary), plus reroll and skip.
@@ -192,14 +208,69 @@ The answer is ~90 new cards to reach ~160, of which **only ~30 are C++ work** �
   the test realm and is **not deployed**: the live `ac-worldserver` is still on
   the previous image until someone runs `up -d`, which kicks the user offline.
 
-### Step 2
+### What step 2 put in place (2026-08-31)
 
-`SimpleTrade` and the first ten commons — prove the table-driven path with the
-bench before writing sixty rows. §3 of the plan has the three primitives, all
-verified to exist. Expect to: add `Rarity::Common` rows via
-`GAUNTLET_MECHANIC_FN`, rewrite `EveryCardIsRareUntilTheEpicPass` into a list,
-and read `--rarity` at tiers 1–20 to see the common share move off zero. §8
-has the rest of the order and §5b what rank removal actually touches.
+- `src/GauntletTrades.h`: the commons' table, Player-free. One `TradeDef` line
+  per common — a denial mask (inventory type or weapon subclass) or a signed
+  coefficient on one `AggregateKind`, plus the boon and its magnitude. The
+  generator's `BoonTable` reads the magnitude from it, so the card promises
+  what the mechanic pays. `inline constexpr`, and it has to be: as a plain
+  `constexpr` every translation unit got its own copy and the implicitly
+  inline `FindTrade` returned pointers into someone else's.
+- `src/mechanics/common/SimpleTrade.cpp`: one class behind every common. Ten
+  named factories and ten `GAUNTLET_MECHANIC_FN`s — the plan's `MakeTrade<N>`
+  snippet cannot compile, the macro pastes the name — and ten anchors.
+- **A new hook**: `IMechanic::CanEquip(Ctx&, ItemTemplate const*)`,
+  `Mgr::CanEquip`, and `OnPlayerCanEquipItem` in `GauntletScripts.cpp`. The
+  core asks it before anything else in `Player::CanEquipItem`
+  (`PlayerStorage.cpp:1912`) and shows a refusal as the generic "You can't do
+  that right now", so the mechanic prints the reason, once per item per two
+  seconds. `not_loading == false` (the login loader) is never vetoed.
+- A denial **strips what is worn** on attach — bags first, mailbox when full,
+  the core's own `AutoUnequipOffhandIfNeed` pattern — remembers the guids in
+  the state store (`<key>.took0/1`) and re-equips on detach through the core's
+  own `CanEquipItem`, with its own veto stood down for the moment.
+- The bench gained the equipment probe (every item template offered to the
+  carried set; first refusal wins) and the on-attach reading (§4).
+- The ten: Bareheaded, Cloakless, Ringless, Charmless, Bare-necked (armour
+  slots, classless), Axeless and Swordless (class-masked to the classes that
+  can hold one; the relevance discount halves their boon), Glass, Frail, Thin
+  Blood (coefficients). Families by lever: denials are Rules, coefficients
+  Attrition — spread on purpose so a set can hold more than one common.
+- Measured (`build/sweep --seeds 300`): tier 1 is 61% common (target 70), the
+  late run's empty slots went from 12,418 to **zero**, and sets with no
+  reward-shaped offer rose 9% → 15% — commons are neither reward-shaped (the
+  design's definition is "tagged as family B") nor rankable, so a full set of
+  them has fewer rank-ups to pay the guarantee with. The invariant test's
+  ceiling moved 12 → 18 with that reasoning in its journey list.
+- GeneratorVersion 13 → 14.
+- Checked end to end on `gt-world`: `offers 1` on a warrior and a mage gives
+  two commons and a rare per set; `bench` reaches every one of the ten (the
+  denials by "equipping X refused" -- Shadowblade Helmet, Troggbane, Marrowgar's
+  Scratching Choker, Runed Band of the Kirin Tor -- the coefficients by
+  "aggregate: ..."); `leaks` on Bareheaded, Ringless and Charmless shows the
+  item stripped at attach and back on at detach, with only the two artefacts
+  above left in the diff. The first pass found the in-combat refusal (put back
+  0, silently); the card now says so and keeps the guid for a later detach.
+  **Not seen on a screen:** the chat lines a real player gets, and the addon
+  drawing a Common (white) card.
+
+### Step 3
+
+Reroll and skip — §4 of the plan. Independent of ranks; needs a counter folded
+into the seed, two addon buttons, and a wire field for the charge count. Then
+step 4 (rank removal) and 5 (the remaining cards). §8 has the order and §5b
+what rank removal actually touches.
+
+Things step 2 left for a later pass, deliberately:
+- The **stat-grant primitive** (§3, "grant a stat" — expertise, ratings) is not
+  built; the first ten pay through the existing Boon plumbing. It needs a
+  class-neutral carrier spell per aura type read out of Spell.dbc.
+- `FAMILY_WEIGHT` still gives Rules 1 against Attrition 3, so at tier 1 the
+  three coefficient trades are drawn about three times as often as any one of
+  the seven denials. Left as measured; the comment on the weights still
+  describes Rules as "three one-rank entries", which is no longer true.
+- Whether commons stack too freely (+8% damage four times over) is §7.1.
 
 ## 8. Known-open, not assigned
 
@@ -216,3 +287,10 @@ has the rest of the order and §5b what rank removal actually touches.
 - The server-wide announce ("X reached tier N and took Y") does not name the
   rarity. Left out on purpose while every card is rare; worth revisiting when
   an epic is worth announcing.
+- A denial's strip-and-return runs on every session detach too: logging out
+  puts the helm back on, logging in takes it off again. Harmless churn, and
+  the contract ("detach gives back what attach took") is what `leaks` audits;
+  a mechanic cannot tell a swap from a logout.
+- The two weapon denials are relevance-gated only by class. A shaman who has
+  never held an axe pays nothing for Axeless and gets half the boon; a
+  `requiresSpell` on the weapon skill would be the truthful gate.

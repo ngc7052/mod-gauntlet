@@ -2,9 +2,8 @@
 
 AzerothCore (WotLK 3.3.5a) module: a procedurally generated hardcore affix
 challenge. A run offers three affix cards per tier, the player picks one, and
-the curses accumulate. 69 mechanics today, every one of them rare;
-`docs/rarity-plan.md` takes it to ~160 and its step 1 -- rarity as a field,
-rolled and displayed -- has landed.
+the curses accumulate. 79 mechanics today: 69 rares and the first ten commons.
+`docs/rarity-plan.md` takes it to ~160; its steps 1 and 2 have landed.
 
 **Read `docs/handoff.md` before starting.** It carries the current state, the
 recurring bug patterns, and where the test harness is blind. This file is the
@@ -52,6 +51,22 @@ Row order matters: ids must ascend. Add new rows at the end of the table.
 
 Tuning ladders and any arithmetic worth testing go in **`src/GauntletRules.h`**,
 not in the mechanic — see the testing rule for why.
+
+## Adding a common
+
+A common is a table row, not a file. Three places, all data:
+
+1. A registry row at the end of the table, `Rarity::Common`, `maxRank` 1.
+2. A line in `src/GauntletTrades.h` with the same id: the curse (a denial mask
+   or a coefficient), the boon -- which must be the row's -- and its magnitude.
+3. One factory and one `GAUNTLET_MECHANIC_FN` in
+   `src/mechanics/common/SimpleTrade.cpp`, and its anchor in
+   `AnchorMechanics()`. The macro pastes the name, so it is a plain identifier.
+
+`tests/TradesTest.cpp` holds the three together and holds every line to being
+a trade: a boon, a cost, never both on one axis. Then `bench` it -- a denial is
+reached by "equipping X refused", a coefficient by "aggregate: ...", and the
+strip of a worn item by "on attach: ...". Read `build/sweep --rarity` after.
 
 ## Adding an offer
 

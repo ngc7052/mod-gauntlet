@@ -2,7 +2,7 @@
 
 A hardcore roguelike challenge module for [AzerothCore](https://www.azerothcore.org/).
 
-One life. A new affix every level — drawn from a registry of **69 mechanics
+One life. A new affix every level — drawn from a registry of **79 mechanics
 across seven families**, never a fixed list. Two runs are never the same.
 
 An affix is not a stat penalty rolled off a table. It is a **mechanic**: a
@@ -11,7 +11,7 @@ it, rather than a multiplier bolted onto your character sheet. A shade that
 hunts you between fights. A strike that lands where you were standing. A
 paladin whose Consecration burns twice as hot for half as long.
 
-> **Status.** **All 69 mechanics are live and offerable.** No registry row is
+> **Status.** **All 79 mechanics are live and offerable.** No registry row is
 > flagged `MF_NotImplemented`, and the `OFFERABLE` list in
 > `tests/RegistryTest.cpp` is what enforces that. Phases 0–4 are complete and
 > reported in `docs/`; Phase 5 is the pacing pass — config, tuning and
@@ -49,17 +49,18 @@ lever:
 | **Spawn** | Something appears and comes after you: a shade that hunts you down, an ambush waiting around the next corner. | 5 / 5 |
 | **Enemy** | Ordinary enemies behave differently: they hit harder in packs, they notice you from farther away, they don't die the way you expect. | 8 / 8 |
 | **Tempo** | Pressure on position and pacing rather than raw numbers: a telegraphed strike you have to move out of, a clock you have to beat. | 5 / 5 |
-| **Attrition** | A cost with a counterplay button, not a flat tax: a wound only rest heals, health spent where mana should have been, healing that comes from killing rather than resting. | 3 / 3 |
-| **Rules** | A restriction on what you're allowed to do rather than a number: no auction house, no partying up. | 3 / 3 |
+| **Attrition** | A cost with a counterplay button, not a flat tax: a wound only rest heals, health spent where mana should have been, healing that comes from killing rather than resting — and, among the commons, the plain trades: take more damage, deal more. | 6 / 6 |
+| **Rules** | A restriction on what you're allowed to do rather than a number: no auction house, no partying up — and, among the commons, no helm, no rings, no axe. | 10 / 10 |
 | **Bargain** | A curse you choose on purpose, because of what it pays out. | 2 / 2 |
 | **Class** | A curse written for one class specifically, leaning on the thing that class actually struggles with. | 43 / 43 |
 
-Every mechanic has up to four **ranks**. If an affix you already carry comes
-up again in a later offer, you are never offered a duplicate — you are offered
-its next rank instead, and taking it replaces what you hold in that slot with
-the stronger version. Eight mechanics stop at three, because their third rank
-already ends the ladder — Vanish cannot be denied harder than never — and a
-rank-up that changes nothing is worse than no rank-up. Simulated over 240,000 offer sets, a run reaches the
+Every rare mechanic has up to four **ranks**. If an affix you already carry
+comes up again in a later offer, you are never offered a duplicate — you are
+offered its next rank instead, and taking it replaces what you hold in that
+slot with the stronger version. Eight mechanics stop at three, because their
+third rank already ends the ladder — Vanish cannot be denied harder than never
+— and a rank-up that changes nothing is worse than no rank-up. A common has one
+rank and no ladder. Simulated over 240,000 offer sets, a run reaches the
 sixteen-affix cap around level 49 and spends the rest of the climb deepening
 and trading rather than collecting.
 
@@ -68,9 +69,11 @@ in the client's own item colours — which is how much of the run it changes
 rather than how big its numbers are: a common is one small trade, a rare is a
 verb you react to, a legendary defines the run. Each offer slot rolls which
 rarity to draw from, weighted by tier, so early tiers lean common and the
-endgame leans rare or better. Today every card in the table is rare; the
-commons, epics and legendaries are the next step of `docs/rarity-plan.md`,
-which is also where the ranks are retired.
+endgame leans rare or better. The ten **commons** are small trades — *you
+cannot wear a helm; in exchange, 5% more health* — backed by one class and a
+table (`src/GauntletTrades.h`), so a new one is a row and a line rather than
+a file; every older card is rare. The epics and legendaries, and the
+retirement of the ranks, are the next steps of `docs/rarity-plan.md`.
 
 The generator also limits how much of one *kind* of pressure a run can carry,
 so it stays varied instead of turning into a pile of the same idea: at most one
@@ -103,14 +106,16 @@ without a reroll button.
 
 ## What is implemented
 
-All sixty-nine rows. A row and its implementation are switched on in the same
+All seventy-nine rows. A row and its implementation are switched on in the same
 commit, so the table has never promised a curse the module could not deliver.
 
 **Spawn** — The Shade, Echo, Carrion, Reinforcements, Ambush
 **Enemy** — Champions, Craven, Call to Arms, Death Rattle, Grudge, Nimble, Cunning, Keen-nosed
 **Tempo** — Falling Sky, Frenzy, Overextended, Falter, Hubris
-**Attrition** — Deep Wounds, Blood Magic, Killing Floor
-**Rules** — Self-found, Lone Wolf, Iron Purse
+**Attrition** — Deep Wounds, Blood Magic, Killing Floor; and the common trades
+Glass, Frail, Thin Blood
+**Rules** — Self-found, Lone Wolf, Iron Purse; and the common denials
+Bareheaded, Cloakless, Ringless, Charmless, Bare-necked, Axeless, Swordless
 **Bargain** — Last Rites, Cursed Hoard
 **Class** — four each for warrior, paladin, hunter, rogue, priest, death
 knight, shaman, mage, warlock and druid; Faint for every mana user; and two
@@ -137,8 +142,9 @@ design, not a readout of your run.
 **"Who"** is class relevance: an affix is never offered to a character it does
 not apply to. Some rows additionally need a specific spell or talent tree, which
 the table does not show — `.gauntlet debug give-class` reports those live.
-**"Rarity"** is how much of the run the card changes, and is rare for every row
-until the pass in `docs/rarity-plan.md` §7.4 decides which are epics.
+**"Rarity"** is how much of the run the card changes: rare for every original
+row until the pass in `docs/rarity-plan.md` §7.4 decides which are epics, and
+common for the trades after id 74.
 
 <!-- AFFIX-TABLE-BEGIN -->
 | # | Affix | Family | Rarity | Who | Levels | Ranks | What it does to you | What it pays |
@@ -212,6 +218,16 @@ until the pass in `docs/rarity-plan.md` §7.4 decides which are epics.
 | 70 | **Ankh Pact** | Class | Rare | Shaman | 40&ndash;80 | 1 | Reincarnation works once in this run, and when it does every boon you carry is burned away. | a second life |
 | 71 | **Stone of the Damned** | Class | Rare | Warlock | 40&ndash;80 | 1 | A Soulstone will bring you back once, and whoever kills you will be waiting. | a second life |
 | 74 | **Killing Floor** | Attrition | Rare | any | 10&ndash;80 | 4 | Healing is held while something you have wounded lives. A kill hands it back. | &mdash; |
+| 75 | **Bareheaded** | Rules | Common | any | 1&ndash;80 | 1 | You cannot wear a helm. | +5% maximum health |
+| 76 | **Cloakless** | Rules | Common | any | 1&ndash;80 | 1 | You cannot wear a cloak. | +5% move speed |
+| 77 | **Ringless** | Rules | Common | any | 1&ndash;80 | 1 | You cannot wear rings. | +10% experience |
+| 78 | **Charmless** | Rules | Common | any | 1&ndash;80 | 1 | You cannot carry a trinket. | +8% damage dealt |
+| 79 | **Bare-necked** | Rules | Common | any | 1&ndash;80 | 1 | You cannot wear anything at your neck. | +10% healing received |
+| 80 | **Axeless** | Rules | Common | Warrior, Paladin, Hunter, Death Knight, Shaman | 1&ndash;80 | 1 | You cannot wield an axe. | +10% damage dealt |
+| 81 | **Swordless** | Rules | Common | Warrior, Paladin, Hunter, Rogue, Death Knight, Mage, Warlock | 1&ndash;80 | 1 | You cannot wield a sword. | +10% damage dealt |
+| 82 | **Glass** | Attrition | Common | any | 1&ndash;80 | 1 | You take 10% more damage. | +8% damage dealt |
+| 83 | **Frail** | Attrition | Common | any | 1&ndash;80 | 1 | You have 10% less health. | +10% experience |
+| 84 | **Thin Blood** | Attrition | Common | any | 1&ndash;80 | 1 | Healing on you is 15% weaker. | +8% damage dealt |
 <!-- AFFIX-TABLE-END -->
 
 ## Boons

@@ -4,10 +4,11 @@
 reasoning is kept because the numbers behind it are worth re-reading when the
 tuning is wrong, not because the direction is still open.
 
-**Status.** Step 1 of §8 landed on 2026-08-31: rarity is a registry column,
-rolled per slot and displayed, every card rare, ranks untouched. §7 of
-`docs/handoff.md` lists what it put where and the three roll decisions it took
-that this document did not spell out. Step 2 is next.
+**Status.** Steps 1 and 2 of §8 landed on 2026-08-31. Rarity is a registry
+column, rolled per slot and displayed; `SimpleTrade` and the first ten commons
+(ids 75–84) are in the table, proven with the bench; every older card is rare;
+ranks untouched. §7 of `docs/handoff.md` lists what each step put where and the
+decisions taken that this document did not spell out. Step 3 is next.
 
 - **The rank system is removed.** `MAX_RANK`, the rank ladders in 56 mechanics,
   rank-up offers, and the rank numerals in every card and chat line all go.
@@ -104,28 +105,39 @@ already has its own factory function". `MechanicRegistrar` takes an id and a
 factory, so **one class can back many registry ids**:
 
 ```cpp
-template <int N> IMechanic* MakeTrade() { return new SimpleTrade(TRADES[N]); }
-GAUNTLET_MECHANIC_FN(101, MakeTrade<0>)
-GAUNTLET_MECHANIC_FN(102, MakeTrade<1>)
+IMechanic* TradeBareheaded() { return MakeTrade(75); }   // reads TRADES by id
+GAUNTLET_MECHANIC_FN(75, TradeBareheaded)
 ```
 
-So a common is a **table row**, not a file. Sixty commons is one `SimpleTrade`
-class and a sixty-row table — a day's work, not a quarter's.
+(Not `MakeTrade<0>`, as this first said: the macro pastes its second argument
+into the registrar's and the anchor's names, so it has to be a plain
+identifier, and each one is a line in `AnchorMechanics()` like every other
+card's. `src/mechanics/common/SimpleTrade.cpp` is the shape as built.)
+
+So a common is a **table row**, not a file: a registry row and a line in
+`src/GauntletTrades.h`. Sixty commons is one `SimpleTrade` class and a
+sixty-line table — a day's work, not a quarter's.
 
 `SimpleTrade` needs three primitives, all verified to exist and all inside the
 "no client patches" rule:
 
 - **Deny equipment.** `PlayerScript::OnPlayerCanEquipItem` returns bool
-  (`PlayerScript.h:575`). "You cannot wear axes" is a subclass check and a
-  return, no DBC involved.
+  (`PlayerScript.h:589`). "You cannot wear axes" is a subclass check and a
+  return, no DBC involved. **Built in step 2** as `IMechanic::CanEquip`, with
+  the worn item put into the bags on attach (the core's own
+  `AutoUnequipOffhandIfNeed` pattern) and put back on detach.
 - **Grant a stat.** `SPELL_AURA_MOD_EXPERTISE = 240` and
   `SPELL_AURA_MOD_RATING = 189` exist (`SpellAuraDefines.h`). The module already
   applies an existing spell and overwrites the effect amount — Falling Sky
   documents the technique in full for `65828`, and `BoonSpeed` now shares it.
   The same trick gives arbitrary amounts on any aura type an existing spell
-  happens to carry.
+  happens to carry. **Not yet built:** the first ten commons pay through the
+  existing Boon plumbing instead (damage, experience, health, healing, speed),
+  and no `TradeCurse` grants a stat. It needs a class-neutral carrier spell
+  per aura type, read out of Spell.dbc, before a line can use it.
 - **The aggregate.** Anything expressible as a coefficient needs no new code at
   all — `AggregateFactor` already exists and is what most commons will use.
+  **Built in step 2** as `TradeCurse::Coefficient`.
 
 The one honest cost: the client's tooltip shows the DBC number, not ours. That
 trade is already made and documented for the speed boon; the icon is the
@@ -229,8 +241,15 @@ The direction is settled. These are not.
    rare. Nothing else changes; the ladder still works. This is reversible and
    provable.~~ **Done, 2026-08-31.** `build/sweep --rarity` is the proof: 100%
    Rare at every tier, beside the weights §2 asks for.
-2. `SimpleTrade` and the first ten commons. Prove the table-driven path with the
-   bench before writing sixty rows.
+2. ~~`SimpleTrade` and the first ten commons. Prove the table-driven path with
+   the bench before writing sixty rows.~~ **Done, 2026-08-31.** Seven denials
+   (Rules) and three coefficient trades (Attrition), ids 75–84. Measured with
+   `build/sweep`: tier 1 is 61% common against the 70% asked for, and the late
+   run's empty slots went from 12,418 to zero — but sets with no reward-shaped
+   offer rose from 9% to 15%, because a common is neither reward-shaped nor
+   rankable and a full set of them has fewer rank-ups to pay the guarantee
+   with. That is §7.1's question arriving early; step 4 changes the late run's
+   whole payer anyway.
 3. Reroll and skip, which are independent of both and immediately playable.
 4. Rank removal, once rarity is carrying enough of the run to make it survivable.
 5. The remaining cards, in rarity order, commons first.

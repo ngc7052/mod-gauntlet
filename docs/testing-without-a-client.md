@@ -162,6 +162,17 @@ target (health, max health, level, aura count, faction, speed, alive). The secon
 exists because a whole family never touches the player — Champions promotes a
 creature, Craven makes one run, Grudge answers when one dies.
 
+Two more probes arrived with the commons. **The equipment veto**: every item
+template the world knows is offered to the carried set through
+`Mgr::CanEquip`, and the first refusal is the answer — a denial changes no
+number until someone tries to put the thing on, so this is the only probe that
+can reach one, and asserting the refusal is asserting what the card is for.
+And **the on-attach reading**: the bench command reads the footprint before and
+after `AuditAttach` and reports the difference as "on attach: ...", because
+`Probe`'s own baseline is taken after attach and a card whose whole effect lands
+there — a standing aura, a helm put into the bags — used to be invisible to
+the verdict.
+
 ### The bench must *cause* events, not call hooks
 
 Calling `Mgr::OnCreatureDamaged` does not move a creature's health, so Craven's
