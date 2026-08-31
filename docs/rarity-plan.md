@@ -1,16 +1,27 @@
 # Rarity, rerolls, and where the next hundred cards come from
 
-A plan for replacing the rank ladder with a rarity ladder, and for getting the
-card count from 69 to roughly 160 without writing 90 mechanics by hand.
+**Decided.** This is not a proposal to weigh; it is what is being built. The
+reasoning is kept because the numbers behind it are worth re-reading when the
+tuning is wrong, not because the direction is still open.
+
+- **The rank system is removed.** `MAX_RANK`, the rank ladders in 56 mechanics,
+  rank-up offers, and the rank numerals in every card and chat line all go.
+- **Rarity replaces it**: common, uncommon, rare, epic, legendary, rolled per
+  offer slot and weighted by tier.
+- **Reroll and skip are added**, with skipping paying for a reroll.
+- **The registry grows from 69 to roughly 160**, of which about 60 are table
+  rows rather than new code.
+- **Cards do not scale with level.** Researched and rejected; see §5, which is
+  the one decision here most worth overturning if play disagrees.
 
 Everything with a number in it below was measured, not estimated. The
 measurements are in §1.
 
 ---
 
-## 0. The problem rarity is solving
+## 0. Why the ranks are going
 
-Ranks are doing two jobs at once, and only one of them is visible.
+Ranks do two jobs at once, and only one of them is visible.
 
 The visible job is **depth**: rank IV of a card is a stronger version of rank I.
 The invisible job is **filling eighty tiers**. `Gauntlet.TierInterval = 1`, so a
@@ -18,7 +29,15 @@ tier is a level and a run to 80 sees **80 offers** — but no character can be
 offered more than about thirty distinct mechanics. Ranks hide that: 56 mechanics
 × 4 ranks is 224 rank-steps to spend 80 picks on.
 
-Remove ranks and both jobs need a new owner. Rarity can take both.
+The visible job is the weaker of the two. A rank-up is the least interesting
+pick on the table: it costs a tier and hands back a bigger number on a card
+already being carried, which is why so much of §5 of the design doc is spent
+arguing against cards that are "always-safe picks that made the other two offers
+irrelevant". Rank-ups are that shape by construction.
+
+Rarity takes both jobs, and takes the second one better: a run gets stronger
+because its cards get *rarer*, not because the player spent eighty tiers buying
+the second copy of six of them.
 
 ## 1. What is actually there today
 
@@ -52,8 +71,9 @@ the card changes**.
 | **Epic** (purple) | Changes how a whole system plays | Killing Floor, Self-found | ~15 |
 | **Legendary** (gold) | Run-defining, one per run | build-arounds | ~8 |
 
-The user's own example is exactly a common: *"you cannot wear an axe but get +15
-sword expertise"*. Small, concrete, build-flavoured, no state, no timer.
+The example that started this is exactly a common: *"you cannot wear an axe but
+get +15 sword expertise"*. Small, concrete, build-flavoured, no state, no timer,
+and readable in one line on an offer card.
 
 **Rarity is rolled per offer slot and weighted by tier.** That is where the
 escalation goes: early tiers are nearly all commons, legendaries only appear
@@ -123,9 +143,11 @@ earns more by declining.
 Both need the addon's chooser to grow two buttons and the `OFFER` frame to carry
 the remaining charge count.
 
-## 5. Should cards scale with level?
+## 5. Cards do not scale with level
 
-Recommendation: **no — let rarity carry it.**
+This was the open question, and the answer after looking at it is **no — rarity
+carries it.** It is the decision here most worth overturning if play disagrees,
+so the reasoning is spelled out rather than asserted.
 
 Level scaling makes a card's own text a lie. "30% of the damage you take becomes
 a wound" has to mean one thing, and a card whose number silently changes with
@@ -138,6 +160,26 @@ late runs are not the same cards with bigger numbers, they are different cards.
 One exception worth keeping: **tier-gated availability**. `minTier`/`maxTier`
 already exist and already do this. A legendary that only appears past tier 50 is
 scaling by rarity, not by arithmetic.
+
+## 5b. What removing ranks actually touches
+
+Written down because it is the largest single edit in the plan and it is easy to
+underestimate:
+
+| Thing | What happens |
+|---|---|
+| `MAX_RANK` in `Gauntlet.h` | Goes. Every `static_assert(std::size(X) >= MAX_RANK)` goes with it. |
+| 79 rank ladders | Each collapses to the single value the card is worth at its rarity. `GauntletRules.h` already holds six of them, which is the pattern for the rest. |
+| `MechanicDef::maxRank` | Becomes `rarity`. Same column width, same place in every row. |
+| `OfferKind::RankUp` | Goes. `BuildOffers` loses a slot kind and the "rank-ups dominate from tier 11" weighting with it. |
+| `AffixInstance::rank` | Becomes `rarity` — the DB column and the wire field are both already the right width, so **no migration**. |
+| `RankNumeral` | Becomes a rarity name and colour. |
+| The ladder audit | Loses most of its subjects. It stays for the ladders that remain (tier weights, reroll costs) and should not be deleted. |
+| `tests/RulesTest.cpp` | Every "gets worse with rank" test becomes "gets worse with rarity" or goes. The shape tests that do not mention rank survive unchanged. |
+
+The audit and the tests are the reason step 4 in §8 comes after the rest: with
+rarity already carrying the run, rank removal is a deletion with a green gate
+around it rather than a rewrite in the dark.
 
 ## 6. What it costs to build
 
@@ -155,20 +197,26 @@ scaling by rarity, not by arithmetic.
 are C++ work.** That takes per-character eligible from 29.6 to well over 100,
 which covers 80 tiers with three real choices at every one of them.
 
-## 7. What still needs deciding
+## 7. Still open
+
+The direction is settled. These are not.
 
 1. **Does rarity gate the carry cap?** Sixteen commons is a very different run
    from sixteen legendaries. A weight per rarity against a budget, rather than a
-   flat count, is worth considering and is a bigger change.
-2. **Can a common be swapped for a rarer card of the same family later?** That
-   is where the "upgrade" feeling goes once ranks are gone, and it may be all
-   the depth that is needed.
-3. **One legendary per run, or one legendary per family?**
+   flat count of 16, is the obvious answer and is a bigger change than it looks.
+2. **Can a common be swapped for a rarer card of the same family later?** This
+   is where the "upgrade" feeling goes now that ranks are gone, and it may turn
+   out to be all the depth the run needs. Worth prototyping before writing sixty
+   commons that might want to be upgrade paths.
+3. **One legendary per run, or one per family?**
 4. **What the existing 69 become.** Most are rares. Which are epics is a
-   judgement per card, and several — Self-found, Killing Floor, One Ward — read
-   as epics already.
-5. **Does skipping really pay a reroll charge**, or something else? This is the
-   one number in the plan with no evidence behind it at all.
+   judgement per card — Self-found, Killing Floor and One Ward read as epics
+   already. This wants one pass with the whole list in front of you rather than
+   a decision per card as it is touched.
+5. **Does skipping pay a reroll charge**, or something else? Still the one
+   number in this plan with no evidence behind it at all.
+6. **The rarity weights in §2 are invented.** They are a starting shape for the
+   sweep tool to argue with, not a result.
 
 ## 8. Order of work
 
@@ -180,5 +228,7 @@ which covers 80 tiers with three real choices at every one of them.
 4. Rank removal, once rarity is carrying enough of the run to make it survivable.
 5. The remaining cards, in rarity order, commons first.
 
-Steps 1–3 are worth doing whether or not ranks ever go, which is the argument
-for that order.
+Steps 1–3 are all reversible and all playable on their own, which is why they
+come before the deletion. Ranks are going either way; landing rarity first means
+step 4 is a deletion with a green gate around it rather than a rewrite with
+nothing holding the run up.
