@@ -286,19 +286,20 @@ Two are proposed, both classless and open at tier 1:
 | Card | Family | The card | Seam |
 |---|---|---|---|
 | **Scavenge** | Attrition | You take 10% more damage. Every corpse you loot restores 4% of your health. | a `DamageTaken` coefficient through `AggregateFactor`; `OnLoot` heals |
-| **Gravedigger** | Spawn | Every 8th corpse you loot gets up again. Kill it and it drops what it was holding back. | **not built — one seam unverified**, see below |
+| **Gravedigger** | Spawn | Every 8th corpse you loot gets up again. Kill it and it drops what it was holding back. | `GauntletSummons` and `ENTRY_RISEN`; the core's own death path run by hand in `OnKill` |
 
-Scavenge is built. Gravedigger is not, and the reason is worth writing down
-rather than guessing at: making a *summoned* creature drop a loot table chosen
-by the module is not a seam this module has ever used. A creature's loot comes
-from its template `lootid`, which for `ENTRY_RISEN` is zero, and filling it
-after death needs the loot recipient and the lootable dynamic flag set by hand
-at a moment (`OnKill`) where the core has not yet decided the creature is
-lootable. The alternative — have the Risen's death summon a chest, which
-Trophy Hunter proves works — makes a common that spawns a fight *and* a chest,
-which is a bigger card than Carrion, a rare. Neither is a guess worth shipping
-on. The next session should verify the first path against
-`Creature::SetLootRecipient` and `UNIT_DYNFLAG_LOOTABLE` before writing it.
+**Both are built.** Gravedigger was held back one commit while the seam it
+needs was checked, and it turned out to be the core's own death path rather
+than anything new: `Unit::Kill` fills a dying creature's loot and then sets
+`UNIT_DYNFLAG_LOOTABLE` only when that loot is not already looted
+(Unit.cpp:14210-14220). `ENTRY_RISEN` carries lootid 0, so the core fills
+nothing — and the card makes the same four calls in the same order, which the
+bench confirmed by watching the thing it raised drop two items.
+
+With both in, **tier 1 delivers 73/23/5 against 70/25/5** — rare exactly on
+target, from the 13% three loot cards could not shift. The two families that
+could only answer slot B with a rare now answer with a common, which is the
+whole of what §0's measurement asked for.
 
 Scavenge is deliberately the opposite of Blood Price: one makes looting cost
 health and the other makes it restore health, and a run offered both is being
