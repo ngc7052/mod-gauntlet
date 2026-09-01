@@ -357,7 +357,7 @@ namespace Gauntlet
             PermanentCooldown::Allow(player, SPELL_ENRAGED_REGENERATION);
         }
 
-        std::string BerserkersBargain::Describe(AffixInstance const& self) const
+        std::string BerserkersBargain::Describe(AffixInstance const& /*self*/) const
         {
             uint32 const line = LINE_PCT;
 
@@ -648,7 +648,7 @@ namespace Gauntlet
                 return out;
             }
 
-            std::string Diagnose(Ctx& ctx) const override
+            std::string Diagnose(Ctx& /*ctx*/) const override
             {
                 return "iron discipline: " + std::to_string(STANCE_LOCK_MS / 1000u)
                      + "s lock, " + std::to_string(_changes) + " change(s)";
@@ -660,7 +660,7 @@ namespace Gauntlet
             TimedLockout _lock;
         };
 
-        std::string DeafeningRoar::Describe(AffixInstance const& self) const
+        std::string DeafeningRoar::Describe(AffixInstance const& /*self*/) const
         {
             uint32 const yards = uint32(ROAR_YARDS);
 

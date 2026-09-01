@@ -199,7 +199,7 @@ namespace Gauntlet
                                      int32(standing));
         }
 
-        std::string OneTotem::Describe(AffixInstance const& self) const
+        std::string OneTotem::Describe(AffixInstance const& /*self*/) const
         {
 
             std::string out = "Only one of your totems may stand at a time; planting another"
@@ -265,7 +265,7 @@ namespace Gauntlet
                 return Anchored(ctx.player) ? 1.0f : ADRIFT_MULT;
             }
 
-            std::string Describe(AffixInstance const& self) const override
+            std::string Describe(AffixInstance const& /*self*/) const override
             {
                 uint32 const extra = uint32((ADRIFT_MULT - 1.0f) * 100.0f + 0.5f);
 

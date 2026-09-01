@@ -122,7 +122,7 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override;
 
-            std::string Diagnose(Ctx& ctx) const override
+            std::string Diagnose(Ctx& /*ctx*/) const override
             {
                 return "fel pact: " + std::to_string(_kills) + "/"
                      + std::to_string(PACT_KILLS) + " kills, grace "
