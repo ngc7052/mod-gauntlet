@@ -807,6 +807,11 @@ Things step 2 left for a later pass, deliberately:
 - The bench cannot reach the *aggro* half of Keen-nosed or Scavenger's Eye
   (§7): it needs a creature summoned outside its own aggro range, with the
   character out of combat, and then an assertion that it attacked.
+- **Carrion's `Spawned nothing` is an ordering problem in the bench**, not a
+  broken card: it arms a scheduler event ten seconds out rather than spawning
+  on the loot, and the probe fires events before the loot windows are driven.
+  Firing events once more after the loot probe would reach it, and would reach
+  any later card that defers off a loot.
 - `bench` reports `Spawned nothing` for all five Spawn cards on an idle bot,
   for the reasons §4 measures. The job: have the bench's target attack the
   player (`target->Attack(player, true)` puts it in `getAttackers()`), kill
