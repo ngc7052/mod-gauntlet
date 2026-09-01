@@ -253,7 +253,13 @@ The direction is settled. These are not.
 5. **Does skipping pay a reroll charge**, or something else? Still the one
    number in this plan with no evidence behind it at all.
 6. **The rarity weights in §2 are invented.** They are a starting shape for the
-   sweep tool to argue with, not a result.
+   sweep tool to argue with, not a result. The sweep has now argued back:
+   `docs/commons.md` (2026-09-01) measures the delivered mix against them and
+   finds the early run's rare floor is not a weighting problem at all but the
+   reward-shaped guarantee — every one of the eleven rows carrying
+   `MF_RewardShaped` is Rare, so one slot in three is reserved for a rare
+   whatever §2 asks for. Re-cut the weights **after** that is fixed, not
+   before.
 
 ## 8. Order of work
 
@@ -285,9 +291,12 @@ The direction is settled. These are not.
    `docs/greed-redesign.md` §7 are the fastest way to refill the late run.
 5. The remaining cards, in rarity order, commons first. **Begun 2026-09-01**
    with Magpie, Butterfingers and Night Owl (ids 85–87) and the loot boon they
-   pay in. `build/sweep --rarity` says where the next rows belong: five
-   families have no common at all, and while that holds the third slot of
-   every early offer is a rare whatever the weights say.
+   pay in. `docs/commons.md` measures where the next rows belong and
+   overturns the obvious answer: the third slot of every early offer is a rare
+   because of the reward-shaped guarantee, not because of family spread, and
+   three reward-shaped non-rare cards are worth more than twenty ordinary
+   rows. Its proposed batch — three mechanics, nine uncommons, ten commons —
+   measures at 69/23/8 against §2's 70/25/5.
 
 Steps 1–3 were all reversible and all playable on their own, which is why they
 came before the deletion. Landing rarity first meant step 4 was a deletion with
