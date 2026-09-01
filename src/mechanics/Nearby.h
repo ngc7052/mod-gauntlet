@@ -72,6 +72,20 @@ namespace Gauntlet
     //                    rolling fight".
     bool IsFairGame(Player* owner, Creature* creature, bool hostileOnly = true);
 
+    // Wakes every idle creature that would *not* have noticed `owner` yet but
+    // would have if its aggro range were `bonusYards` longer, and returns how
+    // many woke. `searchYards` is how wide a net to cast and has to reach past
+    // the widest aggro range a creature can have plus the bonus.
+    //
+    // Two cards share this: Keen-nosed (13, +8 yd) and Scavenger's Eye
+    // (88, +5 yd). It is here rather than in either of them for the reason
+    // IsOrdinaryFoe is -- the second copy of a predicate is the one that
+    // drifts -- and because the interesting part is what it refuses to do: a
+    // creature already inside its own range is left alone, since it is about
+    // to aggro by itself and taking the credit would make the affix look like
+    // it does more than it does.
+    uint32 AlertUnaware(Player* owner, float bonusYards, float searchYards);
+
     // The nearest creature to `origin` that is fair game for `owner`, shares
     // `kin`'s faction, and is not already fighting anybody -- what Call to Arms
     // and Craven both mean by "its nearest kin". Null when the camp is empty.

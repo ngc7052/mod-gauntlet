@@ -238,6 +238,19 @@ namespace Gauntlet
         // how a denial is reached with nothing written per card.
         virtual bool  CanEquip(Ctx&, ItemTemplate const*) { return true; }
 
+        // The same question for *using* an item rather than wearing it, from
+        // PlayerScript::OnPlayerCanUseItem (PlayerScript.h:593). The core asks
+        // it at the end of Player::CanUseItem(ItemTemplate const*)
+        // (PlayerStorage.cpp:2432), and the Item* overload every right-click
+        // goes through calls that one (:2341) -- so a refusal here stops a
+        // potion being drunk and a meal being eaten, which is what Blood for
+        // Bread (89) and Waste Not (90) are.
+        //
+        // The refusal reaches the player as a generic client error, exactly as
+        // CanEquip's does, so a card that refuses owes them a chat line saying
+        // which card it was.
+        virtual bool  CanUseItem(Ctx&, ItemTemplate const*) { return true; }
+
         virtual bool  IsRelevant(Player*) const { return true; }   // beyond the classMask
 
         // The Player-free half of the multiplier callbacks, and an addition to

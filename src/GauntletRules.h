@@ -237,6 +237,67 @@ namespace Rules
     {
         return bank * (100u - LEAVE_LOSS_PCT) / 100u;
     }
+
+    // ------------------------------------------------------------------
+    // The three reward-shaped cards of docs/commons.md -- Scavenger's Eye
+    // (88), Blood for Bread (89), Waste Not (90).
+    //
+    // They exist because of a measurement rather than a theme: every offer set
+    // must contain one card flagged MF_RewardShaped, and every row that
+    // carried the flag was Rare, so one slot in three was a rare before any
+    // weight was consulted. These three are the first that are not. The flag
+    // is not decoration -- it means the card's own mechanic hands the player
+    // something when they engage with it, which is why each of them pays on a
+    // kill or on a fight fought a particular way, and not through a boon.
+    // ------------------------------------------------------------------
+
+    // Keen-nosed's (13) bonus, moved here from the mechanic so the claim below
+    // can be made at all. It is the rare version of the same curse.
+    constexpr float KEEN_NOSED_YARDS = 8.0f;
+
+    // Scavenger's Eye's. Five, against Keen-nosed's eight: the uncommon is
+    // the smaller version of the rare's curse, and the test says so rather
+    // than either file saying a number twice.
+    constexpr float SCAVENGER_YARDS = 5.0f;
+
+    // How many times a clean fight's corpse is rolled. Two is "twice", which
+    // is what the card says; the point the test holds is that it is a whole
+    // extra roll of the creature's own table and not a percentage on top of
+    // one -- a fraction would be a boon, and this card's upside has to be
+    // something the player earned by fighting a particular way.
+    constexpr uint32 SCAVENGER_ROLLS = 2;
+
+    constexpr uint32 ScavengerExtraRolls()
+    {
+        return SCAVENGER_ROLLS - 1u;
+    }
+
+    // Blood for Bread gives up eating and drinking -- both bars, all
+    // downtime -- and pays on every kill. Waste Not gives up potions only and
+    // pays less. The ordering is the decision: a card that takes more must
+    // pay more, or the smaller card is strictly better and the bigger one is
+    // never worth taking.
+    constexpr uint32 BLOOD_FOR_BREAD_PCT = 8;
+    constexpr uint32 WASTE_NOT_PCT       = 5;
+
+    // At least one point, for Deep Wounds' reason: a kill that restores
+    // nothing reads as the card being broken, and a percentage of a level-5
+    // health pool rounds to zero long before the player stops noticing.
+    constexpr uint32 KillRestore(uint32 pool, uint32 pct)
+    {
+        uint32 const share = uint32(uint64(pool) * pct / 100u);
+        return share > 1u ? share : 1u;
+    }
+
+    constexpr uint32 BloodForBreadRestore(uint32 pool)
+    {
+        return KillRestore(pool, BLOOD_FOR_BREAD_PCT);
+    }
+
+    constexpr uint32 WasteNotRestore(uint32 pool)
+    {
+        return KillRestore(pool, WASTE_NOT_PCT);
+    }
 }
 }
 

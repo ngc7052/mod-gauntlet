@@ -448,6 +448,24 @@ public:
         return sGauntlet->CanEquip(player, pItem->GetTemplate());
     }
 
+    // The item-use veto (PlayerScript.h:593), which Blood for Bread and Waste
+    // Not hang on. `result` is what the core returns to the client when a
+    // script refuses; it is left at EQUIP_ERR_OK's neighbour rather than set,
+    // because every value the enum has is a lie about why -- the true reason
+    // is a curse, and the card says so in chat.
+    bool OnPlayerCanUseItem(Player* player, ItemTemplate const* proto,
+                            InventoryResult& result) override
+    {
+        if (!proto)
+            return true;
+
+        if (sGauntlet->CanUseItem(player, proto))
+            return true;
+
+        result = EQUIP_ERR_CANT_DO_RIGHT_NOW;
+        return false;
+    }
+
     // Iron Purse. discountMod arrives as the reputation price discount and the
     // core spends it as a multiplier on the bill (NPCHandler.cpp:780-782,
     // Player.cpp:4955), so a mechanic makes repairs dearer by raising it.

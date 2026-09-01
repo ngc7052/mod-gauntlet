@@ -8,6 +8,7 @@
 #include "Cell.h"
 #include "CellImpl.h"
 #include "Creature.h"
+#include "CreatureAI.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
 #include "Player.h"
@@ -175,5 +176,49 @@ namespace Gauntlet
         }
 
         return best;
+    }
+
+    uint32 AlertUnaware(Player* owner, float bonusYards, float searchYards)
+    {
+        if (!owner)
+            return 0;
+
+        uint32 alerted = 0;
+
+        for (Creature* creature : CreaturesNear(owner, searchYards))
+        {
+            if (!IsFairGame(owner, creature))
+                continue;
+
+            // Already awake, already someone's problem: neither is a creature
+            // that "could normally not see the owner yet".
+            if (creature->IsInCombat() || creature->GetVictim())
+                continue;
+
+            // GetAggroRange is the core's own answer to "how close before this
+            // creature notices" (Creature.h:260), level difference and all, so
+            // the affix extends the real number rather than a guess at it. A
+            // creature already inside its own range is left entirely alone.
+            float const own  = creature->GetAggroRange(owner);
+            float const dist = creature->GetDistance(owner);
+
+            if (dist <= own || dist > own + bonusYards)
+                continue;
+
+            // Everything left that could stop a real aggro: civilian,
+            // immunity, the Z-distance rule, whether it may attack this target
+            // at all, and line of sight. `force` is true because the range
+            // test is exactly the one being replaced; every other test in
+            // CanStartAttack still applies (Creature.cpp:1905-1944).
+            if (!creature->CanStartAttack(owner, true))
+                continue;
+
+            if (CreatureAI* ai = creature->AI())
+                ai->AttackStart(owner);
+
+            ++alerted;
+        }
+
+        return alerted;
     }
 }

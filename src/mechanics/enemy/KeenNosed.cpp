@@ -7,6 +7,7 @@
 
 #include "GauntletAddon.h"
 #include "GauntletRegistry.h"
+#include "GauntletRules.h"
 #include "GauntletScheduler.h"
 #include "GauntletSummons.h"
 #include "../Boons.h"
@@ -46,11 +47,13 @@ namespace Gauntlet
     {
         constexpr uint16 MECHANIC_KEEN_NOSED = 13;
 
-        // The card's ladder: +5 -> +8 -> +12 yd, and +18 at rank IV. Past
-        // that the affix stops being about pulling carefully and starts
-        // being about whether a zone can be crossed at all, which is a
-        // different affix.
-        constexpr float BONUS_YARDS = 8.0f;
+        // The card's number lives in Rules.h, where a test can reach it:
+        // Scavenger's Eye (88) is the uncommon version of this curse and the
+        // two are only meaningful against each other. Past about twelve yards
+        // the affix stops being about pulling carefully and starts being
+        // about whether a zone can be crossed at all, which is a different
+        // affix.
+        constexpr float BONUS_YARDS = Rules::KEEN_NOSED_YARDS;
 
         // How wide a net the grid search casts. It has to reach past the
         // widest aggro range a creature can have plus the widest bonus above;
@@ -147,51 +150,10 @@ namespace Gauntlet
 
         void KeenNosed::Sweep(Ctx& ctx, Player* player)
         {
-            float const bonus = BONUS_YARDS;
-
-            uint32 alerted = 0;
-
-            for (Creature* creature : CreaturesNear(player, SEARCH_YARDS))
-            {
-                if (!IsFairGame(player, creature))
-                    continue;
-
-                // Already awake, already someone's problem, or ours to begin
-                // with: none of those is a creature that "could normally not
-                // see the owner yet".
-                if (creature->IsInCombat() || creature->GetVictim())
-                    continue;
-                if (sGauntletSummons->IsGauntletSummon(creature))
-                    continue;
-
-                // GetAggroRange is the core's own answer to "how close before
-                // this creature notices" (Creature.h:260), level difference and
-                // all, so the affix extends the real number rather than a
-                // guess at it. A creature that is already inside its own range
-                // is left entirely alone: it is about to aggro by itself and
-                // taking the credit for that would make the affix look like it
-                // is doing more than it is.
-                float const own  = creature->GetAggroRange(player);
-                float const dist = creature->GetDistance(player);
-
-                if (dist <= own || dist > own + bonus)
-                    continue;
-
-                // Everything left that could stop a real aggro: civilian,
-                // immunity, the Z-distance rule, whether it may attack this
-                // target at all, and line of sight. `force` is true because
-                // the range test is exactly the one this affix is replacing;
-                // every other test in CanStartAttack still applies
-                // (Creature.cpp:1905-1944).
-                if (!creature->CanStartAttack(player, true))
-                    continue;
-
-                if (CreatureAI* ai = creature->AI())
-                    ai->AttackStart(player);
-
-                ++alerted;
-            }
-
+            // The search itself is Nearby.cpp's AlertUnaware, shared with
+            // Scavenger's Eye. What is left here is the card's own half: how
+            // far, and what the player is told.
+            uint32 const alerted = AlertUnaware(player, BONUS_YARDS, SEARCH_YARDS);
             if (alerted == 0)
                 return;
 
