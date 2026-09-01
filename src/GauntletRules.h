@@ -469,6 +469,24 @@ namespace Rules
         return amount + uint32(uint64(amount) * CALL_TO_ARMS_XP_PCT / 100u);
     }
 
+    // Tribute (115): every 25th kill leaves a chest, and opening it draws the
+    // scavengers that make it a decision rather than a gift. Twenty-five is
+    // Echo's cadence deliberately -- a number the player can feel coming
+    // without counting.
+    constexpr int32  TRIBUTE_EVERY      = 25;
+    constexpr uint32 TRIBUTE_SCAVENGERS = 2;
+
+    // The Tenth Corpse (116): nine corpses hold nothing and the tenth holds
+    // all of it. The run is faster by nine loot windows never opened, and the
+    // risk is dying on the ninth.
+    constexpr int32  TENTH_EVERY = 10;
+
+    constexpr int32 TenthCorpseLeft(int32 opened)
+    {
+        int32 const into = opened % TENTH_EVERY;
+        return into == 0 ? 0 : TENTH_EVERY - into;
+    }
+
     // Blood Magic (20): below the line the cost stops and the payoff starts.
     constexpr uint32 BLOOD_MAGIC_LINE_PCT   = 35;
     constexpr uint32 BLOOD_MAGIC_PAYOFF_PCT = 25;

@@ -266,5 +266,9 @@ GauntletData = {
                  icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain", desc = "You take more damage, and every corpse you loot restores health." },
         [114] = { name = "Gravedigger", key = "gravedigger", family = 0, rarity = 0,
                  icon = "Interface\\Icons\\Spell_Shadow_RaiseDead", desc = "Every eighth corpse you loot gets up again, and drops what it was holding back." },
+        [115] = { name = "Tribute", key = "tribute", family = 0, rarity = 2,
+                 icon = "Interface\\Icons\\Spell_Shadow_RaiseDead", desc = "Every 25th kill leaves a chest. Opening it draws scavengers." },
+        [116] = { name = "The Tenth Corpse", key = "tenth_corpse", family = 4, rarity = 3,
+                 icon = "Interface\\Icons\\INV_Scroll_03", desc = "Corpses hold nothing until the tenth. That one holds everything the others were carrying." },
     },
 }

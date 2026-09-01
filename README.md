@@ -2,7 +2,7 @@
 
 A hardcore roguelike challenge module for [AzerothCore](https://www.azerothcore.org/).
 
-One life. A new affix every level — drawn from a registry of **107 mechanics
+One life. A new affix every level — drawn from a registry of **109 mechanics
 across seven families**, never a fixed list. Two runs are never the same.
 
 An affix is not a stat penalty rolled off a table. It is a **mechanic**: a
@@ -11,7 +11,7 @@ it, rather than a multiplier bolted onto your character sheet. A shade that
 hunts you between fights. A strike that lands where you were standing. A
 paladin whose Consecration burns twice as hot for half as long.
 
-> **Status.** **All 107 mechanics are live and offerable.** No registry row is
+> **Status.** **All 109 mechanics are live and offerable.** No registry row is
 > flagged `MF_NotImplemented`, and the `OFFERABLE` list in
 > `tests/RegistryTest.cpp` is what enforces that. Phases 0–4 are complete and
 > reported in `docs/`; Phase 5 is the pacing pass — config, tuning and
@@ -272,6 +272,8 @@ common for the trades after id 74.
 | 112 | **Trophy Hunter** | Enemy | Uncommon | any | 1&ndash;80 | A rare creature nearby makes everything hit harder. Killing one leaves a chest and banks a reroll. | &mdash; |
 | 113 | **Scavenge** | Attrition | Common | any | 1&ndash;80 | You take more damage, and every corpse you loot restores health. | &mdash; |
 | 114 | **Gravedigger** | Spawn | Common | any | 1&ndash;80 | Every eighth corpse you loot gets up again, and drops what it was holding back. | &mdash; |
+| 115 | **Tribute** | Spawn | Rare | any | 1&ndash;80 | Every 25th kill leaves a chest. Opening it draws scavengers. | &mdash; |
+| 116 | **The Tenth Corpse** | Rules | Epic | any | 1&ndash;80 | Corpses hold nothing until the tenth. That one holds everything the others were carrying. | &mdash; |
 <!-- AFFIX-TABLE-END -->
 
 ## Boons

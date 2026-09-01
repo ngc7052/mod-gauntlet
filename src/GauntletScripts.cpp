@@ -925,6 +925,8 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_TrophyHunter();         // 112
     void AddSC_gauntlet_mechanic_Scavenge();             // 113
     void AddSC_gauntlet_mechanic_Gravedigger();          // 114
+    void AddSC_gauntlet_mechanic_Tribute();              // 115
+    void AddSC_gauntlet_mechanic_TenthCorpse();          // 116
 }
 
 static void AnchorMechanics()
@@ -1048,6 +1050,8 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_TrophyHunter();
     AddSC_gauntlet_mechanic_Scavenge();
     AddSC_gauntlet_mechanic_Gravedigger();
+    AddSC_gauntlet_mechanic_Tribute();
+    AddSC_gauntlet_mechanic_TenthCorpse();
 }
 
 void Addmod_gauntletScripts()

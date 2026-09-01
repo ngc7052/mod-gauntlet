@@ -9,8 +9,8 @@ and §4 before trusting any test.
 
 `mod-gauntlet`, an AzerothCore (WotLK 3.3.5a) module: a procedurally generated
 hardcore affix challenge. A run offers three "affix" cards per tier, the player
-picks one, and the curses accumulate. 107 mechanics, all implemented: twenty-six
-commons, twelve uncommons, fifty-three rares, fourteen epics and two
+picks one, and the curses accumulate. 109 mechanics, all implemented: twenty-six
+commons, twelve uncommons, fifty-four rares, fifteen epics and two
 legendaries, with reroll and skip live on every tier.
 Steps 1-4 of `docs/rarity-plan.md` have landed -- the rank system is gone, a
 card is one value and rarity is its only tier -- and step 5, the remaining
@@ -42,7 +42,7 @@ level with `origin/master`.
 ```bash
 ./tests/compile-check.sh --anchors   # anchors + ladder audit, seconds, no Docker
 ./tests/compile-check.sh             # full compile + link in the build container
-./tests/run-tests.sh                 # 215 unit tests
+./tests/run-tests.sh                 # 217 unit tests
 ./sync-to-server.sh                  # rsync the module into the core tree
 cd /mnt/c/Users/3302/azerothcore-wotlk
 DC="docker compose -f docker-compose.yml -f docker-compose.override.yml --project-directory ."
@@ -70,7 +70,7 @@ that way. Verified after the fact on 2026-09-01: the four live runs, eighteen
 affixes and twenty-seven log rows were untouched by the reapply.
 
 Gate before every commit: anchors, ladders, compile, link, tests. All green
-today — 107 anchors, 4 ladders, 71 objects, 215 tests.
+today — 109 anchors, 4 ladders, 73 objects, 217 tests.
 
 ## 4. The testing rig, and what it cannot see
 
@@ -832,6 +832,31 @@ what turned a shrug into a list:
 None of these is evidence of a broken card; all of them are evidence the
 harness cannot produce the situation. That is the distinction §4 exists for,
 and it is now readable per card instead of per session.
+
+### Two more loot cards (2026-09-01)
+
+**Tribute** (115, Rare, Spawn): every 25th kill leaves a chest, and opening it
+draws two scavengers. The chest is not the card -- the decision about *when* to
+open it is, and it stands for five minutes so the player can clear the ground
+first or fight for it now. Both seams are proven ones: `SummonGameObject` with
+the level-banded world chests Trophy Hunter uses, and a chest's loot window
+arriving through `OnLoot` with the game object's guid exactly as a corpse's
+does.
+
+**The Tenth Corpse** (116, **Epic**, Rules): nine corpses hold nothing but
+their quest items and the tenth holds every table the nine were carrying.
+Exclusive with Fresh Kill through the `loot-rhythm` key -- two cards that
+rewrite when a corpse pays are one card twice. The bank is nine loot *ids* in
+the state store rather than items, which is what makes it survive a logout: an
+id is an int32 and the store holds those, and the tenth corpse rolls them
+fresh. Benched: `12 opened, 2 emptied, 1 paid out over 9 table(s); 8 to the
+next payout`.
+
+Tribute's own counters read zero, and the summary says why on the line beneath
+them -- `not asked: no ordinary foe was standing near this character`. It needs
+twenty-five ordinary kills, which no probe will ever stage. That is the
+harness being honest rather than a card being broken, which is the whole point
+of the `not asked:` line.
 
 ### Step 5, the rest -- and what the sweep says it should be
 

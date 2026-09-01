@@ -820,6 +820,17 @@ namespace
           MF_RewardShaped, "", Boon::None, 0, 0,
           "Every eighth corpse you loot gets up again, and drops what it was holding back." },
 
+        // More of docs/greed-redesign.md section 7.3's loot cards.
+        { 115, "tribute", "Tribute", Family::Spawn, 0, 1, 80, Rarity::Rare,
+          MF_OnKill | MF_RewardShaped, "", Boon::None, 0, 0,
+          "Every 25th kill leaves a chest. Opening it draws scavengers." },
+
+        // Exclusive with Fresh Kill: two cards that rewrite when a corpse pays
+        // are one card twice.
+        { 116, "tenth_corpse", "The Tenth Corpse", Family::Rules, 0, 1, 80, Rarity::Epic,
+          MF_RewardShaped, "loot-rhythm", Boon::None, 0, 0,
+          "Corpses hold nothing until the tenth. That one holds everything the others were carrying." },
+
         };
     }
 

@@ -547,3 +547,32 @@ TEST(Rules, AmbushRestoresTheRestItInterrupted)
     EXPECT_EQ(Rules::AMBUSH_RESTORE_PCT, 100u);
 }
 
+TEST(Rules, TheTenthCorpseCountsDownAndPaysOnTheTenth)
+{
+    // The card's whole shape is a countdown the player can read, so the
+    // arithmetic that drives the chat line and the HUD has to agree with the
+    // arithmetic that decides the payout. A card that said "3 more" and then
+    // paid on the fourth would be unplannable, which is the one thing an epic
+    // that changes how the run loots cannot be.
+    EXPECT_EQ(Rules::TenthCorpseLeft(0), 0) << "nothing opened yet is not a countdown";
+    EXPECT_EQ(Rules::TenthCorpseLeft(1), Rules::TENTH_EVERY - 1);
+    EXPECT_EQ(Rules::TenthCorpseLeft(9), 1) << "the ninth is one from the payout";
+    EXPECT_EQ(Rules::TenthCorpseLeft(10), 0) << "the tenth is the payout";
+    EXPECT_EQ(Rules::TenthCorpseLeft(11), Rules::TENTH_EVERY - 1) << "and the count starts again";
+
+    // The bank has to have somewhere to put every corpse that is not the
+    // payout, or one of them is silently dropped.
+    EXPECT_GT(Rules::TENTH_EVERY, 1);
+}
+
+TEST(Rules, TributeIsRarerThanTheCardsThatShareItsFamily)
+{
+    // Tribute leaves a chest, which is the largest single reward in the table.
+    // Gravedigger raises something every eighth corpse and Carrion draws a pack
+    // every fourth; a chest arriving on that cadence would be the run's whole
+    // economy. Twenty-five kills is the guard, and it has to stay well above
+    // the others.
+    EXPECT_GT(Rules::TRIBUTE_EVERY, Rules::GRAVEDIGGER_EVERY);
+    EXPECT_GT(Rules::TRIBUTE_SCAVENGERS, 0u) << "a chest with nothing watching it is a gift";
+}
+
