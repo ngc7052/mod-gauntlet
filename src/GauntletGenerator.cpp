@@ -60,6 +60,18 @@ namespace
     constexpr uint32 CAP_TEMPO   = 2;   // §4.1 "two tempo mechanics"
     constexpr uint32 CAP_BARGAIN = 2;   // §4.1 "two bargains"
 
+    // "Legendary (gold) | Run-defining, one per run" -- docs/rarity-plan.md
+    // section 2's own words, and the first cap this module has ever counted by
+    // rarity rather than by family or flag.
+    //
+    // It is one of the two answers section 7.3 leaves open ("one legendary per
+    // run, or one per family?"); this is the one section 2 already states, and
+    // a legendary a run can carry three of is not a legendary. With two
+    // legendary rows in the table the measurable effect is small -- the sweep
+    // moves by well under a point -- so what this really buys is that the
+    // documents and the code agree before the count grows.
+    constexpr uint32 CAP_LEGENDARY = 1;
+
     // How many class curses a run may carry.
     //
     // The design gives each class four, "covering four verbs -- a threshold, a
@@ -231,6 +243,7 @@ namespace
         uint32                              tempo   = 0;
         uint32                              bargain = 0;
         uint32                              klass   = 0;   // `class` is a keyword
+        uint32                              legendary = 0;
 
         AffixInstance const* Find(uint16 mechanic) const
         {
@@ -261,6 +274,8 @@ namespace
                 out.bargain++;
             if (def->family == Family::Class)
                 out.klass++;
+            if (def->rarity == Rarity::Legendary)
+                out.legendary++;
         }
 
         return out;
@@ -276,6 +291,8 @@ namespace
         if (def.family == Family::Bargain && carried.bargain >= CAP_BARGAIN)
             return false;
         if (def.family == Family::Class && carried.klass >= CAP_CLASS)
+            return false;
+        if (def.rarity == Rarity::Legendary && carried.legendary >= CAP_LEGENDARY)
             return false;
 
         return true;
@@ -366,6 +383,24 @@ namespace
         // Every offer is an introduction now that rank-ups are gone, so the
         // window binds every kind.
         if (ctx.tier < def.minTier || ctx.tier > def.maxTier)
+            return false;
+
+        // A rarity the tier's weights forbid is not offerable at that tier by
+        // any path.
+        //
+        // The ordinary slots already obeyed this without being told: RollRarity
+        // draws the slot's rarity from those weights, so a rarity weighing zero
+        // is never rolled. The reward-shaped guarantee does not go through
+        // RollRarity -- it rebuilds slot B straight from a pool of everything
+        // carrying MF_RewardShaped -- and so it handed tier-12 characters an
+        // Epic, because Killing Floor happens to be one of the cards it found.
+        // Measured before this guard, with the epic pass in: 3% of sets at
+        // tier 10 rising to 6% at tier 13 offered an epic against a target of
+        // zero, beginning exactly at Killing Floor's own minTier.
+        //
+        // Nothing is lost by the guarantee: at those tiers eight other
+        // reward-shaped cards are eligible and none of them is an epic.
+        if (Rules::RarityWeight(ctx.tier, def.rarity) == 0)
             return false;
         if (def.family == Family::Bargain && ctx.tier < BARGAIN_MIN_TIER)
             return false;

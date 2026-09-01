@@ -437,6 +437,56 @@ TEST(GeneratorConditions, AnOfferCarriesItsTradeLinesCondition)
     EXPECT_GT(conditional, 0u) << "no conditional trade was ever offered; nothing above was tested";
 }
 
+TEST(GeneratorCaps, ARunCarryingALegendaryIsNeverOfferedAnother)
+{
+    // "Legendary (gold) | Run-defining, one per run" -- docs/rarity-plan.md
+    // section 2. A legendary a run can carry three of is not a legendary, and
+    // this is the first cap the generator counts by rarity rather than by
+    // family or flag, so it is worth an assertion rather than a reading of
+    // CapsAllow.
+    //
+    // Swept only where legendaries can be drawn at all: LEGENDARY_PCT is zero
+    // below tier 41, which the registry audit
+    // (Registry.EveryRowsRarityHasWeightSomewhereInsideItsTierWindow) is the
+    // other half of.
+    RegistryView full;
+    full.includeUnimplemented = true;
+
+    MechanicDef const* legendary = nullptr;
+    for (MechanicDef const& def : AllMechanics())
+        if (def.rarity == Rarity::Legendary && def.classMask == 0)
+        {
+            legendary = &def;
+            break;
+        }
+    ASSERT_NE(legendary, nullptr) << "no classless legendary to carry; the pass is untested";
+
+    AffixInstance held;
+    held.mechanic   = legendary->id;
+    held.rarity     = legendary->rarity;
+    held.slot       = 1;
+    held.genVersion = GeneratorVersion;
+    std::vector<AffixInstance> const carried = { held };
+
+    uint32 offered = 0;
+    for (uint8 cls : CLASSES)
+    {
+        StubView const view(cls, 1);
+        for (uint8 tier : { 41, 55, 70, 80 })
+            for (uint32 seed = 1; seed <= 150; ++seed)
+                for (Offer const& o : BuildOffers(seed, tier, view, carried, 3, full).offers)
+                {
+                    MechanicDef const* def = FindMechanic(o.mechanic);
+                    ASSERT_NE(def, nullptr);
+                    EXPECT_NE(def->rarity, Rarity::Legendary)
+                        << def->key << " offered to a run already carrying " << legendary->key
+                        << " (class " << uint32(cls) << " tier " << uint32(tier) << " seed " << seed << ")";
+                    ++offered;
+                }
+    }
+    EXPECT_GT(offered, 0u) << "no offers were built at all; the sweep above tested nothing";
+}
+
 TEST(GeneratorSwaps, ASwapTierOffersNoSwapToARunCarryingNothing)
 {
     // Tiers 20, 40 and 60 guarantee a Swap in slot C -- a guarantee about a
