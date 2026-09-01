@@ -1961,6 +1961,11 @@ public:
                 handler->PSendSysMessage("    events released: {}", probe.eventsFired);
                 if (!probe.diagnose.empty())
                     handler->PSendSysMessage("    its own counters: {}", probe.diagnose);
+
+                // What the probe could not ask, printed beside what the card
+                // did not answer. Without this the two are the same blank.
+                for (std::string const& note : probe.notes)
+                    handler->PSendSysMessage("    |cffff8040not asked:|r {}", note);
             }
 
             if (Scheduler* clock = sGauntlet->ClockFor(p))

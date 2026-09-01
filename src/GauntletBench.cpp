@@ -714,6 +714,51 @@ namespace Gauntlet
                                     raised->DespawnOrUnsummon();
                                 }
                             noteBoth("what the card raised, told it died");
+
+                            // An *ordinary* foe, which is the one thing this
+                            // file cannot manufacture.
+                            //
+                            // Nearby::IsOrdinaryFoe refuses creature->IsSummon()
+                            // (Nearby.cpp:113-116), and every creature a probe
+                            // can create is a summon -- so Grudge, Call to
+                            // Arms, Champions, Death Rattle and every other
+                            // card that asks "was this a real enemy" has had
+                            // its on-kill half silently unreachable for as
+                            // long as this bench has existed. Their counters
+                            // said "nothing has happened" and it was true, and
+                            // it was the harness's doing.
+                            //
+                            // So the world is asked instead of the probe. If a
+                            // genuine foe is standing near the character, the
+                            // cards are told it died -- told, not killed, for
+                            // the reason above. If none is, the summary says
+                            // so rather than leaving a blank where a verdict
+                            // should be.
+                            Creature* ordinary = nullptr;
+                            for (Creature* c : CreaturesNear(player, BENCH_SUMMON_YARDS))
+                                if (c->IsAlive() && IsOrdinaryFoe(c) && !sGauntletSummons->IsGauntletSummon(c))
+                                {
+                                    ordinary = c;
+                                    break;
+                                }
+
+                            if (ordinary)
+                            {
+                                sGauntlet->OnCreatureKill(player, ordinary, /*byPet*/ false);
+                                out.reached.emplace_back("an ordinary foe, told it died");
+                                noteBoth("an ordinary foe dying");
+
+                                // And its corpse opened, so a card that races
+                                // the loot against something has both halves.
+                                sGauntlet->OnLootWindow(player, ordinary->GetGUID(), &ordinary->loot);
+                                noteBoth("an ordinary foe's corpse opened");
+                            }
+                            else
+                            {
+                                out.notes.emplace_back(
+                                    "no ordinary foe was standing near this character, so every card "
+                                    "gated on IsOrdinaryFoe went unasked");
+                            }
                         }
                     }
 

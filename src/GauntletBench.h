@@ -38,6 +38,13 @@ namespace Gauntlet
         // The card's own Diagnose() after the run, when it has one.
         std::string diagnose;
 
+        // What the *probe* could not do, as opposed to what the card did not
+        // answer. A card that was never asked a question is not a card that
+        // failed one, and the summary has to be able to tell the reader which
+        // it is looking at -- section 4 of docs/handoff.md is the list of
+        // times that distinction was missed.
+        std::vector<std::string> notes;
+
         // Scheduled events actually released. Zero for a card that never armed.
         uint32 eventsFired = 0;
 

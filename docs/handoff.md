@@ -810,12 +810,19 @@ what turned a shrug into a list:
   the bench kills its target outright at full health, and the flee is at 25%.
   A probe that damages the target *down to* the flee threshold and then kills
   it is what this needs.
-- `grudge: 0 corpse(s) counting down, 0 beaten to the corpse` -- the kill that
-  should mark a corpse is not marking one. Worth chasing: the quarry is an
-  ordinary foe and the loot window follows immediately, so on paper the race
-  should fire. Something between `OnCreatureKill` and `Mark` is refusing.
-- `call to arms: nothing has answered a call` -- no kin stand near the bench's
-  summoned target, so nothing is ever alerted to pay.
+- `grudge: 0 corpse(s) counting down, 0 beaten to the corpse` -- **chased, and
+  it was the harness.** `Nearby::IsOrdinaryFoe` refuses
+  `creature->IsSummon()` (Nearby.cpp:113-116), and *every* creature a probe
+  can create is a summon. So Grudge, Call to Arms, Champions, Death Rattle and
+  every other card that asks "was this a real enemy" has had its on-kill half
+  unreachable for as long as this bench has existed -- their counters said
+  nothing had happened, and that was true, and it was the bench's doing. The
+  probe now looks for a genuine foe standing near the character and tells the
+  cards it died; with one nearby, Grudge reports **`1 beaten to the corpse`**
+  and Call to Arms **`1 kin still owed the bonus`**. When none is nearby the
+  summary prints a `not asked:` line rather than leaving a blank where a
+  verdict should be.
+- `call to arms` now reports a kin owed the bonus, from the same fix.
 - `falter: 3 stumble(s), 0 reprisal(s) spent` -- the stumbles fire; the window
   opens three seconds later and the probe's damage has already happened. A
   probe that ticks past the stumble and *then* hits would close it.
@@ -885,10 +892,17 @@ Things step 2 left for a later pass, deliberately:
 - `docs/checklists.md` — 672 lines of in-game checks, still mostly undone.
 - `.gauntlet debug remove all` does not exist, so undoing `give-class` means
   removing ~30 affixes one slot at a time.
-- The redesigned brakes' reward halves each need a situation the bench does
-  not stage: a target damaged to its flee threshold (Craven), kin standing
-  near the target (Call to Arms), a tick past the stumble before the damage
-  probe (Falter), and Grudge's mark-on-kill chased to ground.
+- Craven's bounty needs a target damaged *down to* its flee threshold and
+  then killed; the probe kills at full health and the flee is at 25%. Falter's
+  Reprisal needs a tick past the stumble before the damage probe, since the
+  window opens three seconds after the hands fail. Both are small probe
+  additions.
+- **The bench cannot manufacture an ordinary foe** and now says so when it
+  cannot find one. `IsOrdinaryFoe` refuses summons, which is right, and every
+  creature a probe creates is one -- so the bench borrows a real creature from
+  the world when the character happens to be standing near one. On a bot in
+  an empty field, every card gated on that predicate still goes unasked, and
+  the `not asked:` line is how the reader knows.
 - The bench cannot reach the *aggro* half of Keen-nosed or Scavenger's Eye
   (§7): it needs a creature summoned outside its own aggro range, with the
   character out of combat, and then an assertion that it attacked.
