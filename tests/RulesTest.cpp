@@ -382,3 +382,72 @@ TEST(Rules, ACleanFightIsPaidAWholeExtraRollAndNotAFraction)
     EXPECT_GE(Rules::ScavengerExtraRolls(), 1u);
 }
 
+// ---------------------------------------------------------------------------
+// The first loot cards -- Fresh Kill (110), Blood Price (111), Trophy Hunter
+// (112). docs/greed-redesign.md section 7.3.
+// ---------------------------------------------------------------------------
+
+TEST(Rules, ACorpseLootedInTimeIsWorthMoreThanOneLootedLate)
+{
+    // Fresh Kill is a clock, and the clock only means something if the two
+    // ends of it differ. If "late" ever paid as well as "in time" the card
+    // would be a free double-loot with a sentence about hurrying attached, and
+    // the decision it exists to create -- stop mid-pull, or finish the fight --
+    // would not exist. That is the fault Killing Floor shipped with once.
+    EXPECT_GT(Rules::FRESH_KILL_ROLLS, Rules::FRESH_KILL_LATE_ROLLS);
+    EXPECT_GT(Rules::FRESH_KILL_ROLLS, 1u) << "in time must actually double something";
+    EXPECT_EQ(Rules::FRESH_KILL_LATE_ROLLS, 0u) << "late holds nothing but the quest";
+    EXPECT_GT(Rules::FRESH_KILL_WINDOW_MS, 0u);
+}
+
+TEST(Rules, BloodPriceCanNeverBeTheThingThatKillsTheRun)
+{
+    // The card charges health to open a corpse, in a mode where dying is the
+    // end of the character. A loot click that can kill is not a cost, it is a
+    // trap, so the floor is part of the arithmetic rather than a clamp someone
+    // has to remember at the call site -- and this is the test that says so.
+    for (uint32 maxHealth : { 40u, 743u, 4200u, 16795u, 100000u })
+        for (uint32 current : { 1u, 2u, 7u, 50u, 743u, 4200u, 16795u, 100000u })
+        {
+            if (current > maxHealth)
+                continue;
+
+            uint32 const cost = Rules::BloodPriceCost(maxHealth, current);
+            EXPECT_LT(cost, current)
+                << "max " << maxHealth << " current " << current << ": the cost took the last point";
+            EXPECT_GE(current - cost, 1u) << "max " << maxHealth << " current " << current;
+        }
+
+    // And at one health it takes nothing at all rather than rounding to zero
+    // by luck.
+    EXPECT_EQ(Rules::BloodPriceCost(10000u, 1u), 0u);
+}
+
+TEST(Rules, BloodPricePaysForLootingHurtRatherThanForLootingSafely)
+{
+    // The whole card is that the greedy line and the safe line disagree. If
+    // looting whole ever paid as well as looting hurt, the cost would be a tax
+    // with no decision attached.
+    EXPECT_GT(Rules::BLOOD_PRICE_ROLLS_HURT, Rules::BLOOD_PRICE_ROLLS_WHOLE);
+    EXPECT_GE(Rules::BLOOD_PRICE_ROLLS_WHOLE, 1u) << "a corpse always holds its own loot";
+    EXPECT_GT(Rules::BLOOD_PRICE_PCT, 0u) << "a cost of nothing is not a cost";
+}
+
+TEST(Rules, TrophyHunterIsADangerBeforeItIsAPayday)
+{
+    // The curse has to be real for the reward to be a decision, and the chest
+    // has to exist for every level a character can be -- a card that offered
+    // no chest to a level-80 player would be the boon that prints and does
+    // nothing.
+    EXPECT_GT(Rules::TROPHY_TAKEN_PCT, 0u);
+    EXPECT_GT(Rules::TrophyTakenMult(), 1.0f);
+    EXPECT_GT(Rules::TROPHY_YARDS, 0.0f);
+
+    for (uint8 level = 1; level <= 80; ++level)
+        EXPECT_NE(Rules::TrophyChestFor(level), 0u) << "no chest for level " << unsigned(level);
+
+    // The bands are a ladder, not a lookup that repeats itself: a low-level
+    // character and a level-80 one must not be handed the same chest, or the
+    // level banding is decoration.
+    EXPECT_NE(Rules::TrophyChestFor(10), Rules::TrophyChestFor(80));
+}

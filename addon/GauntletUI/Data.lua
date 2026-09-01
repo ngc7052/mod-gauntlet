@@ -260,5 +260,11 @@ GauntletData = {
                  icon = "Interface\\Icons\\Ability_Warrior_BattleShout", desc = "Everything chasing you is 10% faster." },
         [109] = { name = "Slow Learner", key = "slow_learner", family = 3, rarity = 0,
                  icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain", desc = "You gain 15% less experience." },
+        [110] = { name = "Fresh Kill", key = "fresh_kill", family = 4, rarity = 2,
+                 icon = "Interface\\Icons\\INV_Scroll_03", desc = "A corpse opened within eight seconds of the kill is looted twice. After that it holds nothing but the quest." },
+        [111] = { name = "Blood Price", key = "blood_price", family = 3, rarity = 2,
+                 icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain", desc = "Opening a corpse costs health. A corpse opened while hurt is looted twice." },
+        [112] = { name = "Trophy Hunter", key = "trophy_hunter", family = 1, rarity = 1,
+                 icon = "Interface\\Icons\\Ability_Warrior_BattleShout", desc = "A rare creature nearby makes everything hit harder. Killing one leaves a chest and banks a reroll." },
     },
 }

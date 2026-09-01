@@ -298,6 +298,86 @@ namespace Rules
     {
         return KillRestore(pool, WASTE_NOT_PCT);
     }
+
+    // ------------------------------------------------------------------
+    // The loot cards of docs/greed-redesign.md section 7.3: Fresh Kill (110),
+    // Blood Price (111), Trophy Hunter (112).
+    //
+    // All three are reward-shaped, which is the point of building these three
+    // first: section 7 of docs/handoff.md measures slot B's guarantee drawing
+    // from a pool of a dozen cards thinned by the distinct-family rule, and
+    // handing whatever survives the whole rarity share. More reward-shaped
+    // cards, in more families, is the only lever that moves it -- and Blood
+    // Price is the Attrition family's first that is not an epic.
+    // ------------------------------------------------------------------
+
+    // Fresh Kill: loot it now or it holds nothing but the quest item. Eight
+    // seconds is long enough to open a corpse mid-pull and short enough that
+    // doing so is a decision -- which is the whole card, since the pull is
+    // still going on.
+    constexpr uint32 FRESH_KILL_WINDOW_MS = 8000;
+    constexpr uint32 FRESH_KILL_ROLLS     = 2;
+    constexpr uint32 FRESH_KILL_LATE_ROLLS = 0;
+
+    // Blood Price: opening a corpse costs blood, and a corpse opened while
+    // hurt pays double. The two halves point the same way on purpose -- the
+    // card wants you to loot at the worst moment.
+    constexpr uint32 BLOOD_PRICE_PCT         = 3;
+    constexpr uint32 BLOOD_PRICE_ROLLS_HURT  = 2;
+    constexpr uint32 BLOOD_PRICE_ROLLS_WHOLE = 1;
+
+    // What opening a corpse costs, in health, already floored so it can never
+    // be the thing that kills the run: Blood Magic's cost is written the same
+    // way. The mechanic applies exactly this, so "never lethal" is a property
+    // of the arithmetic rather than of remembering to clamp at the call site.
+    constexpr uint32 BloodPriceCost(uint32 maxHealth, uint32 currentHealth)
+    {
+        if (currentHealth <= 1)
+            return 0;
+
+        uint32 const share = maxHealth * BLOOD_PRICE_PCT / 100u;
+        uint32 const most  = currentHealth - 1u;
+        return share < most ? share : most;
+    }
+
+    // Trophy Hunter: a silver dragon within a hundred yards is a payday and a
+    // threat at once. The range is what the tick scans, so it is also the
+    // widest net Nearby::CreaturesNear is asked to cast for this card.
+    constexpr float  TROPHY_YARDS     = 100.0f;
+    constexpr uint32 TROPHY_TAKEN_PCT = 15;
+
+    constexpr float TrophyTakenMult()
+    {
+        return 1.0f + float(TROPHY_TAKEN_PCT) / 100.0f;
+    }
+
+    // A chest of the player's own level band. The world database's classic
+    // chest ladder, verified present with its loot tables: Battered (2849,
+    // loot 2280, 712 rows), Solid (2850, loot 2281), Solid (2855, loot 2283,
+    // 1093 rows) and Northrend's Large Solid (153462, loot 9934, 1411 rows).
+    //
+    // Section 7.1's honest limit applies and is worth repeating where the
+    // number is: a chest's contents are the zone's, so this is greens and
+    // greys at level with the occasional blue. The card promises a chest, not
+    // a jackpot.
+    //
+    // LADDER-SENTINEL: entry ids, not magnitudes -- they ascend by accident of
+    // when Blizzard added them, and 153462 is only larger because Northrend
+    // came last.
+    constexpr uint32 TROPHY_CHEST[] = { 2849, 2850, 2855, 153462 };
+    constexpr uint8  TROPHY_CHEST_LEVEL[] = { 25, 45, 65, 255 };
+
+    constexpr uint32 TrophyChestFor(uint8 level)
+    {
+        for (size_t i = 0; i < std::size(TROPHY_CHEST_LEVEL); ++i)
+            if (level <= TROPHY_CHEST_LEVEL[i])
+                return TROPHY_CHEST[i];
+        return TROPHY_CHEST[std::size(TROPHY_CHEST) - 1];
+    }
+
+    // How long a summoned chest stands before it goes. Long enough to walk
+    // back for after the fight it came out of, short enough not to litter.
+    constexpr uint32 TROPHY_CHEST_SECONDS = 300;
 }
 }
 

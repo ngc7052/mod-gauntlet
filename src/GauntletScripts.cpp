@@ -922,6 +922,9 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_TradeStaffless();       // 107
     void AddSC_gauntlet_mechanic_TradeHunted();          // 108
     void AddSC_gauntlet_mechanic_TradeSlowLearner();     // 109
+    void AddSC_gauntlet_mechanic_FreshKill();            // 110
+    void AddSC_gauntlet_mechanic_BloodPrice();           // 111
+    void AddSC_gauntlet_mechanic_TrophyHunter();         // 112
 }
 
 static void AnchorMechanics()
@@ -1040,6 +1043,11 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_TradeStaffless();
     AddSC_gauntlet_mechanic_TradeHunted();
     AddSC_gauntlet_mechanic_TradeSlowLearner();
+
+    // docs/greed-redesign.md section 7.3's first loot cards.
+    AddSC_gauntlet_mechanic_FreshKill();
+    AddSC_gauntlet_mechanic_BloodPrice();
+    AddSC_gauntlet_mechanic_TrophyHunter();
 }
 
 void Addmod_gauntletScripts()

@@ -788,6 +788,31 @@ namespace
           MF_None, "", Boon::BonusLoot, 0, 0,
           "You gain 15% less experience." },
 
+        // The first of docs/greed-redesign.md section 7.3's loot cards, and
+        // these three first for a measured reason rather than a thematic one:
+        // section 7 of docs/handoff.md shows slot B's reward-shaped guarantee
+        // drawing from a pool of a dozen cards, thinned again by the
+        // distinct-family rule, and handing whatever survives the whole rarity
+        // share. More reward-shaped cards in more families is the only lever
+        // that moves it. Blood Price is the Attrition family's first that is
+        // not an epic; Trophy Hunter is the second reward-shaped uncommon in
+        // the table.
+        //
+        // Fresh Kill carries the "loot-rhythm" exclusive key, which has one
+        // member today: The Tenth Corpse rewrites when a corpse pays in the
+        // same way, and two cards that do that are one card twice.
+        { 110, "fresh_kill", "Fresh Kill", Family::Rules, 0, 1, 80, Rarity::Rare,
+          MF_RewardShaped, "loot-rhythm", Boon::BonusMoveSpeed, 0, 0,
+          "A corpse opened within eight seconds of the kill is looted twice. After that it holds nothing but the quest." },
+
+        { 111, "blood_price", "Blood Price", Family::Attrition, 0, 1, 80, Rarity::Rare,
+          MF_RewardShaped, "", Boon::None, 0, 0,
+          "Opening a corpse costs health. A corpse opened while hurt is looted twice." },
+
+        { 112, "trophy_hunter", "Trophy Hunter", Family::Enemy, 0, 1, 80, Rarity::Uncommon,
+          MF_RewardShaped, "", Boon::None, 0, 0,
+          "A rare creature nearby makes everything hit harder. Killing one leaves a chest and banks a reroll." },
+
         };
     }
 

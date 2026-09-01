@@ -33,7 +33,7 @@ namespace
     // reused, so the holes stay. Killing Floor (74) took Unspent's place in the
     // table and not its number, and 75-84 are the first ten commons of
     // docs/rarity-plan.md step 2.
-    constexpr size_t TABLE_SIZE = 104;
+    constexpr size_t TABLE_SIZE = 107;
     // A tier is a level now, not five of them. Every registry window was
     // multiplied by five with the axis, so the *level* each affix unlocks at
     // is exactly what it was; only the number naming it changed.
@@ -59,7 +59,7 @@ namespace
     // rather than as a count: a row that gains the flag by accident, or loses
     // it before its dispatch is wired, is an affix offered to a live hardcore
     // character that silently does nothing.
-    constexpr std::array<uint16, 104> OFFERABLE = {
+    constexpr std::array<uint16, 107> OFFERABLE = {
         1, 2, 3, 4, 5,           // S1 Shade, S2 Echo, S3 Carrion, S4 Reinforcements, S5 Ambush
         6, 7, 8, 9, 10, 11, 12, 13,  // E1 Champions .. E8 Keen-nosed
         14, 15, 16, 17, 18,      // T1 Falling Sky .. T5 Hubris
@@ -106,7 +106,10 @@ namespace
         91, 92, 93, 94, 95, 96, 97, 98, 99,
 
         // And its ten commons, which settle the mix those nine tipped.
-        100, 101, 102, 103, 104, 105, 106, 107, 108, 109
+        100, 101, 102, 103, 104, 105, 106, 107, 108, 109,
+
+        // The first of the greed redesign's loot cards.
+        110, 111, 112
     };
 
     // CONTRACT.md section 8's id ranges, which are fixed forever. The Attrition
@@ -119,40 +122,45 @@ namespace
         size_t count;
     };
 
-    constexpr std::array<Range, 22> RANGES = { {
+    constexpr std::array<Range, 25> RANGES = { {
         {  1,  5, Family::Spawn,      5 },
-        {  6, 13, Family::Enemy,     11 },
+        {  6, 13, Family::Enemy,     12 },
         { 14, 18, Family::Tempo,      8 },
-        { 19, 22, Family::Attrition, 12 },   // 21 and 22 deleted; 19, 20, 74 and five trades remain
-        { 23, 25, Family::Rules,     23 },   // three rules, sixteen denials, two reward-shaped, two uncommons
+        { 19, 22, Family::Attrition, 13 },   // 21 and 22 deleted; 19, 20, 74 and five trades remain
+        { 23, 25, Family::Rules,     24 },   // three rules, sixteen denials, two reward-shaped, two uncommons
         { 26, 27, Family::Bargain,    2 },
         { 28, 71, Family::Class,     43 },   // 69 deleted with Unspent
         // A5 Killing Floor, outside its family's original band because 21 and
         // 22 are spent and the next free id was 74. The band describes how the
         // table was first laid out; the no-reuse rule outranks it.
-        { 74, 74, Family::Attrition, 12 },
+        { 74, 74, Family::Attrition, 13 },
         // The trades, appended in id order as every row after 74 is: the
         // denials are Rules, the coefficient trades Attrition. The loot trades
         // (85-87) interleave the two, which is why the bands split again.
-        { 75, 81, Family::Rules,     23 },
-        { 82, 84, Family::Attrition, 12 },
-        { 85, 85, Family::Rules,     23 },
-        { 86, 87, Family::Attrition, 12 },
+        { 75, 81, Family::Rules,     24 },
+        { 82, 84, Family::Attrition, 13 },
+        { 85, 85, Family::Rules,     24 },
+        { 86, 87, Family::Attrition, 13 },
         // docs/commons.md's three reward-shaped rows: the first two Rules
         // cards since the denials, and the Enemy family's first non-rare.
-        { 88, 88, Family::Enemy,     11 },
-        { 89, 90, Family::Rules,     23 },
+        { 88, 88, Family::Enemy,     12 },
+        { 89, 90, Family::Rules,     24 },
         // The nine uncommons, interleaving four families in id order.
-        { 91, 91, Family::Attrition, 12 },
+        { 91, 91, Family::Attrition, 13 },
         { 92, 94, Family::Tempo,      8 },
-        { 95, 96, Family::Rules,     23 },
-        { 97, 98, Family::Attrition, 12 },
-        { 99, 99, Family::Enemy,     11 },
+        { 95, 96, Family::Rules,     24 },
+        { 97, 98, Family::Attrition, 13 },
+        { 99, 99, Family::Enemy,     12 },
         // The ten commons: eight denials filed Rules (four of them
         // class-masked, as Axeless is), and the last two coefficient kinds.
-        { 100, 107, Family::Rules,     23 },
-        { 108, 108, Family::Enemy,     11 },
-        { 109, 109, Family::Attrition, 12 }
+        { 100, 107, Family::Rules,     24 },
+        { 108, 108, Family::Enemy,     12 },
+        { 109, 109, Family::Attrition, 13 },
+        // The first loot cards: Fresh Kill is Rules, Blood Price Attrition,
+        // Trophy Hunter Enemy.
+        { 110, 110, Family::Rules,     24 },
+        { 111, 111, Family::Attrition, 13 },
+        { 112, 112, Family::Enemy,     12 }
     } };
 }
 
@@ -170,7 +178,7 @@ TEST(Registry, HoldsEveryEntryInAscendingIdOrder)
             << " (id " << all[i - 1].id << ") in ascending order";
 
     EXPECT_EQ(all.front().id, 1u);
-    EXPECT_EQ(all.back().id, 109u) << "the table must end at the last card, Slow Learner, id 109";
+    EXPECT_EQ(all.back().id, 112u) << "the table must end at the last card, Trophy Hunter, id 112";
 }
 
 TEST(Registry, TheDeletedScalarIdsAreGoneAndStayGone)
@@ -280,7 +288,7 @@ TEST(Registry, TheOriginalCardsAreRareAndEverythingAfterIsATradeLineOrANamedMech
     // on a kill or on a fight fought a particular way, which is what earns
     // them MF_RewardShaped. Adding a fourth is a decision, and this list is
     // where it gets made.
-    constexpr std::array<uint16, 3> MECHANIC_ROWS = { 88, 89, 90 };
+    constexpr std::array<uint16, 6> MECHANIC_ROWS = { 88, 89, 90, 110, 111, 112 };
 
     for (MechanicDef const& def : AllMechanics())
     {
@@ -322,13 +330,17 @@ TEST(Registry, TheOriginalCardsAreRareAndEverythingAfterIsATradeLineOrANamedMech
                 << def.key << " is listed as a mechanic and also has a trade line";
             EXPECT_TRUE(def.flags & MF_RewardShaped)
                 << def.key << " is one of the three written to carry MF_RewardShaped and does not";
-            EXPECT_EQ(def.classMask, 0u)
-                << def.key << " is class-masked; the whole point of these three is that any "
-                   "character can be offered one at tier 1";
-            EXPECT_EQ(def.minTier, 1u) << def.key << " does not open at tier 1";
-            EXPECT_TRUE(def.rarity == Rarity::Common || def.rarity == Rarity::Uncommon)
-                << def.key << " is " << RarityName(def.rarity)
-                << "; a rare carrying the flag is what these were written to stop being the only kind";
+            // Not classless-and-common any more. The first three were written
+            // to be exactly that, because the table had no non-rare
+            // reward-shaped card at all; the loot cards that followed are two
+            // rares and an uncommon, and the property that has to hold for all
+            // of them is only this: a row that is here rather than in the
+            // trade table is here because it does something a single line
+            // cannot say, and that is what MF_RewardShaped means.
+            //
+            // "At least one of them is non-rare, classless and open at tier 1"
+            // is the claim that actually matters, and
+            // Registry.TheRewardShapedGuaranteeCanBePaidWithoutARare makes it.
             continue;
         }
 
@@ -457,10 +469,10 @@ TEST(Registry, LookupsAgreeWithTheTable)
     // one of these is the normal answer for a run migrated from a registry
     // this build has never seen, so nullptr is the contract, not a crash.
     EXPECT_EQ(FindMechanic(static_cast<uint16>(MECHANIC_NONE)), nullptr);
-    // 110, one past the highest id the table carries. Not TABLE_SIZE + 1: the
+    // 113, one past the highest id the table carries. Not TABLE_SIZE + 1: the
     // ids are no longer contiguous, so the count and the highest id are
     // different numbers and only the second one bounds a lookup.
-    EXPECT_EQ(FindMechanic(static_cast<uint16>(110)), nullptr);
+    EXPECT_EQ(FindMechanic(static_cast<uint16>(113)), nullptr);
     EXPECT_EQ(FindMechanic(static_cast<uint16>(72)), nullptr);
     EXPECT_EQ(FindMechanic(static_cast<uint16>(0xFFFF)), nullptr);
     EXPECT_EQ(FindMechanic(std::string_view("")), nullptr);
