@@ -96,6 +96,19 @@ namespace Gauntlet
         Count(out, "summons owned", before.summons, after.summons);
         Count(out, "scheduler entries queued", before.armed, after.armed);
 
+        // The equipment, before the auras: a slot that did not get its item
+        // back is the denials' one real failure, and every aura line after it
+        // would only be describing the same missing item.
+        for (std::size_t slot = 0; slot < before.equipment.size() && slot < after.equipment.size(); ++slot)
+            if (before.equipment[slot] != after.equipment[slot])
+            {
+                std::string line = "equipment slot " + std::to_string(slot) + ": ";
+                line += before.equipment[slot] ? "item " + std::to_string(before.equipment[slot]) : std::string("nothing");
+                line += " -> ";
+                line += after.equipment[slot] ? "item " + std::to_string(after.equipment[slot]) : std::string("nothing");
+                out.push_back(line);
+            }
+
         for (uint32 id : Extra(before.auras, after.auras))
             out.push_back("aura " + std::to_string(id) + " still applied");
         for (uint32 id : Extra(after.auras, before.auras))

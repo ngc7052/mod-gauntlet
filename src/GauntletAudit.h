@@ -43,6 +43,15 @@ namespace Gauntlet
         // make every cooldown a false positive.
         std::vector<uint32> cooldowns;
 
+        // What is worn, one entry per equipment slot (Player.h's
+        // EQUIPMENT_SLOT_START..END, nineteen of them), the item's low guid or
+        // 0 for an empty slot. The denials put an item in the bags on attach
+        // and back on detach, and "did it come back" is *the* question for
+        // them -- one the reading used to answer only by accident, through
+        // the item's auras, which the core adds and removes on its own terms
+        // (GauntletAuditLive.cpp). This asks it directly.
+        std::vector<uint32> equipment;
+
         uint32 maxHealth   = 0;
         uint32 maxPower    = 0;
         uint32 freeTalents = 0;

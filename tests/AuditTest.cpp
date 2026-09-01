@@ -35,6 +35,10 @@ namespace
         Footprint fp;
         fp.auras       = { 1126, 1126, 21562 };   // two stacks of one, one of another
         fp.cooldowns   = { 1856, 5384 };
+        fp.equipment.assign(19, 0);              // the nineteen equipment slots
+        fp.equipment[0]  = 4001;                 // a helm
+        fp.equipment[5]  = 4005;                 // a chest
+        fp.equipment[15] = 4015;                 // a main hand
         fp.maxHealth   = 4200;
         fp.maxPower    = 3100;
         fp.freeTalents = 5;
@@ -63,6 +67,37 @@ namespace
     // a single spurious line per mechanic is sixty-nine lines of chat saying
     // nothing.
     // ------------------------------------------------------------------
+
+    // The denials' one real failure is an item that did not come back, and it
+    // is read from the slot itself rather than inferred from the item's auras
+    // -- which the core adds and removes on its own terms whenever anything is
+    // equipped or unequipped, and which named the wrong card three times on
+    // the test realm before this existed.
+    TEST(Audit, AnItemThatDidNotComeBackIsReportedBySlot)
+    {
+        Footprint const before = Baseline();
+
+        Footprint stripped = before;
+        stripped.equipment[0] = 0;
+        std::vector<std::string> const lines = Diff(before, stripped);
+        ASSERT_EQ(lines.size(), 1u);
+        EXPECT_TRUE(Mentions(lines, "equipment slot 0")) << lines[0];
+        EXPECT_TRUE(Mentions(lines, "item 4001 -> nothing")) << lines[0];
+
+        // A different item in the slot is not the same item back: two of the
+        // same ring are two items, and the guid is what is compared.
+        Footprint swapped = before;
+        swapped.equipment[15] = 9999;
+        std::vector<std::string> const other = Diff(before, swapped);
+        ASSERT_EQ(other.size(), 1u);
+        EXPECT_TRUE(Mentions(other, "equipment slot 15: item 4015 -> item 9999")) << other[0];
+
+        // And a footprint built without slots -- a test's, or an old reading --
+        // compares against one with them without inventing nineteen lines.
+        Footprint bare = before;
+        bare.equipment.clear();
+        EXPECT_TRUE(Diff(before, bare).empty());
+    }
 
     TEST(Audit, AFootprintComparedWithItselfReportsNothing)
     {
