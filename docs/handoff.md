@@ -613,13 +613,44 @@ deliberate one.
   **12/23/40/19/6** against a target of 10/25/40/20/5 -- the late run was
   14/26/60/0/0 before the pass, with rare absorbing the whole epic and
   legendary share. Tier 41 reads 22/26/36/13/3 against 25/35/30/9/1.
-- **The one number still out of line**, and its cause: tier 21 delivers 14%
-  epic against 2% wanted. The reward-shaped guarantee ignores the *weights*
-  (it now only respects a zero), and four of the eleven reward-shaped cards
-  are epic or legendary, so slot B over-delivers whatever rarity they carry.
-  It has always done this -- before the pass it over-delivered rares, which is
-  where tier 21's old 51% rare came from. Worth fixing when the weights are
-  re-cut, and not before.
+### The number still out of line, and two fixes that were measured and rejected
+
+Tier 1 delivers 14% rare against 5% wanted, and tier 21 delivers 14% epic
+against 2%. **The reward-shaped guarantee is the whole of it**, which was
+established rather than argued: a variant build with the guarantee disabled
+outright delivers 72/24/4 at tier 1 and 37/35/26/2 at tier 21 -- both
+essentially on target, at every band.
+
+The mechanism is not "it ignores the weights", which is what this section said
+first and is wrong. `Draw` rolls a rarity from the tier weights on every path,
+the replacement included. But `RollRarity` **renormalises over the rarities
+present in the pool it is handed**, and slot B's pool is the dozen-odd cards
+carrying `MF_RewardShaped`, thinned again by the distinct-family rule and by
+whatever the run already carries. Two survivors and the renormalisation hands
+one of them the whole share.
+
+Two fixes were built and measured:
+
+- **Roll the rarity over what the *tier* has and refuse to replace when the
+  reward-shaped cards cannot supply it.** The curve becomes near-exact --
+  71/23/6 at tier 1, 10/23/41/20/5 at tier 61 against 10/25/40/20/5. It costs
+  far too much: relaxations at tiers 3 and 4 go from 3% and 7% to **33%**, so
+  a third of early tiers would offer the player nothing that pays. The
+  guarantee is worth more than the curve.
+- **The same, but falling back to the old draw instead of refusing.** A no-op:
+  every number returns to exactly what it was, because the tier's preferred
+  rarity is one the small pool almost never holds.
+
+So the distortion stays, and it is the price of the guarantee rather than a
+bug in it. What actually shrinks it is more reward-shaped cards at the low
+rarities and in more families -- `docs/greed-redesign.md` §7.3 is twelve of
+them, most reward-shaped by construction. The three added on 2026-09-01
+already took the "no reward-shaped offer" rate from 20.96% to **5.1%**; the
+same lever moves this one.
+
+Do not re-cut the rarity weights to compensate. They are close to right; it is
+slot B that is off, and tuning the weights around it would bake the distortion
+into the numbers everything else is measured against.
 
 ### Step 5, the rest -- and what the sweep says it should be
 
