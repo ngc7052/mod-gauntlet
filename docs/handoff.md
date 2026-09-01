@@ -9,8 +9,8 @@ and §4 before trusting any test.
 
 `mod-gauntlet`, an AzerothCore (WotLK 3.3.5a) module: a procedurally generated
 hardcore affix challenge. A run offers three "affix" cards per tier, the player
-picks one, and the curses accumulate. 104 mechanics, all implemented: twenty-four
-commons, eleven uncommons, fifty-three rares, fourteen epics and two
+picks one, and the curses accumulate. 107 mechanics, all implemented: twenty-four
+commons, twelve uncommons, fifty-five rares, fourteen epics and two
 legendaries, with reroll and skip live on every tier.
 Steps 1-4 of `docs/rarity-plan.md` have landed -- the rank system is gone, a
 card is one value and rarity is its only tier -- and step 5, the remaining
@@ -42,7 +42,7 @@ level with `origin/master`.
 ```bash
 ./tests/compile-check.sh --anchors   # anchors + ladder audit, seconds, no Docker
 ./tests/compile-check.sh             # full compile + link in the build container
-./tests/run-tests.sh                 # 206 unit tests
+./tests/run-tests.sh                 # 210 unit tests
 ./sync-to-server.sh                  # rsync the module into the core tree
 cd /mnt/c/Users/3302/azerothcore-wotlk
 DC="docker compose -f docker-compose.yml -f docker-compose.override.yml --project-directory ."
@@ -70,7 +70,7 @@ that way. Verified after the fact on 2026-09-01: the four live runs, eighteen
 affixes and twenty-seven log rows were untouched by the reapply.
 
 Gate before every commit: anchors, ladders, compile, link, tests. All green
-today — 104 anchors, 4 ladders, 67 objects, 206 tests.
+today — 107 anchors, 4 ladders, 70 objects, 210 tests.
 
 ## 4. The testing rig, and what it cannot see
 
@@ -651,6 +651,43 @@ same lever moves this one.
 Do not re-cut the rarity weights to compensate. They are close to right; it is
 slot B that is off, and tuning the weights around it would bake the distortion
 into the numbers everything else is measured against.
+
+### The lever, pulled once (2026-09-01)
+
+Three loot cards from `docs/greed-redesign.md` §7.3, chosen for the
+measurement above rather than for the theme: **Fresh Kill** (110, Rare,
+Rules), **Blood Price** (111, Rare, Attrition -- that family's first
+reward-shaped card that is not an epic) and **Trophy Hunter** (112, Uncommon,
+Enemy, the table's second reward-shaped uncommon). The reward-shaped pool went
+from fourteen cards to seventeen, across one more family.
+
+It worked, and by about what the diagnosis predicted:
+
+- **Tier 21's epic overshoot: 14% -> 5%** against a 2% target. Two thirds of
+  it gone, from three cards.
+- **Sets with no reward-shaped offer at all: 5.1% -> 0.36%.** The guarantee
+  almost never has to reach now.
+- Tier 41's epic 14% -> 12%, legendary 3% -> 2%; tier 61 holds at
+  10/22/44/19/5 against 10/25/40/20/5.
+- **Tier 1's rare excess did not move** (13% against 5%), and should not have:
+  two of the three new cards are Rare, so they *add* to the pool tier 1 draws
+  from. Fixing that one needs reward-shaped **commons and uncommons**
+  specifically -- §7.3 has Magpie-scale candidates left, and each is worth
+  more there than another rare.
+
+Seams, all verified against the core or the world database before use:
+`Loot::items` and `quest_items` are separate vectors (`LootMgr.h:320-321`) so
+Fresh Kill can empty a corpse and leave the quest item; the chest ladder is
+real world data (Battered 2849/loot 2280, Solid 2850, Solid 2855, Northrend's
+Large Solid 153462, 712 to 1411 loot rows apiece); a silver dragon is
+`CreatureTemplate::rank` of `CREATURE_ELITE_RARE` (4) or `RAREELITE` (2), which
+is why the card reads the rank rather than `isElite()` -- that helper excludes
+rank 4 on purpose.
+
+Two rules from §7.1 are load-bearing in Fresh Kill and worth not undoing: a
+card may take your greens but never your quest, and one player's curse may
+never be the group's -- so the *emptying* half is skipped entirely while
+grouped, while the doubling half is not.
 
 ### Step 5, the rest -- and what the sweep says it should be
 

@@ -414,8 +414,15 @@ difficulty, and a redesign that made a card easier would have failed it.
 4. **Falter and Cunning** — the role taxes.
 5. **Ambush.**
 6. **The three sharpenings** (Nimble, Call to Arms, Blood Magic).
-7. **The loot cards** (§7.3), in the order given there: Elite Tithe and Fresh
-   Kill first, because they are the two the brief named.
+7. **The loot cards** (§7.3). **Begun 2026-09-01** with Fresh Kill, Blood
+   Price and Trophy Hunter -- not the order given here, and for a reason this
+   document could not have known: §7 of `docs/handoff.md` measured the
+   reward-shaped guarantee distorting the whole rarity curve, and more
+   reward-shaped cards in more families is the only lever that moves it. These
+   three took tier 21's epic overshoot from 14% to 5% and the "no reward-shaped
+   offer" rate from 5.1% to 0.36%. Elite Tithe is still unbuilt; the cards
+   worth doing next are the **common and uncommon** ones, because tier 1's
+   excess rare is the part three rares could not fix.
 8. **The class pass**, one class at a time, with the kit open.
 
 Steps 3–6 wanted to land **after** the rarity plan's step 4 (rank removal),

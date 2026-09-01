@@ -2,7 +2,7 @@
 
 A hardcore roguelike challenge module for [AzerothCore](https://www.azerothcore.org/).
 
-One life. A new affix every level — drawn from a registry of **104 mechanics
+One life. A new affix every level — drawn from a registry of **107 mechanics
 across seven families**, never a fixed list. Two runs are never the same.
 
 An affix is not a stat penalty rolled off a table. It is a **mechanic**: a
@@ -11,7 +11,7 @@ it, rather than a multiplier bolted onto your character sheet. A shade that
 hunts you between fights. A strike that lands where you were standing. A
 paladin whose Consecration burns twice as hot for half as long.
 
-> **Status.** **All 104 mechanics are live and offerable.** No registry row is
+> **Status.** **All 107 mechanics are live and offerable.** No registry row is
 > flagged `MF_NotImplemented`, and the `OFFERABLE` list in
 > `tests/RegistryTest.cpp` is what enforces that. Phases 0–4 are complete and
 > reported in `docs/`; Phase 5 is the pacing pass — config, tuning and
@@ -269,6 +269,9 @@ common for the trades after id 74.
 | 107 | **Staffless** | Rules | Common | Warrior, Hunter, Priest, Shaman, Mage, Warlock, Druid | 1&ndash;80 | You cannot wield a staff. | +5% maximum health |
 | 108 | **Hunted** | Enemy | Common | any | 1&ndash;80 | Everything chasing you is 10% faster. | +8% damage dealt |
 | 109 | **Slow Learner** | Attrition | Common | any | 1&ndash;80 | You gain 15% less experience. | &mdash; |
+| 110 | **Fresh Kill** | Rules | Rare | any | 1&ndash;80 | A corpse opened within eight seconds of the kill is looted twice. After that it holds nothing but the quest. | +5% move speed |
+| 111 | **Blood Price** | Attrition | Rare | any | 1&ndash;80 | Opening a corpse costs health. A corpse opened while hurt is looted twice. | &mdash; |
+| 112 | **Trophy Hunter** | Enemy | Uncommon | any | 1&ndash;80 | A rare creature nearby makes everything hit harder. Killing one leaves a chest and banks a reroll. | &mdash; |
 <!-- AFFIX-TABLE-END -->
 
 ## Boons
