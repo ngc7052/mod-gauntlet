@@ -347,6 +347,15 @@ namespace Gauntlet
     IMechanic* TradeMagpie()        { return MakeTrade(85); }
     IMechanic* TradeButterfingers() { return MakeTrade(86); }
     IMechanic* TradeNightOwl()      { return MakeTrade(87); }
+    IMechanic* TradeSunstruck() { return MakeTrade(91); }
+    IMechanic* TradeSkittish() { return MakeTrade(92); }
+    IMechanic* TradeRooted() { return MakeTrade(93); }
+    IMechanic* TradeSaddleSore() { return MakeTrade(94); }
+    IMechanic* TradeCrowdShy() { return MakeTrade(95); }
+    IMechanic* TradeDelver() { return MakeTrade(96); }
+    IMechanic* TradeCornered() { return MakeTrade(97); }
+    IMechanic* TradeFreshLegs() { return MakeTrade(98); }
+    IMechanic* TradeOutlander() { return MakeTrade(99); }
 
     GAUNTLET_MECHANIC_FN(75, TradeBareheaded)
     GAUNTLET_MECHANIC_FN(76, TradeCloakless)
@@ -361,4 +370,13 @@ namespace Gauntlet
     GAUNTLET_MECHANIC_FN(85, TradeMagpie)
     GAUNTLET_MECHANIC_FN(86, TradeButterfingers)
     GAUNTLET_MECHANIC_FN(87, TradeNightOwl)
+    GAUNTLET_MECHANIC_FN(91, TradeSunstruck)
+    GAUNTLET_MECHANIC_FN(92, TradeSkittish)
+    GAUNTLET_MECHANIC_FN(93, TradeRooted)
+    GAUNTLET_MECHANIC_FN(94, TradeSaddleSore)
+    GAUNTLET_MECHANIC_FN(95, TradeCrowdShy)
+    GAUNTLET_MECHANIC_FN(96, TradeDelver)
+    GAUNTLET_MECHANIC_FN(97, TradeCornered)
+    GAUNTLET_MECHANIC_FN(98, TradeFreshLegs)
+    GAUNTLET_MECHANIC_FN(99, TradeOutlander)
 }

@@ -32,7 +32,7 @@ namespace
     // reused, so the holes stay. Killing Floor (74) took Unspent's place in the
     // table and not its number, and 75-84 are the first ten commons of
     // docs/rarity-plan.md step 2.
-    constexpr size_t TABLE_SIZE = 85;
+    constexpr size_t TABLE_SIZE = 94;
     // A tier is a level now, not five of them. Every registry window was
     // multiplied by five with the axis, so the *level* each affix unlocks at
     // is exactly what it was; only the number naming it changed.
@@ -58,7 +58,7 @@ namespace
     // rather than as a count: a row that gains the flag by accident, or loses
     // it before its dispatch is wired, is an affix offered to a live hardcore
     // character that silently does nothing.
-    constexpr std::array<uint16, 85> OFFERABLE = {
+    constexpr std::array<uint16, 94> OFFERABLE = {
         1, 2, 3, 4, 5,           // S1 Shade, S2 Echo, S3 Carrion, S4 Reinforcements, S5 Ambush
         6, 7, 8, 9, 10, 11, 12, 13,  // E1 Champions .. E8 Keen-nosed
         14, 15, 16, 17, 18,      // T1 Falling Sky .. T5 Hubris
@@ -99,7 +99,10 @@ namespace
         // docs/commons.md's reward-shaped three. Not trades: each is a
         // mechanic, and each is classless and open at tier 1 because that
         // availability is the entire reason they were written.
-        88, 89, 90
+        88, 89, 90,
+
+        // And its nine uncommons, which are trades with a condition.
+        91, 92, 93, 94, 95, 96, 97, 98, 99
     };
 
     // CONTRACT.md section 8's id ranges, which are fixed forever. The Attrition
@@ -112,29 +115,35 @@ namespace
         size_t count;
     };
 
-    constexpr std::array<Range, 14> RANGES = { {
+    constexpr std::array<Range, 19> RANGES = { {
         {  1,  5, Family::Spawn,      5 },
-        {  6, 13, Family::Enemy,      9 },
-        { 14, 18, Family::Tempo,      5 },
-        { 19, 22, Family::Attrition,  8 },   // 21 and 22 deleted; 19, 20, 74 and five trades remain
-        { 23, 25, Family::Rules,     13 },   // three rules, eight denials, two reward-shaped
+        {  6, 13, Family::Enemy,     10 },
+        { 14, 18, Family::Tempo,      8 },
+        { 19, 22, Family::Attrition, 11 },   // 21 and 22 deleted; 19, 20, 74 and five trades remain
+        { 23, 25, Family::Rules,     15 },   // three rules, eight denials, two reward-shaped, two uncommons
         { 26, 27, Family::Bargain,    2 },
         { 28, 71, Family::Class,     43 },   // 69 deleted with Unspent
         // A5 Killing Floor, outside its family's original band because 21 and
         // 22 are spent and the next free id was 74. The band describes how the
         // table was first laid out; the no-reuse rule outranks it.
-        { 74, 74, Family::Attrition,  8 },
+        { 74, 74, Family::Attrition, 11 },
         // The trades, appended in id order as every row after 74 is: the
         // denials are Rules, the coefficient trades Attrition. The loot trades
         // (85-87) interleave the two, which is why the bands split again.
-        { 75, 81, Family::Rules,     13 },
-        { 82, 84, Family::Attrition,  8 },
-        { 85, 85, Family::Rules,     13 },
-        { 86, 87, Family::Attrition,  8 },
+        { 75, 81, Family::Rules,     15 },
+        { 82, 84, Family::Attrition, 11 },
+        { 85, 85, Family::Rules,     15 },
+        { 86, 87, Family::Attrition, 11 },
         // docs/commons.md's three reward-shaped rows: the first two Rules
         // cards since the denials, and the Enemy family's first non-rare.
-        { 88, 88, Family::Enemy,      9 },
-        { 89, 90, Family::Rules,     13 }
+        { 88, 88, Family::Enemy,     10 },
+        { 89, 90, Family::Rules,     15 },
+        // The nine uncommons, interleaving four families in id order.
+        { 91, 91, Family::Attrition, 11 },
+        { 92, 94, Family::Tempo,      8 },
+        { 95, 96, Family::Rules,     15 },
+        { 97, 98, Family::Attrition, 11 },
+        { 99, 99, Family::Enemy,     10 }
     } };
 }
 
@@ -152,7 +161,7 @@ TEST(Registry, HoldsEveryEntryInAscendingIdOrder)
             << " (id " << all[i - 1].id << ") in ascending order";
 
     EXPECT_EQ(all.front().id, 1u);
-    EXPECT_EQ(all.back().id, 90u) << "the table must end at the last card, Waste Not, id 90";
+    EXPECT_EQ(all.back().id, 99u) << "the table must end at the last card, Outlander, id 99";
 }
 
 TEST(Registry, TheDeletedScalarIdsAreGoneAndStayGone)
@@ -386,10 +395,10 @@ TEST(Registry, LookupsAgreeWithTheTable)
     // one of these is the normal answer for a run migrated from a registry
     // this build has never seen, so nullptr is the contract, not a crash.
     EXPECT_EQ(FindMechanic(static_cast<uint16>(MECHANIC_NONE)), nullptr);
-    // 91, one past the highest id the table carries. Not TABLE_SIZE + 1: the
+    // 100, one past the highest id the table carries. Not TABLE_SIZE + 1: the
     // ids are no longer contiguous, so the count and the highest id are
     // different numbers and only the second one bounds a lookup.
-    EXPECT_EQ(FindMechanic(static_cast<uint16>(91)), nullptr);
+    EXPECT_EQ(FindMechanic(static_cast<uint16>(100)), nullptr);
     EXPECT_EQ(FindMechanic(static_cast<uint16>(72)), nullptr);
     EXPECT_EQ(FindMechanic(static_cast<uint16>(0xFFFF)), nullptr);
     EXPECT_EQ(FindMechanic(std::string_view("")), nullptr);

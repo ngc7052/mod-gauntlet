@@ -688,6 +688,46 @@ namespace
           MF_RewardShaped, "", Boon::None, 0, 0,
           "You cannot drink a potion. Every kill mends you instead." },
 
+        // The uncommon tier proper: nine trades with a condition
+        // (docs/commons.md section 3.2). The tier had one card before them,
+        // and the condition is the whole of what makes a trade an uncommon.
+
+        { 91, "sunstruck", "Sunstruck", Family::Attrition, 0, 1, 80, Rarity::Uncommon,
+          MF_None, "", Boon::BonusLoot, 0, 0,
+          "By day you take 10% more damage." },
+
+        { 92, "skittish", "Skittish", Family::Tempo, 0, 1, 80, Rarity::Uncommon,
+          MF_None, "", Boon::BonusMoveSpeed, 0, 0,
+          "While you are moving you take 15% more damage." },
+
+        { 93, "rooted", "Rooted", Family::Tempo, 0, 1, 80, Rarity::Uncommon,
+          MF_None, "", Boon::BonusDamage, 0, 0,
+          "While you stand still you take 15% more damage." },
+
+        { 94, "saddle_sore", "Saddle-sore", Family::Tempo, 0, 1, 80, Rarity::Uncommon,
+          MF_None, "", Boon::BonusMoveSpeed, 0, 0,
+          "While you are mounted you take 25% more damage." },
+
+        { 95, "crowd_shy", "Crowd-shy", Family::Rules, 0, 1, 80, Rarity::Uncommon,
+          MF_None, "", Boon::BonusExperience, 0, 0,
+          "While you are in a group you take 15% more damage." },
+
+        { 96, "delver", "Delver", Family::Rules, 0, 1, 80, Rarity::Uncommon,
+          MF_None, "", Boon::BonusLoot, 0, 0,
+          "In a dungeon you take 15% more damage." },
+
+        { 97, "cornered", "Cornered", Family::Attrition, 0, 1, 80, Rarity::Uncommon,
+          MF_None, "", Boon::BonusDamage, 0, 0,
+          "Below half health, healing on you is 25% weaker." },
+
+        { 98, "fresh_legs", "Fresh Legs", Family::Attrition, 0, 1, 80, Rarity::Uncommon,
+          MF_None, "", Boon::BonusMaxHealth, 0, 0,
+          "Above half health you deal 10% less damage." },
+
+        { 99, "outlander", "Outlander", Family::Enemy, 0, 1, 80, Rarity::Uncommon,
+          MF_None, "", Boon::BonusExperience, 0, 0,
+          "In the open world everything chasing you is 15% faster." },
+
         };
     }
 

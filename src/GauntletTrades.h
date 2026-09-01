@@ -47,7 +47,18 @@ namespace Gauntlet
         char const*   text;     // the curse, present tense, as the card reads it
 
         // The uncommon shape, "lose X while Y, gain Z" (docs/rarity-plan.md
-        // section 2): the curse holds only while this does. The generator
+        // section 2): the curse holds only while this does.
+        //
+        // One kind of line must NOT take a condition: a coefficient on
+        // MaxHealth. Max health is a standing stat rebuilt by
+        // Player::UpdateMaxHealth, and the core fires the hook this module
+        // hangs on only for level and stamina changes -- so a conditional
+        // pool would move at the player's next level-up rather than when the
+        // condition flipped. Lone Wolf is the one card that gets away with it,
+        // and only because Mgr::OnGroupChanged calls RefreshStats by hand for
+        // exactly that reason. Saddle-sore was written as "25% less health
+        // while mounted", measured against this, and rewritten as damage
+        // taken; the core has no mount hook to refresh on. The generator
         // copies it onto the offer, Pick onto the instance, and the aggregate
         // already gates every factor on AffixInstance::condition -- so a line
         // is conditional by saying so and nothing else. The boon is not
@@ -145,6 +156,55 @@ namespace Gauntlet
         { 87, TradeCurse::Coefficient, 0, AggregateKind::DamageTaken,  10,
           Boon::BonusLoot,       25, "",         "By night you take 10% more damage.",
           Condition::AtNight },
+
+        // -- the uncommon tier proper (docs/commons.md section 3.2) ----------
+        // Nine trades with a condition, which is the whole of what separates
+        // the tier from a common. They exist because the tier had one card:
+        // eight hypothetical uncommons took tier 1's delivered uncommon share
+        // from 9% to 27% against a 25% target, and nothing else moved it.
+        //
+        // Sunstruck is Night Owl's twin on purpose -- together they cover the
+        // clock, and a run carrying both has sold the whole day for drops.
+        { 91, TradeCurse::Coefficient, 0, AggregateKind::DamageTaken,  10,
+          Boon::BonusLoot,       25, "",         "By day you take 10% more damage.",
+          Condition::AtDay },
+
+        // Skittish and Rooted are the same trade pointed opposite ways, which
+        // is the closest a table row gets to a tempo decision: one punishes
+        // the kiting the other rewards.
+        { 92, TradeCurse::Coefficient, 0, AggregateKind::DamageTaken,  15,
+          Boon::BonusMoveSpeed,   8, "",         "While you are moving you take 15% more damage.",
+          Condition::WhileMoving },
+        { 93, TradeCurse::Coefficient, 0, AggregateKind::DamageTaken,  15,
+          Boon::BonusDamage,     10, "",         "While you stand still you take 15% more damage.",
+          Condition::WhileStationary },
+
+        // Damage taken rather than a smaller pool, for the reason written
+        // against TradeDef::condition above.
+        { 94, TradeCurse::Coefficient, 0, AggregateKind::DamageTaken,  25,
+          Boon::BonusMoveSpeed,  10, "",         "While you are mounted you take 25% more damage.",
+          Condition::WhileMounted },
+
+        { 95, TradeCurse::Coefficient, 0, AggregateKind::DamageTaken,  15,
+          Boon::BonusExperience, 20, "",         "While you are in a group you take 15% more damage.",
+          Condition::WhileGrouped },
+        { 96, TradeCurse::Coefficient, 0, AggregateKind::DamageTaken,  15,
+          Boon::BonusLoot,       30, "",         "In a dungeon you take 15% more damage.",
+          Condition::InDungeon },
+
+        // The two health-gated ones pull in opposite directions on purpose:
+        // Cornered pays for fighting hurt and Fresh Legs taxes fighting whole,
+        // so a run carrying both is one that wants to live at half health.
+        { 97, TradeCurse::Coefficient, 0, AggregateKind::HealTaken,   -25,
+          Boon::BonusDamage,     15, "",         "Below half health, healing on you is 25% weaker.",
+          Condition::BelowHalfHealth },
+        { 98, TradeCurse::Coefficient, 0, AggregateKind::DamageDone,  -10,
+          Boon::BonusMaxHealth,  10, "",         "Above half health you deal 10% less damage.",
+          Condition::AboveHalfHealth },
+
+        { 99, TradeCurse::Coefficient, 0, AggregateKind::EnemySpeed,   15,
+          Boon::BonusExperience, 15, "",         "In the open world everything chasing you is 15% faster.",
+          Condition::InOpenWorld },
     };
 
     constexpr std::size_t TRADE_COUNT = sizeof(TRADES) / sizeof(TRADES[0]);

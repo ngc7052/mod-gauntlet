@@ -903,6 +903,15 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_ScavengersEye();      // 88
     void AddSC_gauntlet_mechanic_BloodForBread();      // 89
     void AddSC_gauntlet_mechanic_WasteNot();           // 90
+    void AddSC_gauntlet_mechanic_TradeSunstruck();   // 91
+    void AddSC_gauntlet_mechanic_TradeSkittish();    // 92
+    void AddSC_gauntlet_mechanic_TradeRooted();      // 93
+    void AddSC_gauntlet_mechanic_TradeSaddleSore();  // 94
+    void AddSC_gauntlet_mechanic_TradeCrowdShy();    // 95
+    void AddSC_gauntlet_mechanic_TradeDelver();      // 96
+    void AddSC_gauntlet_mechanic_TradeCornered();    // 97
+    void AddSC_gauntlet_mechanic_TradeFreshLegs();   // 98
+    void AddSC_gauntlet_mechanic_TradeOutlander();   // 99
 }
 
 static void AnchorMechanics()
@@ -998,6 +1007,17 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_ScavengersEye();
     AddSC_gauntlet_mechanic_BloodForBread();
     AddSC_gauntlet_mechanic_WasteNot();
+
+    // docs/commons.md's nine uncommons: trades with a condition.
+    AddSC_gauntlet_mechanic_TradeSunstruck();
+    AddSC_gauntlet_mechanic_TradeSkittish();
+    AddSC_gauntlet_mechanic_TradeRooted();
+    AddSC_gauntlet_mechanic_TradeSaddleSore();
+    AddSC_gauntlet_mechanic_TradeCrowdShy();
+    AddSC_gauntlet_mechanic_TradeDelver();
+    AddSC_gauntlet_mechanic_TradeCornered();
+    AddSC_gauntlet_mechanic_TradeFreshLegs();
+    AddSC_gauntlet_mechanic_TradeOutlander();
 }
 
 void Addmod_gauntletScripts()
