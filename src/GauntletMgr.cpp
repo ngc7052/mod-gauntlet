@@ -2047,7 +2047,8 @@ namespace Gauntlet
         });
     }
 
-    void Mgr::OnItemRoll(Player const* player, float& chance)
+    void Mgr::OnItemRoll(Player const* player, float& chance, ItemTemplate const* item,
+                         ObjectGuid const& source)
     {
         // The const_cast is confined to this line and is what the hook's
         // signature forces: GlobalScript::OnItemRoll is const because the core
@@ -2063,9 +2064,9 @@ namespace Gauntlet
         if (!st || st->dead)
             return;
 
-        ForEachMechanic(mutablePlayer, st, [&chance](Ctx& ctx, AffixInstance& a)
+        ForEachMechanic(mutablePlayer, st, [&chance, item, &source](Ctx& ctx, AffixInstance& a)
         {
-            a.impl->OnItemRoll(ctx, chance);
+            a.impl->OnItemRoll(ctx, chance, item, source);
 
             // The one generic loot boon, paid here once for every card that
             // names it rather than by each card -- the shape BoonSpeed::Sync

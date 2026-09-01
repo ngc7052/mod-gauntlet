@@ -187,7 +187,13 @@ namespace Gauntlet
         // player. Carrion's card promises "+25% item drop chance on creature
         // loot" and this is where that is paid; Phase 3's Cursed Hoard and
         // Self-Found want the same seam.
-        virtual void  OnItemRoll(Ctx&, float& /*chance*/) {}
+        // `item` is the candidate the core is rolling and `source` the guid
+        // of whatever is being looted, both of which the adapter used to drop
+        // on the floor. A card that wants "elites always give up their blue"
+        // needs the item's quality and the corpse's owner, and neither can be
+        // recovered later: by the time OnLoot fires the roll is over.
+        virtual void  OnItemRoll(Ctx&, float& /*chance*/, ItemTemplate const* /*item*/,
+                                 ObjectGuid const& /*source*/) {}
 
         // How many items the core is about to roll out of one loot group.
         // GlobalScript::OnAfterCalculateLootGroupAmount is where a chest's

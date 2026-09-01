@@ -576,3 +576,13 @@ TEST(Rules, TributeIsRarerThanTheCardsThatShareItsFamily)
     EXPECT_GT(Rules::TRIBUTE_SCAVENGERS, 0u) << "a chest with nothing watching it is a gift";
 }
 
+TEST(Rules, EliteTitheChargesForWhatItGuarantees)
+{
+    // The card's trade is the whole of it: the fight you were avoiding becomes
+    // the fight you want, and it is more dangerous than the one you were
+    // avoiding. A guarantee with no added danger would be a pure upside on a
+    // curse card.
+    EXPECT_GT(Rules::EliteTitheTakenMult(), 1.0f);
+    EXPECT_GT(Rules::ELITE_TITHE_TAKEN_PCT, 0u);
+}
+

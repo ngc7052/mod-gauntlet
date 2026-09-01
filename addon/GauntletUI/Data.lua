@@ -270,5 +270,7 @@ GauntletData = {
                  icon = "Interface\\Icons\\Spell_Shadow_RaiseDead", desc = "Every 25th kill leaves a chest. Opening it draws scavengers." },
         [116] = { name = "The Tenth Corpse", key = "tenth_corpse", family = 4, rarity = 3,
                  icon = "Interface\\Icons\\INV_Scroll_03", desc = "Corpses hold nothing until the tenth. That one holds everything the others were carrying." },
+        [117] = { name = "Elite Tithe", key = "elite_tithe", family = 1, rarity = 2,
+                 icon = "Interface\\Icons\\Ability_Warrior_BattleShout", desc = "Elites hit harder, and always give up everything uncommon or better they carry." },
     },
 }

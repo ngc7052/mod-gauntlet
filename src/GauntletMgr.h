@@ -199,7 +199,8 @@ namespace Gauntlet
         // hands this hook a const Player because it has no business changing
         // one; the module needs a non-const pointer only to find the run keyed
         // on its guid, and changes nothing about the player either.
-        void OnItemRoll(Player const* player, float& chance);
+        void OnItemRoll(Player const* player, float& chance, ItemTemplate const* item,
+                        ObjectGuid const& source);
 
         // The loot-group size, for the one bargain that pays in items.
         void OnLootGroupAmount(Player const* player, uint32& groupAmount);

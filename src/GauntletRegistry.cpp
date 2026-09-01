@@ -831,6 +831,11 @@ namespace
           MF_RewardShaped, "loot-rhythm", Boon::None, 0, 0,
           "Corpses hold nothing until the tenth. That one holds everything the others were carrying." },
 
+        // The brief's own example: killing an elite guarantees loot.
+        { 117, "elite_tithe", "Elite Tithe", Family::Enemy, 0, 1, 80, Rarity::Rare,
+          MF_RewardShaped, "", Boon::None, 0, 0,
+          "Elites hit harder, and always give up everything uncommon or better they carry." },
+
         };
     }
 

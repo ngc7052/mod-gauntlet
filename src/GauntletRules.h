@@ -469,6 +469,15 @@ namespace Rules
         return amount + uint32(uint64(amount) * CALL_TO_ARMS_XP_PCT / 100u);
     }
 
+    // Elite Tithe (117): an elite's pockets are yours, and the elite is worse
+    // for it. The brief's own example -- "killing elite guarantees loot".
+    constexpr uint32 ELITE_TITHE_TAKEN_PCT = 25;
+
+    constexpr float EliteTitheTakenMult()
+    {
+        return 1.0f + float(ELITE_TITHE_TAKEN_PCT) / 100.0f;
+    }
+
     // Tribute (115): every 25th kill leaves a chest, and opening it draws the
     // scavengers that make it a decision rather than a gift. Twenty-five is
     // Echo's cadence deliberately -- a number the player can feel coming

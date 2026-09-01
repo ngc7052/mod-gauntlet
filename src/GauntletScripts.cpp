@@ -680,10 +680,19 @@ class GauntletGlobalScript : public GlobalScript
 public:
     GauntletGlobalScript() : GlobalScript("GauntletGlobalScript") { }
 
-    bool OnItemRoll(Player const* player, LootStoreItem const* /*item*/, float& chance,
-                    Loot& /*loot*/, LootStore const& /*store*/) override
+    bool OnItemRoll(Player const* player, LootStoreItem const* item, float& chance,
+                    Loot& loot, LootStore const& /*store*/) override
     {
-        sGauntlet->OnItemRoll(player, chance);
+        // The candidate and the thing being looted, both of which this adapter
+        // used to drop. They cannot be recovered later: by the time the loot
+        // window opens the rolls are over, so a card that wants to say "an
+        // elite always gives up its blue" has to be told here or never.
+        //
+        // The template rather than the LootStoreItem, because the quality and
+        // the class live on the template and nothing downstream has any
+        // business with the loot store's own bookkeeping.
+        ItemTemplate const* proto = item ? sObjectMgr->GetItemTemplate(item->itemid) : nullptr;
+        sGauntlet->OnItemRoll(player, chance, proto, loot.sourceWorldObjectGUID);
         return true;
     }
 
@@ -927,6 +936,7 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_Gravedigger();          // 114
     void AddSC_gauntlet_mechanic_Tribute();              // 115
     void AddSC_gauntlet_mechanic_TenthCorpse();          // 116
+    void AddSC_gauntlet_mechanic_EliteTithe();           // 117
 }
 
 static void AnchorMechanics()
@@ -1052,6 +1062,7 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_Gravedigger();
     AddSC_gauntlet_mechanic_Tribute();
     AddSC_gauntlet_mechanic_TenthCorpse();
+    AddSC_gauntlet_mechanic_EliteTithe();
 }
 
 void Addmod_gauntletScripts()

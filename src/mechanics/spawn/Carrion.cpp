@@ -110,7 +110,8 @@ namespace Gauntlet
             void OnLootMoney(Ctx& ctx, Loot* loot) override;
 
             // And its item half.
-            void OnItemRoll(Ctx& ctx, float& chance) override;
+            void OnItemRoll(Ctx& ctx, float& chance, ItemTemplate const*,
+                            ObjectGuid const&) override;
 
             void OnWarn(Ctx& ctx, uint32 eventId) override;
             void OnEvent(Ctx& ctx, uint32 eventId) override;
@@ -325,7 +326,8 @@ namespace Gauntlet
             loot->gold = static_cast<uint32>(std::min<uint64>(raised, std::numeric_limits<uint32>::max()));
         }
 
-        void Carrion::OnItemRoll(Ctx& ctx, float& chance)
+        void Carrion::OnItemRoll(Ctx& ctx, float& chance, ItemTemplate const*,
+                                 ObjectGuid const&)
         {
             // The other half of the card's built-in boon, and the only one of
             // the two that needs a hook nothing else in the module uses. It is

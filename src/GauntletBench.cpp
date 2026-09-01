@@ -233,8 +233,21 @@ namespace Gauntlet
         }
 
         {
+            // A candidate the probe can name, so a card that reads the item's
+            // quality has something to read. Anything uncommon or better will
+            // do; the world's own Hearthstone is common, so this asks for a
+            // template the store actually has and settles for none.
+            ItemTemplate const* candidate = nullptr;
+            if (ItemTemplateContainer const* store = sObjectMgr->GetItemTemplateStore())
+                for (auto const& [entry, proto] : *store)
+                    if (proto.Quality >= ITEM_QUALITY_UNCOMMON && proto.Class == ITEM_CLASS_ARMOR)
+                    {
+                        candidate = &proto;
+                        break;
+                    }
+
             float chance = 10.f;
-            sGauntlet->OnItemRoll(player, chance);
+            sGauntlet->OnItemRoll(player, chance, candidate, ObjectGuid::Empty);
             NoteIf(out, Moved(chance, 10.f), "item drop chance");
         }
 

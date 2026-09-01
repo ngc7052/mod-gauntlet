@@ -9,8 +9,8 @@ and §4 before trusting any test.
 
 `mod-gauntlet`, an AzerothCore (WotLK 3.3.5a) module: a procedurally generated
 hardcore affix challenge. A run offers three "affix" cards per tier, the player
-picks one, and the curses accumulate. 109 mechanics, all implemented: twenty-six
-commons, twelve uncommons, fifty-four rares, fifteen epics and two
+picks one, and the curses accumulate. 110 mechanics, all implemented: twenty-six
+commons, twelve uncommons, fifty-five rares, fifteen epics and two
 legendaries, with reroll and skip live on every tier.
 Steps 1-4 of `docs/rarity-plan.md` have landed -- the rank system is gone, a
 card is one value and rarity is its only tier -- and step 5, the remaining
@@ -42,7 +42,7 @@ level with `origin/master`.
 ```bash
 ./tests/compile-check.sh --anchors   # anchors + ladder audit, seconds, no Docker
 ./tests/compile-check.sh             # full compile + link in the build container
-./tests/run-tests.sh                 # 217 unit tests
+./tests/run-tests.sh                 # 218 unit tests
 ./sync-to-server.sh                  # rsync the module into the core tree
 cd /mnt/c/Users/3302/azerothcore-wotlk
 DC="docker compose -f docker-compose.yml -f docker-compose.override.yml --project-directory ."
@@ -70,7 +70,7 @@ that way. Verified after the fact on 2026-09-01: the four live runs, eighteen
 affixes and twenty-seven log rows were untouched by the reapply.
 
 Gate before every commit: anchors, ladders, compile, link, tests. All green
-today — 109 anchors, 4 ladders, 73 objects, 217 tests.
+today — 110 anchors, 4 ladders, 74 objects, 218 tests.
 
 ## 4. The testing rig, and what it cannot see
 
@@ -857,6 +857,32 @@ them -- `not asked: no ordinary foe was standing near this character`. It needs
 twenty-five ordinary kills, which no probe will ever stage. That is the
 harness being honest rather than a card being broken, which is the whole point
 of the `not asked:` line.
+
+### Elite Tithe, and the item-roll hook widened for it (2026-09-01)
+
+**Elite Tithe** (117, Rare, Enemy) is the brief's own example -- "killing an
+elite guarantees loot". Every candidate of uncommon quality or better in an
+elite's pockets goes to a certain drop, and elites hit 25% harder for it.
+
+It needed the item-roll adapter widened, and that is the reusable part.
+`GlobalScript::OnItemRoll` hands the core's candidate `LootStoreItem` and the
+`Loot` over, and this module's adapter dropped both on the floor -- so
+`IMechanic::OnItemRoll` saw a bare chance and nothing else. Neither can be
+recovered later: by the time a loot window opens every roll is over. The hook
+now carries the item's **template** (quality and class live there; the loot
+store's bookkeeping is nobody's business downstream) and the **source guid**
+from `Loot::sourceWorldObjectGUID`. Carrion, the only other user, was updated
+and re-benched unchanged.
+
+§7.1's honest limit is written into the card's own file, because this is the
+card most likely to disappoint someone who has not read it: **quality cannot be
+invented.** It makes an elite drop the blue that is in its table; it cannot put
+one into a table that has none.
+
+Benched: attaches and detaches clean, and its counter says `no elite has been
+looted since this was attached` -- the probe's roll has no source corpse, so
+the guarantee half is unasked. The damage half is a straightforward
+attacker-gated multiplier in Hubris' shape.
 
 ### Step 5, the rest -- and what the sweep says it should be
 
