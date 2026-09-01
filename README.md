@@ -2,7 +2,7 @@
 
 A hardcore roguelike challenge module for [AzerothCore](https://www.azerothcore.org/).
 
-One life. A new affix every level — drawn from a registry of **82 mechanics
+One life. A new affix every level — drawn from a registry of **85 mechanics
 across seven families**, never a fixed list. Two runs are never the same.
 
 An affix is not a stat penalty rolled off a table. It is a **mechanic**: a
@@ -11,7 +11,7 @@ it, rather than a multiplier bolted onto your character sheet. A shade that
 hunts you between fights. A strike that lands where you were standing. A
 paladin whose Consecration burns twice as hot for half as long.
 
-> **Status.** **All 82 mechanics are live and offerable.** No registry row is
+> **Status.** **All 85 mechanics are live and offerable.** No registry row is
 > flagged `MF_NotImplemented`, and the `OFFERABLE` list in
 > `tests/RegistryTest.cpp` is what enforces that. Phases 0–4 are complete and
 > reported in `docs/`; Phase 5 is the pacing pass — config, tuning and
@@ -72,11 +72,14 @@ rarity to draw from, weighted by tier, so early tiers lean common and the
 endgame leans rare or better. The twelve **commons** are small trades — *you
 cannot wear a helm; in exchange, 5% more health* — backed by one class and a
 table (`src/GauntletTrades.h`), so a new one is a row and a line rather than
-a file. The first **uncommon**, Night Owl, is a trade with a condition — *by
-night you take 10% more damage* — which is that tier's whole shape; and three
-of the trades pay in **loot**, the boon the table never had (*things drop 15%
-more often*). Every older card is rare. The epics and legendaries are the next
-step of `docs/rarity-plan.md`.
+a file. The **uncommons** are trades with a condition — *by night you take 10%
+more damage* — which is that tier's whole shape, and three of the trades pay in
+**loot**, the boon the table never had. Three cards pay you for engaging with
+them rather than through a boon at all: Scavenger's Eye rolls a corpse twice
+for a fight nothing touched you in, and Blood for Bread and Waste Not take away
+eating and potions and hand the health back a kill at a time. Every older card
+is rare. The epics and legendaries are the next step of
+`docs/rarity-plan.md`.
 
 The generator also limits how much of one *kind* of pressure a run can carry,
 so it stays varied instead of turning into a pile of the same idea: at most one
@@ -239,6 +242,9 @@ common for the trades after id 74.
 | 85 | **Magpie** | Rules | Common | any | 1&ndash;80 | You cannot wear a belt. | &mdash; |
 | 86 | **Butterfingers** | Attrition | Common | any | 1&ndash;80 | You deal 8% less damage. | &mdash; |
 | 87 | **Night Owl** | Attrition | Uncommon | any | 1&ndash;80 | By night you take 10% more damage. | &mdash; |
+| 88 | **Scavenger's Eye** | Enemy | Uncommon | any | 1&ndash;80 | Enemies notice you from further away, and a fight nothing touches you in pays twice. | &mdash; |
+| 89 | **Blood for Bread** | Rules | Common | any | 1&ndash;80 | You cannot eat or drink. Every kill feeds you instead. | &mdash; |
+| 90 | **Waste Not** | Rules | Common | any | 1&ndash;80 | You cannot drink a potion. Every kill mends you instead. | &mdash; |
 <!-- AFFIX-TABLE-END -->
 
 ## Boons

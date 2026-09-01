@@ -5,6 +5,15 @@ not: it is the measurement behind step 5's next batch and a list of cards to
 cut before any of it becomes rows. The measurement is the part worth keeping
 if the card list is wrong.
 
+**Step 1 of §5 has landed (2026-09-01).** The three reward-shaped cards of
+§3.1 are built — Scavenger's Eye (88), Blood for Bread (89), Waste Not (90) —
+and the live table now delivers **58% common / 34% uncommon / 7% rare** at
+tier 1, against 50/10/40 before them and a 70/25/5 target. The variant sweep
+predicted 57/36/7 for three such rows, which is as close as this kind of
+forecast gets. Everything below is unchanged apart from that: the nineteen
+table rows of §3.2 and §3.3 are still proposals, and the mid-run is still
+short of them — tier 21 delivers 40/8/51.
+
 Written 2026-09-01, after the first three loot trades landed and
 `build/sweep --rarity` said tier 1 delivers **50% common / 10% uncommon / 40%
 rare** against the plan's 70 / 25 / 5.
@@ -120,9 +129,27 @@ would be a lie that the guarantee then tells every tier.
 
 | Card | Rarity | Family | The card | Seam |
 |---|---|---|---|---|
-| **Scavenger's Eye** | Uncommon | Enemy | Enemies notice you from five yards further. A fight in which you are never hit rolls its loot twice. | already designed — `docs/greed-redesign.md` §7.2; Keen-nosed's radius, `OnDamageTaken` dirties the fight |
-| **Blood for Bread** | Common | Rules | You cannot eat or drink to recover. Every kill restores 8% of your health and mana. | already designed — greed §3, as Iron Purse's replacement |
-| **Waste Not** | Common | Rules | You cannot drink a healing potion. Every kill restores 5% of your health. | `OnPlayerCanUseItem` (`PlayerScript.h:593`), the equipment veto's twin; `OnKill` |
+| **Scavenger's Eye** (88) | Uncommon | Enemy | Enemies notice you from five yards further. A fight in which nothing lays a hand on you rolls its loot twice. | **built** — `AlertUnaware` in `Nearby.cpp`, shared with Keen-nosed; `OnDamageTaken` dirties the fight; a second `Loot::FillLoot` in `OnLoot`, which appends (`LootMgr.cpp:561`) |
+| **Blood for Bread** (89) | Common | Rules | You cannot eat or drink. Every kill restores 8% of your health and mana. | **built** — `CanUseItem` on `ITEM_SUBCLASS_FOOD`; `OnKill` |
+| **Waste Not** (90) | Common | Rules | You cannot drink a potion. Every kill restores 5% of your health. | **built** — `CanUseItem` on `ItemTemplate::IsPotion`; `OnKill` |
+
+Three things the build settled that the proposal did not:
+
+- **The item-use veto did not exist.** `IMechanic::CanUseItem` and
+  `Mgr::CanUseItem` are new, mirroring the equipment veto exactly, wired to
+  `PlayerScript::OnPlayerCanUseItem`. Every right-click reaches it:
+  `HandleUseItemOpcode` → `Player::CanUseItem(Item*)` → the `ItemTemplate`
+  overload, which consults the hook (`PlayerStorage.cpp:2341`, `:2432`).
+- **Keen-nosed's sweep is now shared.** `AlertUnaware(owner, bonusYards,
+  searchYards)` lives in `Nearby.cpp`, which says in its own comments that it
+  exists so a predicate cannot be copied into eight files and drift. Both
+  cards call it and Keen-nosed's number moved to `GauntletRules.h`, which is
+  what lets a test say "the uncommon notices you from less far than the rare".
+- **The bench was blind to all three.** It had no item-use scan, no
+  loot-window probe, and its footprint reads *max* health rather than current,
+  so a kill that restores health moved nothing it could see. All three probes
+  are added; the loot-window one is the one `docs/greed-redesign.md` §7.4 asks
+  for by name, and it reaches Carrion too.
 
 **One disagreement to settle.** `docs/greed-redesign.md` §6 names Blood for
 Bread an epic candidate. This document says it is worth more as a common,
@@ -197,9 +224,10 @@ Not incidental — this is most of the work of a batch:
 
 ## 5. Order of work
 
-1. **The three reward-shaped cards.** They are the measurement's whole point,
-   two of the three are already designed in `docs/greed-redesign.md`, and each
-   is a mechanic — so each ships with a unit test and a bench check.
+1. ~~**The three reward-shaped cards.**~~ **Done, 2026-09-01.** Tier 1 went
+   from 50/10/40 to 58/34/7. Blood for Bread landed as a Common, so the
+   disagreement in §3.1 was settled that way; if play says otherwise it is one
+   field to change.
 2. **The nine uncommons.** Table lines; the tier has one card today.
 3. **The ten commons.** Table lines.
 4. **Re-measure, then re-cut the weights.**

@@ -9,8 +9,8 @@ and §4 before trusting any test.
 
 `mod-gauntlet`, an AzerothCore (WotLK 3.3.5a) module: a procedurally generated
 hardcore affix challenge. A run offers three "affix" cards per tier, the player
-picks one, and the curses accumulate. 82 mechanics, all implemented: 69 rares,
-twelve commons and the first uncommon, with reroll and skip live on every tier.
+picks one, and the curses accumulate. 85 mechanics, all implemented: 69 rares,
+fourteen commons and two uncommons, with reroll and skip live on every tier.
 Steps 1-4 of `docs/rarity-plan.md` have landed -- the rank system is gone, a
 card is one value and rarity is its only tier -- and step 5, the remaining
 cards, has begun with the loot trades.
@@ -41,7 +41,7 @@ level with `origin/master`.
 ```bash
 ./tests/compile-check.sh --anchors   # anchors + ladder audit, seconds, no Docker
 ./tests/compile-check.sh             # full compile + link in the build container
-./tests/run-tests.sh                 # 199 unit tests
+./tests/run-tests.sh                 # 204 unit tests
 ./sync-to-server.sh                  # rsync the module into the core tree
 docker compose -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.yml \
   -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.override.yml \
@@ -50,7 +50,7 @@ docker compose -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.yml \
 ```
 
 Gate before every commit: anchors, ladders, compile, link, tests. All green
-today — 82 anchors, 4 ladders, 64 objects, 199 tests.
+today — 85 anchors, 4 ladders, 67 objects, 204 tests.
 
 ## 4. The testing rig, and what it cannot see
 
@@ -437,6 +437,58 @@ open:
   bench it by day and the summary says "no probe reached it", which is the
   harness being honest, not the card being broken.
 
+### What step 5 built next: the three reward-shaped cards (2026-09-01)
+
+`docs/commons.md`'s step 1, and the measurement it was written for paid off:
+tier 1 went from **50/10/40** to **58/34/7** against a 70/25/5 target, the
+rare floor collapsing because the reward-shaped guarantee can now be paid
+without a rare for the first time.
+
+- **Scavenger's Eye** (88, Uncommon, Enemy): five yards of extra notice
+  against Keen-nosed's eight, and a fight nothing touches you in rolls its
+  corpse twice. The second roll is a second `Loot::FillLoot`, which *appends*
+  through `LootTemplate::Process` -> `Loot::AddItem` (`LootMgr.cpp:561`,
+  `:481`), called from `OnLoot` because that hook runs on
+  `OnPlayerBeforeSendLoot` -- before the window packet, so the extra items are
+  visible.
+- **Blood for Bread** (89, Common, Rules) and **Waste Not** (90, Common,
+  Rules): no food and drink, no potions, and every kill hands back 8% of both
+  bars / 5% of health. Both carry `Boon::None` for Killing Floor's reason --
+  the payout *is* the upside, and a BoonClause would promise a second one.
+- **New plumbing:** `IMechanic::CanUseItem` and `Mgr::CanUseItem`, mirroring
+  the equipment veto, on `PlayerScript::OnPlayerCanUseItem`. Verified that a
+  right-click reaches it: `HandleUseItemOpcode` -> `Player::CanUseItem(Item*)`
+  -> the `ItemTemplate` overload -> the hook (`PlayerStorage.cpp:2341`,
+  `:2432`).
+- **Keen-nosed's sweep moved to `Nearby.cpp`** as `AlertUnaware`, shared by
+  both cards, and its yardage to `GauntletRules.h` so a test can compare the
+  two cards at all.
+- **Three new bench probes**, because the bench could see none of these three:
+  an item-*use* scan beside the equip one, a health/power reading around the
+  kill (the footprint holds *max* health, so a restore moved nothing it
+  watched), and the loot-window probe `docs/greed-redesign.md` §7.4 asks for
+  by name -- which reaches Carrion too. §4's list of what the harness cannot
+  see is three items shorter.
+- Checked end to end on `gt-world`: Blood for Bread "using <food> refused",
+  "a kill restored health", "a kill restored power", counters `refused 1
+  meal(s), fed on 5 kill(s), restored 3520 health and 5110 power`; Waste Not
+  the same for potions; **Scavenger's Eye `a clean kill's corpse rolled 3 -> 5
+  item(s)`**, which is the doubling itself, with counters `2 clean kill(s), 1
+  corpse(s) rolled again`. `leaks` and `soak` clean on all three.
+- **What the bench still cannot see: the aggro half.** `alerted 0
+  creature(s)` -- there is no idle creature at the right distance during the
+  probe, and the character is in combat for most of it, which the sweep
+  refuses on purpose. Keen-nosed has always had this blind spot and now two
+  cards do. Proving it needs a probe that summons a creature *outside* its own
+  aggro range and then checks it attacked, out of combat; until then the
+  yardage is covered only by the shape test.
+- Four shape tests in `RulesTest.cpp`, and `Registry.TheRewardShapedGuarantee-
+  CanBePaidWithoutARare` keeps the finding as an assertion. Two registry tests
+  became lists exactly as their comments predicted, and
+  `Trades.EveryCommonRowHasALine` became a *rule* instead: a common with no
+  trade line must carry `MF_RewardShaped`, since that is the only honest
+  reason to be one.
+
 ### Step 5, the rest -- and what the sweep says it should be
 
 `docs/commons.md` (2026-09-01) is the measurement and the proposed batch. It
@@ -496,6 +548,9 @@ Things step 2 left for a later pass, deliberately:
 - `docs/checklists.md` — 672 lines of in-game checks, still mostly undone.
 - `.gauntlet debug remove all` does not exist, so undoing `give-class` means
   removing ~30 affixes one slot at a time.
+- The bench cannot reach the *aggro* half of Keen-nosed or Scavenger's Eye
+  (§7): it needs a creature summoned outside its own aggro range, with the
+  character out of combat, and then an assertion that it attacked.
 - `bench` reports `Spawned nothing` for all five Spawn cards on an idle bot,
   for the reasons §4 measures. The job: have the bench's target attack the
   player (`target->Attack(player, true)` puts it in `getAttackers()`), kill
