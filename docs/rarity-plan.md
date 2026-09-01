@@ -12,7 +12,8 @@ older card is rare; **the rank system is gone** — a card is one value, the one
 its blurb states. §7 of `docs/handoff.md` lists what each step put where and
 the decisions taken that this document did not spell out, including what the
 rank removal did to the late run (§7.1 is now the loudest open number). Step 5
-— the remaining cards — is next.
+— the remaining cards — has begun: the first loot trades, two commons and the
+first uncommon, landed 2026-09-01 with `Boon::BonusLoot`.
 
 - **The rank system is removed.** `MAX_RANK`, the rank ladders in 56 mechanics,
   rank-up offers, and the rank numerals in every card and chat line all go.
@@ -282,7 +283,11 @@ The direction is settled. These are not.
    full-set offers had none; with it, 21%). §7.1 — the carry cap by rarity —
    went from an open question to the loudest one, and the loot cards of
    `docs/greed-redesign.md` §7 are the fastest way to refill the late run.
-5. The remaining cards, in rarity order, commons first.
+5. The remaining cards, in rarity order, commons first. **Begun 2026-09-01**
+   with Magpie, Butterfingers and Night Owl (ids 85–87) and the loot boon they
+   pay in. `build/sweep --rarity` says where the next rows belong: five
+   families have no common at all, and while that holds the third slot of
+   every early offer is a rare whatever the weights say.
 
 Steps 1–3 were all reversible and all playable on their own, which is why they
 came before the deletion. Landing rarity first meant step 4 was a deletion with

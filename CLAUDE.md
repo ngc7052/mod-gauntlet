@@ -2,8 +2,9 @@
 
 AzerothCore (WotLK 3.3.5a) module: a procedurally generated hardcore affix
 challenge. A run offers three affix cards per tier, the player picks one, and
-the curses accumulate. 79 mechanics today: 69 rares and the first ten commons.
-`docs/rarity-plan.md` takes it to ~160; its steps 1 and 2 have landed.
+the curses accumulate. 82 mechanics today: 69 rares, twelve commons and the
+first uncommon. `docs/rarity-plan.md` takes it to ~160; steps 1-4 have landed
+and step 5 -- the remaining cards -- has begun.
 
 **Read `docs/handoff.md` before starting.** It carries the current state, the
 recurring bug patterns, and where the test harness is blind. This file is the
@@ -59,6 +60,8 @@ A common is a table row, not a file. Three places, all data:
 1. A registry row at the end of the table, `Rarity::Common`.
 2. A line in `src/GauntletTrades.h` with the same id: the curse (a denial mask
    or a coefficient), the boon -- which must be the row's -- and its magnitude.
+   An **uncommon** trade is the same line with a `Condition`; the condition is
+   what makes it one, and `TradesTest` holds rarity and condition to agree.
 3. One factory and one `GAUNTLET_MECHANIC_FN` in
    `src/mechanics/common/SimpleTrade.cpp`, and its anchor in
    `AnchorMechanics()`. The macro pastes the name, so it is a plain identifier.

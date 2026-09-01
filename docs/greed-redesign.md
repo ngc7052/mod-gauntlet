@@ -407,7 +407,9 @@ difficulty, and a redesign that made a card easier would have failed it.
    the rank removal.
 2. **The loot boon and the four loot trades** (§7.2). Plumbing first, then
    rows: the trades are table lines, and `Boon::BonusLoot` is what every later
-   loot card's boon column names.
+   loot card's boon column names. **Landed 2026-09-01** — the boon, Magpie,
+   Butterfingers and Night Owl; Scavenger's Eye is a mechanic, not a line, and
+   is still open.
 3. **Craven and Grudge** — the two brakes felt on every single kill.
 4. **Falter and Cunning** — the role taxes.
 5. **Ambush.**
@@ -416,11 +418,10 @@ difficulty, and a redesign that made a card easier would have failed it.
    Kill first, because they are the two the brief named.
 8. **The class pass**, one class at a time, with the kit open.
 
-Steps 3–6 want to land **after** the rarity plan's step 4 (rank removal): every
-one of those cards carries a ladder today, and writing a new single value beside
-an old ladder only to delete the ladder a step later is the same card touched
-twice. Steps 1, 2 and 7 have no such dependency — new rows are born rank-free —
-and are where this starts. The rarity column above and in §7 feeds the plan's
+Steps 3–6 wanted to land **after** the rarity plan's step 4 (rank removal),
+which landed on 2026-09-01: every one of those cards is one value now, and
+nothing here waits on anything else. Steps 1, 2 and 7 never had the
+dependency — new rows are born rank-free — and step 2 is where this started. The rarity column above and in §7 feeds the plan's
 §7.4 pass directly: the cards with a greed loop inside them are the epic
 candidates, and Blood for Bread, The Tenth Corpse, Dragon's Hoard and Reliquary
 arrive as ones.

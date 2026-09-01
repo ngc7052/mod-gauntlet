@@ -9,10 +9,11 @@ and §4 before trusting any test.
 
 `mod-gauntlet`, an AzerothCore (WotLK 3.3.5a) module: a procedurally generated
 hardcore affix challenge. A run offers three "affix" cards per tier, the player
-picks one, and the curses accumulate. 79 mechanics, all implemented: 69 rares
-and the first ten commons, with reroll and skip live on every tier. Steps 1-4
-of `docs/rarity-plan.md` have landed -- the rank system is gone, a card is one
-value and rarity is its only tier -- and step 5, the remaining cards, is next.
+picks one, and the curses accumulate. 82 mechanics, all implemented: 69 rares,
+twelve commons and the first uncommon, with reroll and skip live on every tier.
+Steps 1-4 of `docs/rarity-plan.md` have landed -- the rank system is gone, a
+card is one value and rarity is its only tier -- and step 5, the remaining
+cards, has begun with the loot trades.
 
 Working directory `/home/nero/projects/mod-gauntlet`, on **`master`**, clean,
 level with `origin/master`.
@@ -40,7 +41,7 @@ level with `origin/master`.
 ```bash
 ./tests/compile-check.sh --anchors   # anchors + ladder audit, seconds, no Docker
 ./tests/compile-check.sh             # full compile + link in the build container
-./tests/run-tests.sh                 # 194 unit tests
+./tests/run-tests.sh                 # 199 unit tests
 ./sync-to-server.sh                  # rsync the module into the core tree
 docker compose -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.yml \
   -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.override.yml \
@@ -49,7 +50,7 @@ docker compose -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.yml \
 ```
 
 Gate before every commit: anchors, ladders, compile, link, tests. All green
-today — 79 anchors, 4 ladders, 64 objects, 194 tests.
+today — 82 anchors, 4 ladders, 64 objects, 199 tests.
 
 ## 4. The testing rig, and what it cannot see
 
@@ -119,8 +120,16 @@ distrust a green result:
   and `EquipItem` re-adds only what fits. So `leaks <troll> all` reports
   Bareheaded (id 75, the first denial in id order) leaking two racials, once per
   login, and a re-run is clean. It is what the player does by hand when they
-  take a helm off; nothing for a card to fix. The audit could skip passive
-  item-dependent auras that do not fit -- not done yet, §8.
+  take a helm off; nothing for a card to fix. The same bookkeeping runs the
+  other way on equip (`ApplyItemDependentAuras`, Player.cpp:7267): a death
+  knight who had logged in without Two-Handed Weapon Specialization and Dark
+  Conviction got both when Bareheaded returned his helm, and the audit read
+  "still applied". And an item put back arrives with the core's thirty-second
+  equip cooldown on its use effect (`ApplyEquipCooldown`, Player.cpp:12008):
+  Fezzik's Pocketwatch read "still on cooldown" after Charmless. **Fixed
+  2026-09-01:** the reading leaves every aura with an equipment requirement
+  and every item cooldown out, and reads the nineteen equipment slots
+  directly instead -- "did the item come back" asked as itself, by guid.
 - **`bench` cannot reach four of the five Spawn cards, and where the bot stands
   decides the fifth.** The Shade and Ambush refuse cities and taverns
   (`REST_FLAG_IN_CITY`, Shade.cpp:221, Ambush.cpp:105) and idle bots sit in
@@ -182,7 +191,7 @@ card.
 judgement. The two most likely to be wrong are named at the end of
 `docs/tempo-redesign.md`.
 
-## 7. The rarity plan: steps 1-4 landed, step 5 next
+## 7. The rarity plan: steps 1-4 landed, step 5 begun
 
 `docs/rarity-plan.md` is decided, not a proposal. Ranks have been removed and
 replaced with a rarity ladder (common → legendary), plus reroll and skip.
@@ -373,10 +382,67 @@ The rank system is gone. What the deletion actually was, and the decisions
   `give`/`dump` are `Console::No`, so "a carried card is never offered again"
   rests on the 1.6M-set invariant and `Pick`'s refusal, not on a live run.
 
-### Step 5
+### What step 5 has put in place so far (2026-09-01)
 
-The remaining cards, in rarity order, commons first -- and the seventeen
-offers of `docs/greed-redesign.md` §7, none of which waits on anything now.
+The first three loot trades and the boon they pay in -- step 2 of the greed
+redesign's order, minus Scavenger's Eye, which is a real mechanic and still
+open:
+
+- **`Boon::BonusLoot`** ("Lucky", *things drop N% more often*), appended to the
+  enum and paid once for every card that names it, in `Mgr::OnItemRoll`, by
+  multiplying the chance the core hands `GlobalScript::OnItemRoll` by
+  reference (`LootMgr.cpp:311` for a plain entry, `:1268` inside a group; 100
+  or more drops). `BoonLootMult` in `Boons.cpp` is the arithmetic, and
+  `Boons.cpp` is now in the Player-free test build (`run-tests.sh` walks
+  `src/mechanics/` too; every other file there includes `Player.h` and is
+  skipped as before).
+- **Magpie** (85, Rules, common: no belt, +15% drops), **Butterfingers** (86,
+  Attrition, common: -8% damage, +20% drops), **Night Owl** (87, Attrition,
+  **the first uncommon**: +10% damage taken by night, +25% drops).
+- **A trade line can fix a condition.** `TradeDef::condition` (default
+  `Always`); the generator copies it onto the offer, Pick onto the instance,
+  and the aggregate's existing gating does the rest -- the uncommon shape
+  costs a field, not a mechanism. Rarity and condition are held to agree
+  (`Trades.AnUncommonIsATradeWithACondition`; the registry test that pinned
+  everything past 74 as Common now says "a trade line, common or uncommon by
+  its condition", and will become a list when Scavenger's Eye lands).
+  `NameOf` skips the condition adjective for a trade-born condition --
+  "Nocturnal Lucky Night Owl" says night twice.
+- The bench's existing `item drop chance` probe (10% in through
+  `Mgr::OnItemRoll`) reaches the boon; each trade moved it to 11.5 / 12 /
+  12.5%.
+- Measured (`build/sweep --rarity`): tier 1 delivers 50% common / 10%
+  uncommon / 40% rare against 70 / 25 / 5 wanted. The rare share is
+  structural, not a weight: commons live in two families (Rules, Attrition),
+  three slots must be three families, so the third slot is rare until commons
+  exist elsewhere. Uncommon falls to 3% by tier 13 because one uncommon card,
+  once carried, is gone. Tier 12's live-view ceiling moved 55 → 60 (three
+  rows reshuffle every draw after them).
+- Two fixes the step-4 check surfaced: a swap tier no longer offers a Swap to
+  a run carrying nothing (`GeneratorSwaps` test), and the leak audit no longer
+  reads auras with an equipment requirement at all -- the core removes and
+  adds them on any unequip or equip (Player.cpp:12875, :7267), measured in
+  both directions on three trolls and a death knight -- nor item cooldowns,
+  which the core sets on equip -- and reads the equipment slots directly
+  instead, which is the denials' real question
+  (`Audit.AnItemThatDidNotComeBackIsReportedBySlot`).
+- Checked end to end on `gt-world` at 03:00 local (night): `bench` on a druid
+  in the field -- Magpie "equipping Cord of the Patronizing Practitioner
+  refused", Butterfingers "damage done x1.00 -> x0.92", Night Owl "damage
+  taken x1.00 -> x1.10", and the item-drop probe 10% -> 11.5 / 12.0 / 12.5%;
+  `offers 1` on a mage put "Lucky Night Owl" (Uncommon) in slot 1 with no
+  "Nocturnal"; `offers 20` for a run carrying nothing gave three plain offers;
+  `cards` lists the three; `export-addon` is byte-identical to the regenerated
+  Data.lua. Night Owl's curse is reachable only while its condition holds --
+  bench it by day and the summary says "no probe reached it", which is the
+  harness being honest, not the card being broken.
+
+### Step 5, the rest
+
+More trades in more families first -- the sweep says exactly where: Spawn,
+Enemy, Tempo, Bargain and Class have no common at all, and until they do the
+third slot of every early offer is a rare. Then Scavenger's Eye and the loot
+cards of `docs/greed-redesign.md` §7.3.
 
 ### Queued behind it: the greed redesign
 
@@ -422,14 +488,9 @@ Things step 2 left for a later pass, deliberately:
   a city rather than report it. Until then a Spawn card's spawn is proven only
   by a bot out in the field, and Reinforcements, Echo, Ambush and Carrion not
   at all.
-- The leak audit's false positive on unfitting item-dependent passives (§4):
-  skip auras the core itself removes on any unequip, and prove it on a troll
-  bot before trusting it.
-- `offers` at a swap tier for a run carrying nothing shows a Swap that "swaps
-  out slot 0": the generator only picks a slot when the set is non-empty and
-  `Pick` falls through to a plain add, so it is cosmetic -- but reachable live
-  by skipping every tier to 20. The fix is one clause in `BuildOffers`
-  (`swapTier && !carried.empty()`) with a generator test.
+- ~~The leak audit's false positive on unfitting item-dependent passives; the
+  Swap offered to a run carrying nothing at a swap tier.~~ Both fixed
+  2026-09-01, §7.
 - `CAP_CLASS` is still 3 and still `TODO(design)`, eight phases on.
 - Cold Trail's Vanish lockout and Dead Weight's Feign Death lockout deliberately
   survive detach. Design question, not a leak.

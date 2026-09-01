@@ -2,7 +2,7 @@
 
 A hardcore roguelike challenge module for [AzerothCore](https://www.azerothcore.org/).
 
-One life. A new affix every level — drawn from a registry of **79 mechanics
+One life. A new affix every level — drawn from a registry of **82 mechanics
 across seven families**, never a fixed list. Two runs are never the same.
 
 An affix is not a stat penalty rolled off a table. It is a **mechanic**: a
@@ -11,7 +11,7 @@ it, rather than a multiplier bolted onto your character sheet. A shade that
 hunts you between fights. A strike that lands where you were standing. A
 paladin whose Consecration burns twice as hot for half as long.
 
-> **Status.** **All 79 mechanics are live and offerable.** No registry row is
+> **Status.** **All 82 mechanics are live and offerable.** No registry row is
 > flagged `MF_NotImplemented`, and the `OFFERABLE` list in
 > `tests/RegistryTest.cpp` is what enforces that. Phases 0–4 are complete and
 > reported in `docs/`; Phase 5 is the pacing pass — config, tuning and
@@ -69,11 +69,14 @@ in the client's own item colours — which is how much of the run it changes
 rather than how big its numbers are: a common is one small trade, a rare is a
 verb you react to, a legendary defines the run. Each offer slot rolls which
 rarity to draw from, weighted by tier, so early tiers lean common and the
-endgame leans rare or better. The ten **commons** are small trades — *you
+endgame leans rare or better. The twelve **commons** are small trades — *you
 cannot wear a helm; in exchange, 5% more health* — backed by one class and a
 table (`src/GauntletTrades.h`), so a new one is a row and a line rather than
-a file; every older card is rare. The epics and legendaries are the next step
-of `docs/rarity-plan.md`.
+a file. The first **uncommon**, Night Owl, is a trade with a condition — *by
+night you take 10% more damage* — which is that tier's whole shape; and three
+of the trades pay in **loot**, the boon the table never had (*things drop 15%
+more often*). Every older card is rare. The epics and legendaries are the next
+step of `docs/rarity-plan.md`.
 
 The generator also limits how much of one *kind* of pressure a run can carry,
 so it stays varied instead of turning into a pile of the same idea: at most one
@@ -233,6 +236,9 @@ common for the trades after id 74.
 | 82 | **Glass** | Attrition | Common | any | 1&ndash;80 | You take 10% more damage. | +8% damage dealt |
 | 83 | **Frail** | Attrition | Common | any | 1&ndash;80 | You have 10% less health. | +10% experience |
 | 84 | **Thin Blood** | Attrition | Common | any | 1&ndash;80 | Healing on you is 15% weaker. | +8% damage dealt |
+| 85 | **Magpie** | Rules | Common | any | 1&ndash;80 | You cannot wear a belt. | &mdash; |
+| 86 | **Butterfingers** | Attrition | Common | any | 1&ndash;80 | You deal 8% less damage. | &mdash; |
+| 87 | **Night Owl** | Attrition | Uncommon | any | 1&ndash;80 | By night you take 10% more damage. | &mdash; |
 <!-- AFFIX-TABLE-END -->
 
 ## Boons
@@ -240,10 +246,11 @@ common for the trades after id 74.
 Every implemented mechanic pays for itself. A curse names an upside and the
 mechanic behind it delivers that upside — there is no generically rolled boon
 anywhere in the module, and no aggregate that pays one on a mechanic's behalf.
-The thirteen kinds are damage, healing, move speed, experience, money, maximum
+The fourteen kinds are damage, healing, move speed, experience, money, maximum
 health and resource regeneration, plus five the redesign added for cards the
-first seven could not express: avoidance, a shorter cooldown on one named
-ability, a bespoke buff to one ability, pet damage, and a second life.
+first seven could not express — avoidance, a shorter cooldown on one named
+ability, a bespoke buff to one ability, pet damage, and a second life — and
+loot, paid once at the item roll for every card that names it.
 
 Where a boon is bespoke — *Consecration doubled and halved*, *Polymorph is
 instant* — the mechanic's own `Describe()` says what it actually does, because
