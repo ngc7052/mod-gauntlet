@@ -689,6 +689,15 @@ card may take your greens but never your quest, and one player's curse may
 never be the group's -- so the *emptying* half is skipped entirely while
 grouped, while the doubling half is not.
 
+**The bench gained a fourth probe**: a kill of something the world calls
+special. Thuros Lightfingers (61) is a level-11 silver dragon, and nothing else
+the bench summons is anything but rank 0 -- so before this, Trophy Hunter read
+as a card that did nothing while working. It is a seam the greed redesign's
+elite cards will want too. Benched: Fresh Kill `a clean kill's corpse rolled 1
+-> 2 item(s)` with counters `5 kill(s) timed, 1 looted in time`; Blood Price
+`1 -> 3 item(s)` and `950 health paid`; Trophy Hunter `2 rare(s) killed, 2
+chest(s) left, 2 charge(s) banked`. `leaks all`: 64 audited, 0 leaked.
+
 ### Step 5, the rest -- and what the sweep says it should be
 
 `docs/commons.md` (2026-09-01) is the measurement and the proposed batch. It

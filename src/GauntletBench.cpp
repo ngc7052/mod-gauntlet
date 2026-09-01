@@ -59,6 +59,15 @@ namespace Gauntlet
         // have it, the probe skips rather than pretends.
         constexpr uint32 BENCH_LOOT_ENTRY = 2969;
 
+        // Something the world calls special. Thuros Lightfingers (61) is a
+        // level-11 silver dragon -- CreatureTemplate::rank 4,
+        // CREATURE_ELITE_RARE -- and killing one is a seam of its own: Trophy
+        // Hunter (112) pays only for a rare, and the greed redesign's elite
+        // cards will want the same probe. Nothing else the bench summons is
+        // anything but rank 0, so without this those cards read as doing
+        // nothing while working.
+        constexpr uint32 BENCH_RARE_ENTRY = 61;
+
         bool Moved(float a, float b) { return std::fabs(a - b) > 0.0001f; }
 
         std::vector<uint32> CooldownIds(Player* player)
@@ -661,6 +670,32 @@ namespace Gauntlet
                     }
 
                     quarry->DespawnOrUnsummon();
+                }
+
+                // And a kill of something rare. Separate from the quarry above
+                // because the two questions are different -- that one is "was
+                // this corpse worth looting", this one is "was this creature
+                // worth killing" -- and because a card may answer either
+                // without answering the other.
+                if (TempSummon* trophy = player->SummonCreature(BENCH_RARE_ENTRY, player->GetPosition(),
+                                                               TEMPSUMMON_TIMED_DESPAWN, BENCH_TARGET_LIFE_MS))
+                {
+                    if (Creature* rare = trophy->ToCreature())
+                    {
+                        // The tick is what notices one is nearby; a card that
+                        // reads the world on its own clock has to be given the
+                        // clock before it can be asked about the kill.
+                        for (uint32 i = 0; i < 4; ++i)
+                            sGauntlet->Tick(player, Scheduler::TICK_MS);
+                        noteBoth("something rare standing nearby");
+
+                        if (rare->IsAlive())
+                            Unit::Kill(player, rare);
+                        sGauntlet->OnCreatureKill(player, rare, /*byPet*/ false);
+                        noteBoth("killing something rare");
+                    }
+
+                    trophy->DespawnOrUnsummon();
                 }
             }
 
