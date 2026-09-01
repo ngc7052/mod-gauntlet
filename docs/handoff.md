@@ -437,12 +437,28 @@ open:
   bench it by day and the summary says "no probe reached it", which is the
   harness being honest, not the card being broken.
 
-### Step 5, the rest
+### Step 5, the rest -- and what the sweep says it should be
 
-More trades in more families first -- the sweep says exactly where: Spawn,
-Enemy, Tempo, Bargain and Class have no common at all, and until they do the
-third slot of every early offer is a rare. Then Scavenger's Eye and the loot
-cards of `docs/greed-redesign.md` §7.3.
+`docs/commons.md` (2026-09-01) is the measurement and the proposed batch. It
+overturns the obvious next move. "More commons in more families" was the
+guess; the variant sweep says **fifty-two hypothetical commons across all
+seven families leave tier 1 at 54%**, because every set reserves a slot for a
+card flagged `MF_RewardShaped` and **all eleven rows that carry that flag are
+Rare** -- at tier 1, filtered by window and mask, exactly three exist
+(Carrion, Champions, Hubris). Three reward-shaped *non-rare* cards move tier 1
+further than twenty ordinary rows do, which is the same thing the note above
+Killing Floor (`GauntletRegistry.cpp:554`) measured before rarity existed.
+
+So the order is: **the three reward-shaped cards first** (Scavenger's Eye and
+Blood for Bread are already designed in `docs/greed-redesign.md`; the third is
+proposed there), then nine uncommons, then ten commons -- measured together at
+69/23/8 against a 70/25/5 target. Two things that document settles on the way:
+a `Family::Class` common would spend `CAP_CLASS`, the run's class-curse
+budget, so class-masked trades stay filed `Rules` as Axeless already is; and
+Spawn and Bargain cannot be trade lines at all. It also flags a real
+disagreement with the greed redesign, which wants Blood for Bread as an epic.
+
+That document is a proposal, not a decision -- the card list is for cutting.
 
 ### Queued behind it: the greed redesign
 
