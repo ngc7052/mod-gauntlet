@@ -704,8 +704,14 @@ namespace Gauntlet
         // which is thirty levels of a run being asked nothing at all.
         bool const full = carried.size() >= maxCarried;
 
+        // A swap tier guarantees a Swap to a run that has something to give
+        // up. A run carrying nothing -- every tier skipped to 20, which skip
+        // made possible -- has no slot for the offer to name, and a Swap that
+        // says "slot 0" over an empty set is a card that says one thing and
+        // does another (Pick finds nothing at the slot and falls through to a
+        // plain add). Nothing to swap, nothing offered as one.
         if (count >= 3)
-            kinds[2] = (swapTier || full)
+            kinds[2] = ((swapTier && !carried.empty()) || full)
                      ? OfferKind::Swap
                      : (RollIn(state, 0, 5) == 0 ? OfferKind::Bargain : OfferKind::New);
 

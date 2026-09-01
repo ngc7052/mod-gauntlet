@@ -407,6 +407,29 @@ TEST(GeneratorDeterminism, CountIsHonoured)
             << "count=" << count;
 }
 
+TEST(GeneratorSwaps, ASwapTierOffersNoSwapToARunCarryingNothing)
+{
+    // Tiers 20, 40 and 60 guarantee a Swap in slot C -- a guarantee about a
+    // run that has something to give up. Skip made the other run possible:
+    // every tier declined to 20, nothing carried. A Swap over an empty set
+    // names "slot 0" of nothing, the panel shows a trade for a card that is
+    // not there, and Pick quietly does a plain add instead. Found by
+    // `.gauntlet debug offers 20` on a bot, which builds for an empty set.
+    RegistryView full;
+    full.includeUnimplemented = true;
+    std::vector<AffixInstance> const empty;
+
+    for (uint8 cls : CLASSES)
+    {
+        StubView const view(cls, 1);
+        for (uint8 tier : { 20, 40, 60 })
+            for (uint32 seed = 1; seed <= 100; ++seed)
+                for (Offer const& o : BuildOffers(seed, tier, view, empty, 3, full).offers)
+                    EXPECT_NE(o.kind, OfferKind::Swap)
+                        << "class " << uint32(cls) << " tier " << uint32(tier) << " seed " << seed;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Rarity. docs/rarity-plan.md step 1: every slot rolls a rarity to draw from,
 // weighted by tier, and the offer carries the rarity of the card it drew.
