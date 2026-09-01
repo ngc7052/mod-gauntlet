@@ -9,9 +9,9 @@ and §4 before trusting any test.
 
 `mod-gauntlet`, an AzerothCore (WotLK 3.3.5a) module: a procedurally generated
 hardcore affix challenge. A run offers three "affix" cards per tier, the player
-picks one, and the curses accumulate. 104 mechanics, all implemented: 69 rares,
-twenty-four commons and eleven uncommons, with reroll and skip live on every
-tier.
+picks one, and the curses accumulate. 104 mechanics, all implemented: twenty-four
+commons, eleven uncommons, fifty-three rares, fourteen epics and two
+legendaries, with reroll and skip live on every tier.
 Steps 1-4 of `docs/rarity-plan.md` have landed -- the rank system is gone, a
 card is one value and rarity is its only tier -- and step 5, the remaining
 cards, has begun with the loot trades.
@@ -42,7 +42,7 @@ level with `origin/master`.
 ```bash
 ./tests/compile-check.sh --anchors   # anchors + ladder audit, seconds, no Docker
 ./tests/compile-check.sh             # full compile + link in the build container
-./tests/run-tests.sh                 # 204 unit tests
+./tests/run-tests.sh                 # 206 unit tests
 ./sync-to-server.sh                  # rsync the module into the core tree
 cd /mnt/c/Users/3302/azerothcore-wotlk
 DC="docker compose -f docker-compose.yml -f docker-compose.override.yml --project-directory ."
@@ -70,7 +70,7 @@ that way. Verified after the fact on 2026-09-01: the four live runs, eighteen
 affixes and twenty-seven log rows were untouched by the reapply.
 
 Gate before every commit: anchors, ladders, compile, link, tests. All green
-today — 104 anchors, 4 ladders, 67 objects, 204 tests.
+today — 104 anchors, 4 ladders, 67 objects, 206 tests.
 
 ## 4. The testing rig, and what it cannot see
 
@@ -575,6 +575,51 @@ spent -- `EnemySpeed` as Hunted, `Experience` as Slow Learner. Ids 100-109.
 - Four of the ten are class-masked and filed **Rules, not Class**, the same
   call Axeless made: a `Family::Class` row spends `CAP_CLASS`, the run's
   budget of three class curses, and a small trade must not compete for it.
+
+### The epic pass (2026-09-01) -- `docs/rarity-plan.md` §7.4
+
+One pass over the whole table, as §7.4 asks for, rather than a decision per
+card. **Sixteen of the sixty-nine originals are no longer Rare**, and the list
+lives in `Registry.TheOriginalCardsAreRareAndEverythingAfterIsATradeLineOr-
+ANamedMechanic` -- so a seventeenth promotion is an edit to that list and a
+deliberate one.
+
+- **Epic is "changes how a whole system plays".** Four classless: Self-found
+  (the economy), Deep Wounds (recovery), Killing Floor (healing), Cursed Hoard
+  (loot). Then **one card per class**, the one that changes how that class is
+  played: Berserker's Bargain, Consecrated Ground, Wide Dead Zone, Slow Hands,
+  Penance of Silence, One Ward, One Totem, Arcane Frailty, Shard Economy,
+  Bound Skin.
+- **Legendary is "run-defining".** The Shade, which hunts the whole run, and
+  Last Rites, which is a second life every level -- the thing that hunts you
+  and the thing that saves you. `CAP_LEGENDARY = 1` now enforces §2's own
+  "one per run"; §7.3's alternative (one per *family*) stays open.
+- **The trap this pass walked into, now audited.** A slot's rarity is drawn
+  from the per-tier weights *before* its card is, so a row whose rarity weighs
+  zero across its whole tier window can never be drawn. Promoting Self-found
+  (window 1-20) to Epic did exactly that -- `EPIC_PCT` is zero below tier 21 --
+  and would have deleted the card silently. Its window is widened to 1-60, and
+  `Registry.EveryRowsRarityHasWeightSomewhereInsideItsTierWindow` is the audit
+  that catches the next one. Verified to fail before being trusted.
+- **A second leak, found by measuring rather than reading.** With the pass in,
+  epics appeared in 3-6% of sets at tiers 10-20 against a target of zero,
+  beginning exactly at Killing Floor's minTier. The reward-shaped guarantee
+  rebuilds slot B straight from a pool of everything carrying
+  `MF_RewardShaped` and never consulted the weights. `Eligible` now refuses any
+  card whose rarity weighs zero at that tier, on every path; the guarantee
+  loses nothing, because eight other reward-shaped cards are eligible there and
+  none is an epic.
+- **Measured, and this is the payoff:** tiers 61-80 now deliver
+  **12/23/40/19/6** against a target of 10/25/40/20/5 -- the late run was
+  14/26/60/0/0 before the pass, with rare absorbing the whole epic and
+  legendary share. Tier 41 reads 22/26/36/13/3 against 25/35/30/9/1.
+- **The one number still out of line**, and its cause: tier 21 delivers 14%
+  epic against 2% wanted. The reward-shaped guarantee ignores the *weights*
+  (it now only respects a zero), and four of the eleven reward-shaped cards
+  are epic or legendary, so slot B over-delivers whatever rarity they carry.
+  It has always done this -- before the pass it over-delivered rares, which is
+  where tier 21's old 51% rare came from. Worth fixing when the weights are
+  re-cut, and not before.
 
 ### Step 5, the rest -- and what the sweep says it should be
 

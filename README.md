@@ -72,7 +72,12 @@ rarity to draw from, weighted by tier, so early tiers lean common and the
 endgame leans rare or better. The twelve **commons** are small trades — *you
 cannot wear a helm; in exchange, 5% more health* — backed by one class and a
 table (`src/GauntletTrades.h`), so a new one is a row and a line rather than
-a file. The **uncommons** are trades with a condition — *by night you take 10%
+a file. The **epics** are the cards that change how a whole system plays — the
+economy, healing, recovery, loot, and one card per class that changes how that
+class is played — and the two **legendaries** are the run-defining ones: the
+Shade, which hunts you for the whole run, and Last Rites, which is a second
+life every level. A run carries at most one legendary. The **uncommons** are
+trades with a condition — *by night you take 10%
 more damage* — which is that tier's whole shape, and three of the trades pay in
 **loot**, the boon the table never had. Three cards pay you for engaging with
 them rather than through a boon at all: Scavenger's Eye rolls a corpse twice
@@ -160,7 +165,7 @@ common for the trades after id 74.
 <!-- AFFIX-TABLE-BEGIN -->
 | # | Affix | Family | Rarity | Who | Levels | What it does to you | What it pays |
 |---|---|---|---|---|---|---|---|
-| 1 | **The Shade** | Spawn | Rare | any | 20&ndash;80 | A Shade rises behind you every few minutes and hunts you until you kill it or leave it behind. | +15% experience |
+| 1 | **The Shade** | Spawn | Legendary | any | 20&ndash;80 | A Shade rises behind you every few minutes and hunts you until you kill it or leave it behind. | +15% experience |
 | 2 | **Echo** | Spawn | Rare | any | 30&ndash;80 | Every 25th enemy you kill returns as an echo of yourself. | +15% experience |
 | 3 | **Carrion** | Spawn | Rare | any | 1&ndash;50 | Every 4th corpse you loot draws scavengers. | +5% move speed |
 | 4 | **Reinforcements** | Spawn | Rare | any | 25&ndash;80 | Fights longer than 30 seconds draw another enemy every 15 seconds. | +8% damage dealt |
@@ -178,57 +183,57 @@ common for the trades after id 74.
 | 16 | **Overextended** | Tempo | Rare | any | 1&ndash;60 | Anything hitting you from behind deals 30% more damage. Keep them in front of you. | +10% healing received |
 | 17 | **Falter** | Tempo | Rare | any | 25&ndash;65 | Every 45 seconds in combat your hands fail you for three seconds. | +5% maximum health |
 | 18 | **Hubris** | Tempo | Rare | any | 1&ndash;50 | The first enemy in a fight is your duel: it hurts you less, everything else more. | +8% damage dealt |
-| 19 | **Deep Wounds** | Attrition | Rare | any | 10&ndash;60 | A third of the damage you take becomes a wound. Only a kill closes one. | +8% damage dealt |
+| 19 | **Deep Wounds** | Attrition | Epic | any | 10&ndash;60 | A third of the damage you take becomes a wound. Only a kill closes one. | +8% damage dealt |
 | 20 | **Blood Magic** | Attrition | Rare | Paladin, Hunter, Priest, Shaman, Mage, Warlock, Druid | 25&ndash;60 | Spells cost 3% of your maximum health in addition to mana. | +8% damage dealt |
-| 23 | **Self-found** | Rules | Rare | any | 1&ndash;20 | You cannot trade, mail, or use the auction house. | +8% damage dealt |
+| 23 | **Self-found** | Rules | Epic | any | 1&ndash;60 | You cannot trade, mail, or use the auction house. | +8% damage dealt |
 | 24 | **Lone Wolf** | Rules | Rare | any | 1&ndash;30 | Half health in a group; more experience alone. | +15% experience |
 | 25 | **Iron Purse** | Rules | Rare | any | 1&ndash;15 | Repairs cost double. | &mdash; |
-| 26 | **Last Rites** | Bargain | Rare | any | 40&ndash;80 | A hit that would kill you leaves you at 1 health instead, once per level. | a second life |
-| 27 | **Cursed Hoard** | Bargain | Rare | any | 30&ndash;80 | Chests give twice as much loot, but opening one makes you take triple damage until you kill three enemies. | +8% damage dealt |
+| 26 | **Last Rites** | Bargain | Legendary | any | 40&ndash;80 | A hit that would kill you leaves you at 1 health instead, once per level. | a second life |
+| 27 | **Cursed Hoard** | Bargain | Epic | any | 30&ndash;80 | Chests give twice as much loot, but opening one makes you take triple damage until you kill three enemies. | +8% damage dealt |
 | 28 | **Red Mist** | Class | Rare | Warrior | 15&ndash;80 | At 100 rage you lose your mind for three seconds and your rage empties. | +15% resource regeneration |
-| 29 | **Berserker's Bargain** | Class | Rare | Warrior | 25&ndash;80 | Below 35% health you deal 25% more damage, but your panic buttons will not answer. | +25% damage dealt |
+| 29 | **Berserker's Bargain** | Class | Epic | Warrior | 25&ndash;80 | Below 35% health you deal 25% more damage, but your panic buttons will not answer. | +25% damage dealt |
 | 30 | **Iron Discipline** | Class | Rare | Warrior | 20&ndash;80 | Changing stance has a ten-second cooldown. | +15% resource regeneration |
 | 31 | **Deafening Roar** | Class | Rare | Warrior | 20&ndash;80 | Your shouts wake every enemy within thirty yards. | a bespoke buff to the ability it names |
 | 32 | **Long Forbearance** | Class | Rare | Paladin | 15&ndash;80 | Forbearance lasts three minutes, and Divine Shield empties your mana. | +10% a bespoke buff to the ability it names |
-| 33 | **Consecrated Ground** | Class | Rare | Paladin | 25&ndash;80 | You take 25% more damage while not standing in your own Consecration. | a bespoke buff to the ability it names |
+| 33 | **Consecrated Ground** | Class | Epic | Paladin | 25&ndash;80 | You take 25% more damage while not standing in your own Consecration. | a bespoke buff to the ability it names |
 | 34 | **No Sanctuary** | Class | Rare | Paladin | 15&ndash;60 | Your Hearthstone will not answer under Divine Shield. | a shorter cooldown on the ability it names |
 | 35 | **Commitment** | Class | Rare | Paladin | 20&ndash;80 | Hammer of Justice roots you for its duration. | a shorter cooldown on the ability it names |
 | 36 | **Half-Tamed** | Class | Rare | Hunter | 15&ndash;80 | An unhappy pet turns on you. | your pet's damage |
 | 37 | **Dead Weight** | Class | Rare | Hunter | 20&ndash;80 | Feign Death has a three-minute cooldown. | a shorter cooldown on the ability it names |
-| 38 | **Wide Dead Zone** | Class | Rare | Hunter | 20&ndash;80 | Ranged attacks cannot be used within ten yards. | +8% damage dealt |
+| 38 | **Wide Dead Zone** | Class | Epic | Hunter | 20&ndash;80 | Ranged attacks cannot be used within ten yards. | +8% damage dealt |
 | 39 | **Blood Bond** | Class | Rare | Hunter | 25&ndash;80 | A fifth of the damage your pet takes is dealt to you. | +10% healing received |
 | 40 | **Cold Trail** | Class | Rare | Rogue | 20&ndash;80 | Vanish has a ten-minute cooldown. | a shorter cooldown on the ability it names |
 | 41 | **Poisoned Blades** | Class | Rare | Rogue | 20&ndash;80 | A quarter of the poison damage you deal ticks on you as well. | +8% damage dealt |
 | 42 | **Exposed Back** | Class | Rare | Rogue | 15&ndash;80 | Attacks from behind you deal 50% more damage. | a chance to avoid a blow outright |
-| 43 | **Slow Hands** | Class | Rare | Rogue | 20&ndash;80 | Energy does not regenerate while you move in combat. | +15% resource regeneration |
+| 43 | **Slow Hands** | Class | Epic | Rogue | 20&ndash;80 | Energy does not regenerate while you move in combat. | +15% resource regeneration |
 | 44 | **Frail Soul** | Class | Rare | Priest | 15&ndash;80 | Weakened Soul lasts 30 seconds. | +10% healing received |
 | 45 | **Faithless Form** | Class | Rare | Priest | 30&ndash;80 | Leaving Shadowform has a thirty-second cooldown. | +8% damage dealt |
-| 46 | **Penance of Silence** | Class | Rare | Priest | 20&ndash;80 | Healing yourself silences you for two seconds. | +10% healing received |
+| 46 | **Penance of Silence** | Class | Epic | Priest | 20&ndash;80 | Healing yourself silences you for two seconds. | +10% healing received |
 | 47 | **Whispers of the Deep** | Class | Rare | Priest | 25&ndash;80 | Below 20% health you lose your mind and flee for three seconds, once per fight. | a shorter cooldown on the ability it names |
 | 48 | **Rune-starved** | Class | Rare | Death Knight | 60&ndash;80 | While all six runes are on cooldown you take 30% more damage. | +15% resource regeneration |
 | 49 | **Grave Call** | Class | Rare | Death Knight | 60&ndash;80 | The dead you do not claim rise against you. | a shorter cooldown on the ability it names |
 | 50 | **Cold Presence** | Class | Rare | Death Knight | 60&ndash;80 | Changing presence costs all your runic power and has a ten-second cooldown. | a bespoke buff to the ability it names |
-| 51 | **One Ward** | Class | Rare | Death Knight | 60&ndash;80 | Anti-Magic Shell and Icebound Fortitude share a cooldown. | a bespoke buff to the ability it names |
-| 52 | **One Totem** | Class | Rare | Shaman | 15&ndash;80 | Only one totem may stand at a time. | a bespoke buff to the ability it names |
+| 51 | **One Ward** | Class | Epic | Death Knight | 60&ndash;80 | Anti-Magic Shell and Icebound Fortitude share a cooldown. | a bespoke buff to the ability it names |
+| 52 | **One Totem** | Class | Epic | Shaman | 15&ndash;80 | Only one totem may stand at a time. | a bespoke buff to the ability it names |
 | 53 | **Totemic Anchor** | Class | Rare | Shaman | 20&ndash;80 | You take 30% more damage when more than fifteen yards from your totems. | a bespoke buff to the ability it names |
 | 54 | **Elemental Overload** | Class | Rare | Shaman | 20&ndash;80 | Casting the same spell twice in a row costs double. | +8% damage dealt |
 | 55 | **Spirit Debt** | Class | Rare | Shaman | 25&ndash;80 | Every hit consumes a shield charge, and each consumed charge costs you 2% health. | a bespoke buff to the ability it names |
 | 56 | **Cold Feet** | Class | Rare | Mage | 15&ndash;80 | Blink costs 15% of your maximum health. | a shorter cooldown on the ability it names |
 | 57 | **Fickle Sheep** | Class | Rare | Mage | 20&ndash;80 | Polymorph breaks after five seconds, and the sheep comes back angry. | a bespoke buff to the ability it names |
 | 58 | **Mana Burn** | Class | Rare | Mage | 20&ndash;80 | Half the damage you take also burns your mana. | +8% damage dealt |
-| 59 | **Arcane Frailty** | Class | Rare | Mage | 30&ndash;80 | Thirty percent less health, thirty percent more spell damage. | +8% damage dealt |
+| 59 | **Arcane Frailty** | Class | Epic | Mage | 30&ndash;80 | Thirty percent less health, thirty percent more spell damage. | +8% damage dealt |
 | 60 | **Fel Pact** | Class | Rare | Warlock | 20&ndash;80 | Your demon's binding frays with every kill it makes, and after twenty it turns on you. | your pet's damage |
 | 61 | **Affliction of the Self** | Class | Rare | Warlock | 20&ndash;80 | Your curses and corruption afflict you too, at a fifth of their strength. | +8% damage dealt |
-| 62 | **Shard Economy** | Class | Rare | Warlock | 20&ndash;80 | Every summon and every Healthstone costs a Soul Shard, and shards drop only from your level up. | +15% resource regeneration |
+| 62 | **Shard Economy** | Class | Epic | Warlock | 20&ndash;80 | Every summon and every Healthstone costs a Soul Shard, and shards drop only from your level up. | +15% resource regeneration |
 | 63 | **Shared Blood** | Class | Rare | Warlock | 25&ndash;80 | While your demon lives you take 25% more damage, and it deals 40% more. | your pet's damage |
-| 64 | **Bound Skin** | Class | Rare | Druid | 15&ndash;80 | Shapeshifting has a six-second cooldown. | +5% maximum health |
+| 64 | **Bound Skin** | Class | Epic | Druid | 15&ndash;80 | Shapeshifting has a six-second cooldown. | +5% maximum health |
 | 65 | **Nature's Toll** | Class | Rare | Druid | 20&ndash;80 | Every kill made as a beast leaves you bleeding until you calm. | +8% damage dealt |
 | 66 | **Commitment of Roots** | Class | Rare | Druid | 15&ndash;60 | Entangling Roots holds you as long as it holds them. | +15% resource regeneration |
 | 67 | **Two Faces** | Class | Rare | Druid | 15&ndash;60 | By day your spells are weaker; by night your claws are. | +8% damage dealt |
 | 68 | **Faint** | Class | Rare | Paladin, Hunter, Priest, Shaman, Mage, Warlock, Druid | 15&ndash;80 | When your mana hits zero in combat you black out for two seconds. | +15% resource regeneration |
 | 70 | **Ankh Pact** | Class | Rare | Shaman | 40&ndash;80 | Reincarnation works once in this run, and when it does every boon you carry is burned away. | a second life |
 | 71 | **Stone of the Damned** | Class | Rare | Warlock | 40&ndash;80 | A Soulstone will bring you back once, and whoever kills you will be waiting. | a second life |
-| 74 | **Killing Floor** | Attrition | Rare | any | 10&ndash;80 | Healing is held while something you have wounded lives. A kill hands it back. | &mdash; |
+| 74 | **Killing Floor** | Attrition | Epic | any | 10&ndash;80 | Healing is held while something you have wounded lives. A kill hands it back. | &mdash; |
 | 75 | **Bareheaded** | Rules | Common | any | 1&ndash;80 | You cannot wear a helm. | +5% maximum health |
 | 76 | **Cloakless** | Rules | Common | any | 1&ndash;80 | You cannot wear a cloak. | +5% move speed |
 | 77 | **Ringless** | Rules | Common | any | 1&ndash;80 | You cannot wear rings. | +10% experience |

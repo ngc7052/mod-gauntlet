@@ -245,11 +245,17 @@ The direction is settled. These are not.
    is where the "upgrade" feeling goes now that ranks are gone, and it may turn
    out to be all the depth the run needs. Worth prototyping before writing sixty
    commons that might want to be upgrade paths.
-3. **One legendary per run, or one per family?**
-4. **What the existing 69 become.** Most are rares. Which are epics is a
-   judgement per card — Self-found, Killing Floor and One Ward read as epics
-   already. This wants one pass with the whole list in front of you rather than
-   a decision per card as it is touched.
+3. **One legendary per run, or one per family?** *Per run* is implemented
+   (`CAP_LEGENDARY`), because §2 already says so in as many words; per family
+   remains the open alternative and is one constant away.
+4. ~~**What the existing 69 become.**~~ **Done, 2026-09-01**, as one pass with
+   the whole list in front of it. Sixteen promotions: fourteen epics (the four
+   classless system-changers — Self-found, Deep Wounds, Killing Floor, Cursed
+   Hoard — plus one card per class) and two legendaries (the Shade and Last
+   Rites). All three cards this section named read as epics and all three are.
+   The list is in `tests/RegistryTest.cpp`, so the seventeenth promotion is a
+   deliberate edit. §7 of `docs/handoff.md` has what it measured and the two
+   bugs it found.
 5. **Does skipping pay a reroll charge**, or something else? Still the one
    number in this plan with no evidence behind it at all.
 6. **The rarity weights in §2 are invented.** They are a starting shape for the
