@@ -12,6 +12,7 @@
 
 #include "GauntletRegistry.h"
 #include "GauntletGenerator.h"
+#include "GauntletRules.h"
 #include "GauntletTrades.h"
 
 #include <gtest/gtest.h>
@@ -231,6 +232,35 @@ TEST(Registry, RarityIsInsideTheEnum)
             << "id " << def.id << " carries a rarity Data.lua cannot name";
 }
 
+TEST(Registry, EveryRowsRarityHasWeightSomewhereInsideItsTierWindow)
+{
+    // The audit that the epic pass needed and did not have.
+    //
+    // A slot's rarity is drawn from the per-tier weights before its card is
+    // (Rules::RarityWeight), so a row whose rarity weighs zero across every
+    // tier of its own window is a card the generator can never draw -- present
+    // in the table, listed in the README, and unreachable. Promoting
+    // Self-found to Epic did exactly that: its window ended at tier 20 and
+    // EPIC_PCT is zero below 21. Nothing else in the table would have said so.
+    //
+    // This is about a row contradicting itself, not about the weights being
+    // right. Re-cutting the weights is allowed to make cards rarer; it is not
+    // allowed to make one impossible.
+    for (MechanicDef const& def : AllMechanics())
+    {
+        bool reachable = false;
+        for (uint8 tier = def.minTier; tier <= def.maxTier && !reachable; ++tier)
+            if (Rules::RarityWeight(tier, def.rarity) > 0)
+                reachable = true;
+
+        EXPECT_TRUE(reachable)
+            << def.key << " (id " << def.id << ") is " << RarityName(def.rarity)
+            << " over tiers " << unsigned(def.minTier) << "-" << unsigned(def.maxTier)
+            << ", and that rarity weighs zero at every one of them -- the generator can never "
+               "draw it";
+    }
+}
+
 // docs/rarity-plan.md, steps 1, 2 and 5. The sixty-nine cards that existed
 // when rarity landed are all Rare, and stay Rare until the plan's section 7.4
 // -- one pass over the whole list deciding which are epics -- rewrites this
@@ -256,9 +286,33 @@ TEST(Registry, TheOriginalCardsAreRareAndEverythingAfterIsATradeLineOrANamedMech
     {
         if (def.id <= LAST_ORIGINAL)
         {
-            EXPECT_EQ(def.rarity, Rarity::Rare)
+            // The epic pass of docs/rarity-plan.md 7.4 happened on 2026-09-01,
+            // and this is its result: sixteen of the sixty-nine original cards
+            // are no longer Rare. The lists are the pass, so a seventeenth
+            // promotion is an edit here and a deliberate one -- which is the
+            // whole point of the plan asking for "one pass with the whole list
+            // in front of you" rather than a decision per card as it is
+            // touched.
+            //
+            // Epic is "changes how a whole system plays": the economy
+            // (Self-found), recovery (Deep Wounds), healing (Killing Floor),
+            // loot (Cursed Hoard), and one card per class that changes how
+            // that class is played. Legendary is "run-defining": the Shade,
+            // which is the run's nemesis, and Last Rites, which is what a
+            // hardcore run is about.
+            constexpr std::array<uint16, 14> EPICS =
+                { 19, 23, 27, 29, 33, 38, 43, 46, 51, 52, 59, 62, 64, 74 };
+            constexpr std::array<uint16, 2> LEGENDARIES = { 1, 26 };
+
+            Rarity expected = Rarity::Rare;
+            if (std::find(EPICS.begin(), EPICS.end(), def.id) != EPICS.end())
+                expected = Rarity::Epic;
+            else if (std::find(LEGENDARIES.begin(), LEGENDARIES.end(), def.id) != LEGENDARIES.end())
+                expected = Rarity::Legendary;
+
+            EXPECT_EQ(def.rarity, expected)
                 << "id " << def.id << " (" << def.key << ") is " << RarityName(def.rarity)
-                << "; the epic pass is one decision over the whole table, not per row";
+                << " and the epic pass says " << RarityName(expected);
             continue;
         }
 

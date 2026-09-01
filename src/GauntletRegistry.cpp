@@ -121,7 +121,7 @@ namespace
         return {
 
         // --- Family S: things that spawn -------------------------------
-        { 1, "shade", "The Shade", Family::Spawn, 0, 20, 80, Rarity::Rare,
+        { 1, "shade", "The Shade", Family::Spawn, 0, 20, 80, Rarity::Legendary,
           MF_Timed | MF_Stalker, "stalker", Boon::BonusExperience, 0, 0,
           "A Shade rises behind you every few minutes and hunts you until you kill it or leave it behind." },
 
@@ -229,7 +229,7 @@ namespace
         // this row opens, and with it open tier 3 has four families like every
         // tier above it. Nothing about the mechanic changes: it is answered by
         // taking less damage, which a level-15 character can already do.
-        { 19, "deep_wounds", "Deep Wounds", Family::Attrition, 0, 10, 60, Rarity::Rare,
+        { 19, "deep_wounds", "Deep Wounds", Family::Attrition, 0, 10, 60, Rarity::Epic,
           MF_None, "", Boon::BonusDamage, 0, 0,
           "A third of the damage you take becomes a wound. Only a kill closes one." },
 
@@ -246,7 +246,18 @@ namespace
         // is no longer contiguous and nothing may fill the holes.
 
         // --- Family R: rules -------------------------------------------
-        { 23, "self_found", "Self-found", Family::Rules, 0, 1, 20, Rarity::Rare,
+        // Epic, and its window widened from 1-20 to 1-60 to go with it. The
+        // two are one decision: RollRarity draws a slot's rarity from the
+        // per-tier weights, and Rules::EPIC_PCT is zero below tier 21 -- so an
+        // epic whose window ends at 20 is a card the generator can never draw,
+        // and promoting it on its own would have deleted it from the game
+        // silently. Every promotion in docs/rarity-plan.md 7.4's pass was
+        // checked against that, and this is the only row it caught.
+        //
+        // What the widening costs is the card's "decide at the start"
+        // framing: it is a mid-run commitment now rather than an opening one.
+        // What it buys is the card existing.
+        { 23, "self_found", "Self-found", Family::Rules, 0, 1, 60, Rarity::Epic,
           MF_None, "rule", Boon::BonusDamage, 0, 0,
           "You cannot trade, mail, or use the auction house." },
 
@@ -273,7 +284,7 @@ namespace
         // --- Family B: bargains ----------------------------------------
         // The boon is the cheat death itself: a killing blow leaves you at one
         // health, once per level, and the Mark that follows is the price.
-        { 26, "last_rites", "Last Rites", Family::Bargain, 0, 40, 80, Rarity::Rare,
+        { 26, "last_rites", "Last Rites", Family::Bargain, 0, 40, 80, Rarity::Legendary,
           MF_RewardShaped, "", Boon::SecondLife, 0, 0,
           "A hit that would kill you leaves you at 1 health instead, once per level." },
 
@@ -286,7 +297,7 @@ namespace
         // of dead letter: the row said 4, the constant said 6, and the
         // constant won every time. Registry.BargainsOpenWhereTheGeneratorSaysThey
         // Do keeps the two from drifting apart again.
-        { 27, "cursed_hoard", "Cursed Hoard", Family::Bargain, 0, 30, 80, Rarity::Rare,
+        { 27, "cursed_hoard", "Cursed Hoard", Family::Bargain, 0, 30, 80, Rarity::Epic,
           MF_RewardShaped, "", Boon::BonusDamage, 0, 0,
           "Chests give twice as much loot, but opening one makes you take triple damage"
           " until you kill three enemies." },
@@ -303,7 +314,7 @@ namespace
           "At 100 rage you lose your mind for three seconds and your rage empties." },
 
         // TODO(design): requiresSpell picks Shield Wall of the card's three panic buttons.
-        { 29, "c02_berserkers_bargain", "Berserker's Bargain", Family::Class, CM_WARRIOR, 25, 80, Rarity::Rare,
+        { 29, "c02_berserkers_bargain", "Berserker's Bargain", Family::Class, CM_WARRIOR, 25, 80, Rarity::Epic,
           MF_RewardShaped, "", Boon::BonusDamage, 871, 0,
           "Below 35% health you deal 25% more damage, but your panic buttons will not answer." },
 
@@ -336,7 +347,7 @@ namespace
           "Forbearance lasts three minutes, and Divine Shield empties your mana." },
 
         // The boon is bespoke: Consecration lasts twice as long and costs half.
-        { 33, "c06_consecrated_ground", "Consecrated Ground", Family::Class, CM_PALADIN, 25, 80, Rarity::Rare,
+        { 33, "c06_consecrated_ground", "Consecrated Ground", Family::Class, CM_PALADIN, 25, 80, Rarity::Epic,
           MF_None, "", Boon::BonusAbility, 26573, 0,
           "You take 25% more damage while not standing in your own Consecration." },
 
@@ -364,7 +375,7 @@ namespace
           MF_None, "shortcut:kiting", Boon::BonusCooldown, 5384, 0,
           "Feign Death has a three-minute cooldown." },
 
-        { 38, "c11_wide_dead_zone", "Wide Dead Zone", Family::Class, CM_HUNTER, 20, 80, Rarity::Rare,
+        { 38, "c11_wide_dead_zone", "Wide Dead Zone", Family::Class, CM_HUNTER, 20, 80, Rarity::Epic,
           MF_None, "shortcut:kiting", Boon::BonusDamage, 0, 0,
           "Ranged attacks cannot be used within ten yards." },
 
@@ -388,7 +399,7 @@ namespace
           MF_None, "", Boon::BonusAvoidance, 0, 0,
           "Attacks from behind you deal 50% more damage." },
 
-        { 43, "c16_slow_hands", "Slow Hands", Family::Class, CM_ROGUE, 20, 80, Rarity::Rare,
+        { 43, "c16_slow_hands", "Slow Hands", Family::Class, CM_ROGUE, 20, 80, Rarity::Epic,
           MF_None, "", Boon::BonusRegen, 0, 0,
           "Energy does not regenerate while you move in combat." },
 
@@ -405,7 +416,7 @@ namespace
           MF_None, "", Boon::BonusDamage, 15473, 3,
           "Leaving Shadowform has a thirty-second cooldown." },
 
-        { 46, "c19_penance_of_silence", "Penance of Silence", Family::Class, CM_PRIEST, 20, 80, Rarity::Rare,
+        { 46, "c19_penance_of_silence", "Penance of Silence", Family::Class, CM_PRIEST, 20, 80, Rarity::Epic,
           MF_None, "", Boon::BonusHealing, 0, 0,
           "Healing yourself silences you for two seconds." },
 
@@ -433,13 +444,13 @@ namespace
         // The boon is bespoke: both wards last half again as long. requiresSpell
         // is Icebound Fortitude, the later of the two the card shares a
         // cooldown between.
-        { 51, "c24_one_ward", "One Ward", Family::Class, CM_DEATH_KNIGHT, 60, 80, Rarity::Rare,
+        { 51, "c24_one_ward", "One Ward", Family::Class, CM_DEATH_KNIGHT, 60, 80, Rarity::Epic,
           MF_None, "", Boon::BonusAbility, 48792, 0,
           "Anti-Magic Shell and Icebound Fortitude share a cooldown." },
 
         // Shaman
         // The boon is bespoke: the one totem still standing lasts twice as long.
-        { 52, "c25_one_totem", "One Totem", Family::Class, CM_SHAMAN, 15, 80, Rarity::Rare,
+        { 52, "c25_one_totem", "One Totem", Family::Class, CM_SHAMAN, 15, 80, Rarity::Epic,
           MF_None, "", Boon::BonusAbility, 0, 0,
           "Only one totem may stand at a time." },
 
@@ -476,7 +487,7 @@ namespace
           MF_None, "", Boon::BonusDamage, 0, 0,
           "Half the damage you take also burns your mana." },
 
-        { 59, "c32_arcane_frailty", "Arcane Frailty", Family::Class, CM_MAGE, 30, 80, Rarity::Rare,
+        { 59, "c32_arcane_frailty", "Arcane Frailty", Family::Class, CM_MAGE, 30, 80, Rarity::Epic,
           MF_None, "", Boon::BonusDamage, 0, 0,
           "Thirty percent less health, thirty percent more spell damage." },
 
@@ -490,7 +501,7 @@ namespace
           MF_None, "", Boon::BonusDamage, 0, 0,
           "Your curses and corruption afflict you too, at a fifth of their strength." },
 
-        { 62, "c35_shard_economy", "Shard Economy", Family::Class, CM_WARLOCK, 20, 80, Rarity::Rare,
+        { 62, "c35_shard_economy", "Shard Economy", Family::Class, CM_WARLOCK, 20, 80, Rarity::Epic,
           MF_None, "", Boon::BonusRegen, 0, 0,
           "Every summon and every Healthstone costs a Soul Shard, and shards drop only from your level up." },
 
@@ -500,7 +511,7 @@ namespace
           "While your demon lives you take 25% more damage, and it deals 40% more." },
 
         // Druid
-        { 64, "c37_bound_skin", "Bound Skin", Family::Class, CM_DRUID, 15, 80, Rarity::Rare,
+        { 64, "c37_bound_skin", "Bound Skin", Family::Class, CM_DRUID, 15, 80, Rarity::Epic,
           MF_None, "shortcut:shapeshift", Boon::BonusMaxHealth, 0, 0,
           "Shapeshifting has a six-second cooldown." },
 
@@ -563,7 +574,7 @@ namespace
         // CAP_ON_KILL", and the curse here is the continuous healing block. The
         // kill is the release.
         // ---------------------------------------------------------------
-        { 74, "a05_killing_floor", "Killing Floor", Family::Attrition, 0, 10, 80, Rarity::Rare,
+        { 74, "a05_killing_floor", "Killing Floor", Family::Attrition, 0, 10, 80, Rarity::Epic,
           MF_RewardShaped, "", Boon::None, 0, 0,
           "Healing is held while something you have wounded lives. A kill hands it back." },
 
