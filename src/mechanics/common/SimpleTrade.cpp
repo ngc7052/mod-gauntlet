@@ -378,5 +378,26 @@ namespace Gauntlet
     GAUNTLET_MECHANIC_FN(96, TradeDelver)
     GAUNTLET_MECHANIC_FN(97, TradeCornered)
     GAUNTLET_MECHANIC_FN(98, TradeFreshLegs)
+    IMechanic* TradeShoulderless() { return MakeTrade(100); }
+    IMechanic* TradeBarefoot() { return MakeTrade(101); }
+    IMechanic* TradeBareHanded() { return MakeTrade(102); }
+    IMechanic* TradeWristless() { return MakeTrade(103); }
+    IMechanic* TradeShieldless() { return MakeTrade(104); }
+    IMechanic* TradeMaceless() { return MakeTrade(105); }
+    IMechanic* TradeDaggerless() { return MakeTrade(106); }
+    IMechanic* TradeStaffless() { return MakeTrade(107); }
+    IMechanic* TradeHunted() { return MakeTrade(108); }
+    IMechanic* TradeSlowLearner() { return MakeTrade(109); }
+
     GAUNTLET_MECHANIC_FN(99, TradeOutlander)
+    GAUNTLET_MECHANIC_FN(100, TradeShoulderless)
+    GAUNTLET_MECHANIC_FN(101, TradeBarefoot)
+    GAUNTLET_MECHANIC_FN(102, TradeBareHanded)
+    GAUNTLET_MECHANIC_FN(103, TradeWristless)
+    GAUNTLET_MECHANIC_FN(104, TradeShieldless)
+    GAUNTLET_MECHANIC_FN(105, TradeMaceless)
+    GAUNTLET_MECHANIC_FN(106, TradeDaggerless)
+    GAUNTLET_MECHANIC_FN(107, TradeStaffless)
+    GAUNTLET_MECHANIC_FN(108, TradeHunted)
+    GAUNTLET_MECHANIC_FN(109, TradeSlowLearner)
 }

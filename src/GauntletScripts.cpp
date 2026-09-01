@@ -912,6 +912,16 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_TradeCornered();    // 97
     void AddSC_gauntlet_mechanic_TradeFreshLegs();   // 98
     void AddSC_gauntlet_mechanic_TradeOutlander();   // 99
+    void AddSC_gauntlet_mechanic_TradeShoulderless();    // 100
+    void AddSC_gauntlet_mechanic_TradeBarefoot();        // 101
+    void AddSC_gauntlet_mechanic_TradeBareHanded();      // 102
+    void AddSC_gauntlet_mechanic_TradeWristless();       // 103
+    void AddSC_gauntlet_mechanic_TradeShieldless();      // 104
+    void AddSC_gauntlet_mechanic_TradeMaceless();        // 105
+    void AddSC_gauntlet_mechanic_TradeDaggerless();      // 106
+    void AddSC_gauntlet_mechanic_TradeStaffless();       // 107
+    void AddSC_gauntlet_mechanic_TradeHunted();          // 108
+    void AddSC_gauntlet_mechanic_TradeSlowLearner();     // 109
 }
 
 static void AnchorMechanics()
@@ -1018,6 +1028,18 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_TradeCornered();
     AddSC_gauntlet_mechanic_TradeFreshLegs();
     AddSC_gauntlet_mechanic_TradeOutlander();
+
+    // docs/commons.md's ten commons.
+    AddSC_gauntlet_mechanic_TradeShoulderless();
+    AddSC_gauntlet_mechanic_TradeBarefoot();
+    AddSC_gauntlet_mechanic_TradeBareHanded();
+    AddSC_gauntlet_mechanic_TradeWristless();
+    AddSC_gauntlet_mechanic_TradeShieldless();
+    AddSC_gauntlet_mechanic_TradeMaceless();
+    AddSC_gauntlet_mechanic_TradeDaggerless();
+    AddSC_gauntlet_mechanic_TradeStaffless();
+    AddSC_gauntlet_mechanic_TradeHunted();
+    AddSC_gauntlet_mechanic_TradeSlowLearner();
 }
 
 void Addmod_gauntletScripts()

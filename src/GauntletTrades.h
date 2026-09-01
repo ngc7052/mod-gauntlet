@@ -205,6 +205,43 @@ namespace Gauntlet
         { 99, TradeCurse::Coefficient, 0, AggregateKind::EnemySpeed,   15,
           Boon::BonusExperience, 15, "",         "In the open world everything chasing you is 15% faster.",
           Condition::InOpenWorld },
+
+        // -- ten more commons (docs/commons.md section 3.3) -------------------
+        // The other half of that batch. Nine uncommons alone took the uncommon
+        // share past its target and pushed commons down, because both halves
+        // compete for the same three slots; these are what settle it.
+        //
+        // Four of the ten are class-masked and filed Rules, not Class, which
+        // is the same call Axeless and Swordless made: a Family::Class row
+        // spends CAP_CLASS, the run's budget of three class curses, and a
+        // small trade must not compete with a real one for that.
+        { 100, TradeCurse::DenyInventoryType, InvTypeBit(Inv::SHOULDERS), AggregateKind::MAX, 0,
+          Boon::BonusDamage,     8,  "shoulders", "You cannot wear shoulders." },
+        { 101, TradeCurse::DenyInventoryType, InvTypeBit(Inv::FEET),      AggregateKind::MAX, 0,
+          Boon::BonusMoveSpeed,  8,  "boots",     "You cannot wear boots." },
+        { 102, TradeCurse::DenyInventoryType, InvTypeBit(Inv::HANDS),     AggregateKind::MAX, 0,
+          Boon::BonusHealing,    10, "gloves",    "You cannot wear gloves." },
+        { 103, TradeCurse::DenyInventoryType, InvTypeBit(Inv::WRISTS),    AggregateKind::MAX, 0,
+          Boon::BonusExperience, 10, "bracers",   "You cannot wear bracers." },
+        { 104, TradeCurse::DenyInventoryType, InvTypeBit(Inv::SHIELD),    AggregateKind::MAX, 0,
+          Boon::BonusDamage,     10, "shield",    "You cannot carry a shield." },
+        { 105, TradeCurse::DenyWeaponSubclass, WeaponBit(Wpn::MACE) | WeaponBit(Wpn::MACE2), AggregateKind::MAX, 0,
+          Boon::BonusDamage,     10, "mace",      "You cannot wield a mace." },
+        { 106, TradeCurse::DenyWeaponSubclass, WeaponBit(Wpn::DAGGER),    AggregateKind::MAX, 0,
+          Boon::BonusDamage,     10, "dagger",    "You cannot wield a dagger." },
+        { 107, TradeCurse::DenyWeaponSubclass, WeaponBit(Wpn::STAFF),     AggregateKind::MAX, 0,
+          Boon::BonusMaxHealth,  5,  "staff",     "You cannot wield a staff." },
+
+        // The last two coefficient kinds the table had never spent. Boon::
+        // BonusRegen would have suited a third, and is deliberately not used:
+        // it has no generic delivery -- Boons.cpp's Pays() does not map it and
+        // the two class cards that name it pay it themselves on a tick -- so a
+        // trade line naming it would print "you recover 15% faster" and do
+        // nothing, which is the fault a player caught once already.
+        { 108, TradeCurse::Coefficient, 0, AggregateKind::EnemySpeed,   10,
+          Boon::BonusDamage,     8,  "",         "Everything chasing you is 10% faster." },
+        { 109, TradeCurse::Coefficient, 0, AggregateKind::Experience,  -15,
+          Boon::BonusLoot,       25, "",         "You gain 15% less experience." },
     };
 
     constexpr std::size_t TRADE_COUNT = sizeof(TRADES) / sizeof(TRADES[0]);

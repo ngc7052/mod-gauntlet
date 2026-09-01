@@ -728,6 +728,55 @@ namespace
           MF_None, "", Boon::BonusExperience, 0, 0,
           "In the open world everything chasing you is 15% faster." },
 
+        // Ten more commons (docs/commons.md section 3.3), the half that
+        // settles the mix the nine uncommons tipped. The four weapon and
+        // shield denials are class-masked but filed Rules, as Axeless is:
+        // a Family::Class row would spend CAP_CLASS.
+
+        { 100, "shoulderless", "Shoulderless", Family::Rules, 0, 1, 80, Rarity::Common,
+          MF_None, "", Boon::BonusDamage, 0, 0,
+          "You cannot wear shoulders." },
+
+        { 101, "barefoot", "Barefoot", Family::Rules, 0, 1, 80, Rarity::Common,
+          MF_None, "", Boon::BonusMoveSpeed, 0, 0,
+          "You cannot wear boots." },
+
+        { 102, "bare_handed", "Bare-handed", Family::Rules, 0, 1, 80, Rarity::Common,
+          MF_None, "", Boon::BonusHealing, 0, 0,
+          "You cannot wear gloves." },
+
+        { 103, "wristless", "Wristless", Family::Rules, 0, 1, 80, Rarity::Common,
+          MF_None, "", Boon::BonusExperience, 0, 0,
+          "You cannot wear bracers." },
+
+        { 104, "shieldless", "Shieldless", Family::Rules,
+          CM_WARRIOR | CM_PALADIN | CM_SHAMAN, 1, 80, Rarity::Common,
+          MF_None, "", Boon::BonusDamage, 0, 0,
+          "You cannot carry a shield." },
+
+        { 105, "maceless", "Maceless", Family::Rules,
+          CM_WARRIOR | CM_PALADIN | CM_PRIEST | CM_ROGUE | CM_SHAMAN | CM_DRUID | CM_DEATH_KNIGHT, 1, 80, Rarity::Common,
+          MF_None, "", Boon::BonusDamage, 0, 0,
+          "You cannot wield a mace." },
+
+        { 106, "daggerless", "Daggerless", Family::Rules,
+          CM_WARRIOR | CM_ROGUE | CM_HUNTER | CM_PRIEST | CM_MAGE | CM_WARLOCK | CM_DRUID | CM_SHAMAN, 1, 80, Rarity::Common,
+          MF_None, "", Boon::BonusDamage, 0, 0,
+          "You cannot wield a dagger." },
+
+        { 107, "staffless", "Staffless", Family::Rules,
+          CM_WARRIOR | CM_HUNTER | CM_PRIEST | CM_SHAMAN | CM_MAGE | CM_WARLOCK | CM_DRUID, 1, 80, Rarity::Common,
+          MF_None, "", Boon::BonusMaxHealth, 0, 0,
+          "You cannot wield a staff." },
+
+        { 108, "hunted", "Hunted", Family::Enemy, 0, 1, 80, Rarity::Common,
+          MF_None, "", Boon::BonusDamage, 0, 0,
+          "Everything chasing you is 10% faster." },
+
+        { 109, "slow_learner", "Slow Learner", Family::Attrition, 0, 1, 80, Rarity::Common,
+          MF_None, "", Boon::BonusLoot, 0, 0,
+          "You gain 15% less experience." },
+
         };
     }
 
