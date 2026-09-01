@@ -656,6 +656,38 @@ namespace
           MF_None, "", Boon::BonusLoot, 0, 0,
           "By night you take 10% more damage." },
 
+        // ---------------------------------------------------------------
+        // The three reward-shaped cards of docs/commons.md.
+        //
+        // Every offer set must contain one row flagged MF_RewardShaped
+        // (GauntletGenerator.cpp:810), and until these three, every row that
+        // carried the flag was Rare -- at tier 1, filtered by window and
+        // class mask, exactly three existed for an arbitrary character.
+        // One slot in three was a rare before any rarity weight was read,
+        // and the variant sweep showed no quantity of ordinary commons
+        // moving it: fifty-two of them left tier 1 at 54% against a 70%
+        // target, while three rows like these moved it further than twenty
+        // ordinary ones did.
+        //
+        // So all three are classless and open at tier 1 on purpose -- that
+        // availability is the whole point of them -- and each earns the flag
+        // rather than being handed it: the card's own mechanic pays out when
+        // the player engages with it, the standard Champions and Killing
+        // Floor set. Two carry Boon::None for Killing Floor's reason, that
+        // the payout is the upside and a BoonClause would promise a second.
+        // ---------------------------------------------------------------
+        { 88, "scavengers_eye", "Scavenger's Eye", Family::Enemy, 0, 1, 80, Rarity::Uncommon,
+          MF_RewardShaped, "", Boon::None, 0, 0,
+          "Enemies notice you from further away, and a fight nothing touches you in pays twice." },
+
+        { 89, "blood_for_bread", "Blood for Bread", Family::Rules, 0, 1, 80, Rarity::Common,
+          MF_RewardShaped, "", Boon::None, 0, 0,
+          "You cannot eat or drink. Every kill feeds you instead." },
+
+        { 90, "waste_not", "Waste Not", Family::Rules, 0, 1, 80, Rarity::Common,
+          MF_RewardShaped, "", Boon::None, 0, 0,
+          "You cannot drink a potion. Every kill mends you instead." },
+
         };
     }
 

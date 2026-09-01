@@ -216,5 +216,11 @@ GauntletData = {
                  icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain", desc = "You deal 8% less damage." },
         [87] = { name = "Night Owl", key = "night_owl", family = 3, rarity = 1,
                  icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain", desc = "By night you take 10% more damage." },
+        [88] = { name = "Scavenger's Eye", key = "scavengers_eye", family = 1, rarity = 1,
+                 icon = "Interface\\Icons\\Ability_Warrior_BattleShout", desc = "Enemies notice you from further away, and a fight nothing touches you in pays twice." },
+        [89] = { name = "Blood for Bread", key = "blood_for_bread", family = 4, rarity = 0,
+                 icon = "Interface\\Icons\\INV_Scroll_03", desc = "You cannot eat or drink. Every kill feeds you instead." },
+        [90] = { name = "Waste Not", key = "waste_not", family = 4, rarity = 0,
+                 icon = "Interface\\Icons\\INV_Scroll_03", desc = "You cannot drink a potion. Every kill mends you instead." },
     },
 }

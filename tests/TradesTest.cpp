@@ -54,15 +54,30 @@ TEST(Trades, EveryLineBacksATradeRow)
     }
 }
 
-TEST(Trades, EveryCommonRowHasALine)
+TEST(Trades, ACommonWithNoLineIsAMechanicThatEarnedIt)
 {
     // The other direction, and the one that matters more: a Rarity::Common row
-    // with no line here is offered to a live character and does nothing, and
-    // MakeTrade's null return is what it would do instead of crashing.
+    // with no line here and no mechanic behind it is offered to a live
+    // character and does nothing.
+    //
+    // It used to be enough to demand a line. docs/commons.md put three cards
+    // in the table that a single line cannot say -- they pay out on a kill or
+    // on a fight fought a particular way -- so the rule is now the reason
+    // rather than the list: the only excuse for a common without a line is
+    // that it is doing the one thing a trade row cannot, which is what
+    // MF_RewardShaped means. A row that is neither is the silent card this
+    // test exists to catch.
     for (MechanicDef const& def : AllMechanics())
-        if (def.rarity == Rarity::Common)
-            EXPECT_NE(FindTrade(def.id), nullptr)
-                << def.key << " (id " << def.id << ") is a common with no trade line";
+    {
+        if (def.rarity != Rarity::Common && def.rarity != Rarity::Uncommon)
+            continue;
+        if (FindTrade(def.id) != nullptr)
+            continue;
+
+        EXPECT_TRUE(def.flags & MF_RewardShaped)
+            << def.key << " (id " << def.id << ") is a " << RarityName(def.rarity)
+            << " with no trade line and no reward-shaped mechanic to justify one";
+    }
 }
 
 TEST(Trades, AnUncommonIsATradeWithACondition)

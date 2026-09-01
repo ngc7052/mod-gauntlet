@@ -900,6 +900,9 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_TradeMagpie();        // 85
     void AddSC_gauntlet_mechanic_TradeButterfingers(); // 86
     void AddSC_gauntlet_mechanic_TradeNightOwl();      // 87
+    void AddSC_gauntlet_mechanic_ScavengersEye();      // 88
+    void AddSC_gauntlet_mechanic_BloodForBread();      // 89
+    void AddSC_gauntlet_mechanic_WasteNot();           // 90
 }
 
 static void AnchorMechanics()
@@ -990,6 +993,11 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_TradeMagpie();
     AddSC_gauntlet_mechanic_TradeButterfingers();
     AddSC_gauntlet_mechanic_TradeNightOwl();
+
+    // docs/commons.md's three reward-shaped cards.
+    AddSC_gauntlet_mechanic_ScavengersEye();
+    AddSC_gauntlet_mechanic_BloodForBread();
+    AddSC_gauntlet_mechanic_WasteNot();
 }
 
 void Addmod_gauntletScripts()

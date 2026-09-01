@@ -318,3 +318,67 @@ namespace
         EXPECT_LE(KillingFloorLeaveBack(huge), huge);
     }
 }
+
+// ---------------------------------------------------------------------------
+// The three reward-shaped cards of docs/commons.md -- Scavenger's Eye (88),
+// Blood for Bread (89), Waste Not (90).
+//
+// The claims worth making about them are the ones that are about the cards
+// being those cards. Their percentages will be tuned by play; that one card
+// takes more than another and must therefore pay more than it is the design,
+// and a transposed digit breaks it.
+// ---------------------------------------------------------------------------
+
+TEST(Rules, TheCardThatTakesMoreOfYourDowntimePaysMore)
+{
+    // Blood for Bread gives up eating and drinking -- both bars, every rest.
+    // Waste Not gives up potions only. If the smaller sacrifice ever paid as
+    // well as the larger one, the larger card would be strictly worse than the
+    // smaller and there would be no reason to ever take it.
+    for (uint32 pool : { 100u, 743u, 4200u, 16795u, 100000u })
+        EXPECT_GT(Rules::BloodForBreadRestore(pool), Rules::WasteNotRestore(pool))
+            << "pool " << pool;
+}
+
+TEST(Rules, AKillAlwaysRestoresSomethingAndNeverThePlayersWholePool)
+{
+    // Both halves matter. Nothing restored reads to a player as the card being
+    // broken -- which is the fault Deafening Roar shipped with -- and a
+    // level-5 health pool rounds a percentage to zero long before the player
+    // stops noticing. A whole pool would make either card a full heal on every
+    // kill, which is not a hardcore curse at all.
+    for (uint32 pool : { 1u, 20u, 100u, 743u, 4200u, 16795u, 100000u })
+    {
+        EXPECT_GT(Rules::BloodForBreadRestore(pool), 0u) << "pool " << pool;
+        EXPECT_GT(Rules::WasteNotRestore(pool), 0u) << "pool " << pool;
+
+        if (pool > 2u)
+        {
+            EXPECT_LT(Rules::BloodForBreadRestore(pool), pool) << "pool " << pool;
+            EXPECT_LT(Rules::WasteNotRestore(pool), pool) << "pool " << pool;
+        }
+    }
+}
+
+TEST(Rules, TheUncommonNoticesYouFromLessFarThanTheRareDoes)
+{
+    // Scavenger's Eye is Keen-nosed's curse at a lower rarity, and rarity is
+    // "how much of the run the card changes" (docs/rarity-plan.md section 2).
+    // If the uncommon ever reached further than the rare, the rare would be
+    // the weaker card at the higher rarity and the ladder would read backwards.
+    EXPECT_GT(Rules::SCAVENGER_YARDS, 0.0f) << "a curse of zero yards is not a curse";
+    EXPECT_LT(Rules::SCAVENGER_YARDS, Rules::KEEN_NOSED_YARDS);
+}
+
+TEST(Rules, ACleanFightIsPaidAWholeExtraRollAndNotAFraction)
+{
+    // The card's upside has to be something the player earned by fighting a
+    // particular way, so it is a second roll of the creature's own table --
+    // its blues included -- rather than a percentage laid over the first roll.
+    // A percentage would be a boon, and a boon is not what MF_RewardShaped is
+    // for.
+    EXPECT_GT(Rules::SCAVENGER_ROLLS, 1u);
+    EXPECT_EQ(Rules::ScavengerExtraRolls(), Rules::SCAVENGER_ROLLS - 1u);
+    EXPECT_GE(Rules::ScavengerExtraRolls(), 1u);
+}
+

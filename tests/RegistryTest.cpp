@@ -32,7 +32,7 @@ namespace
     // reused, so the holes stay. Killing Floor (74) took Unspent's place in the
     // table and not its number, and 75-84 are the first ten commons of
     // docs/rarity-plan.md step 2.
-    constexpr size_t TABLE_SIZE = 82;
+    constexpr size_t TABLE_SIZE = 85;
     // A tier is a level now, not five of them. Every registry window was
     // multiplied by five with the axis, so the *level* each affix unlocks at
     // is exactly what it was; only the number naming it changed.
@@ -58,7 +58,7 @@ namespace
     // rather than as a count: a row that gains the flag by accident, or loses
     // it before its dispatch is wired, is an affix offered to a live hardcore
     // character that silently does nothing.
-    constexpr std::array<uint16, 82> OFFERABLE = {
+    constexpr std::array<uint16, 85> OFFERABLE = {
         1, 2, 3, 4, 5,           // S1 Shade, S2 Echo, S3 Carrion, S4 Reinforcements, S5 Ambush
         6, 7, 8, 9, 10, 11, 12, 13,  // E1 Champions .. E8 Keen-nosed
         14, 15, 16, 17, 18,      // T1 Falling Sky .. T5 Hubris
@@ -94,7 +94,12 @@ namespace
         // Every one is a line in src/GauntletTrades.h.
         75, 76, 77, 78, 79, 80, 81,
         82, 83, 84,
-        85, 86, 87
+        85, 86, 87,
+
+        // docs/commons.md's reward-shaped three. Not trades: each is a
+        // mechanic, and each is classless and open at tier 1 because that
+        // availability is the entire reason they were written.
+        88, 89, 90
     };
 
     // CONTRACT.md section 8's id ranges, which are fixed forever. The Attrition
@@ -107,12 +112,12 @@ namespace
         size_t count;
     };
 
-    constexpr std::array<Range, 12> RANGES = { {
+    constexpr std::array<Range, 14> RANGES = { {
         {  1,  5, Family::Spawn,      5 },
-        {  6, 13, Family::Enemy,      8 },
+        {  6, 13, Family::Enemy,      9 },
         { 14, 18, Family::Tempo,      5 },
         { 19, 22, Family::Attrition,  8 },   // 21 and 22 deleted; 19, 20, 74 and five trades remain
-        { 23, 25, Family::Rules,     11 },   // three rules and eight common denials
+        { 23, 25, Family::Rules,     13 },   // three rules, eight denials, two reward-shaped
         { 26, 27, Family::Bargain,    2 },
         { 28, 71, Family::Class,     43 },   // 69 deleted with Unspent
         // A5 Killing Floor, outside its family's original band because 21 and
@@ -122,10 +127,14 @@ namespace
         // The trades, appended in id order as every row after 74 is: the
         // denials are Rules, the coefficient trades Attrition. The loot trades
         // (85-87) interleave the two, which is why the bands split again.
-        { 75, 81, Family::Rules,     11 },
+        { 75, 81, Family::Rules,     13 },
         { 82, 84, Family::Attrition,  8 },
-        { 85, 85, Family::Rules,     11 },
-        { 86, 87, Family::Attrition,  8 }
+        { 85, 85, Family::Rules,     13 },
+        { 86, 87, Family::Attrition,  8 },
+        // docs/commons.md's three reward-shaped rows: the first two Rules
+        // cards since the denials, and the Enemy family's first non-rare.
+        { 88, 88, Family::Enemy,      9 },
+        { 89, 90, Family::Rules,     13 }
     } };
 }
 
@@ -143,7 +152,7 @@ TEST(Registry, HoldsEveryEntryInAscendingIdOrder)
             << " (id " << all[i - 1].id << ") in ascending order";
 
     EXPECT_EQ(all.front().id, 1u);
-    EXPECT_EQ(all.back().id, 87u) << "the table must end at the last trade, Night Owl, id 87";
+    EXPECT_EQ(all.back().id, 90u) << "the table must end at the last card, Waste Not, id 90";
 }
 
 TEST(Registry, TheDeletedScalarIdsAreGoneAndStayGone)
@@ -213,11 +222,19 @@ TEST(Registry, RarityIsInsideTheEnum)
 // what makes it a table row rather than a file -- and which of the two trade
 // tiers it is, the line says: an uncommon is "a trade with a condition"
 // (section 2), so a line's condition and its row's rarity have to agree. The
-// first real-mechanic uncommon (Scavenger's Eye, greed-redesign 7.2) will turn
-// the trade-line half of this into a list too; that is intended.
-TEST(Registry, TheOriginalCardsAreRareAndEverythingAfterIsATradeLine)
+// first real-mechanic uncommon (Scavenger's Eye) would turn the trade-line
+// half of this into a list too; that day came, and MECHANIC_ROWS is the list.
+TEST(Registry, TheOriginalCardsAreRareAndEverythingAfterIsATradeLineOrANamedMechanic)
 {
     constexpr uint16 LAST_ORIGINAL = 74;   // A5 Killing Floor
+
+    // docs/commons.md's three. A row lands here rather than in the trade table
+    // only by being something a single line cannot say -- these three pay out
+    // on a kill or on a fight fought a particular way, which is what earns
+    // them MF_RewardShaped. Adding a fourth is a decision, and this list is
+    // where it gets made.
+    constexpr std::array<uint16, 3> MECHANIC_ROWS = { 88, 89, 90 };
+
     for (MechanicDef const& def : AllMechanics())
     {
         if (def.id <= LAST_ORIGINAL)
@@ -228,9 +245,26 @@ TEST(Registry, TheOriginalCardsAreRareAndEverythingAfterIsATradeLine)
             continue;
         }
 
+        if (std::find(MECHANIC_ROWS.begin(), MECHANIC_ROWS.end(), def.id) != MECHANIC_ROWS.end())
+        {
+            EXPECT_EQ(FindTrade(def.id), nullptr)
+                << def.key << " is listed as a mechanic and also has a trade line";
+            EXPECT_TRUE(def.flags & MF_RewardShaped)
+                << def.key << " is one of the three written to carry MF_RewardShaped and does not";
+            EXPECT_EQ(def.classMask, 0u)
+                << def.key << " is class-masked; the whole point of these three is that any "
+                   "character can be offered one at tier 1";
+            EXPECT_EQ(def.minTier, 1u) << def.key << " does not open at tier 1";
+            EXPECT_TRUE(def.rarity == Rarity::Common || def.rarity == Rarity::Uncommon)
+                << def.key << " is " << RarityName(def.rarity)
+                << "; a rare carrying the flag is what these were written to stop being the only kind";
+            continue;
+        }
+
         TradeDef const* line = FindTrade(def.id);
         ASSERT_NE(line, nullptr)
-            << "id " << def.id << " (" << def.key << ") is past the originals with no trade line";
+            << "id " << def.id << " (" << def.key << ") is past the originals, is not in "
+            << "MECHANIC_ROWS, and has no trade line";
         if (line->condition == Condition::Always)
             EXPECT_EQ(def.rarity, Rarity::Common)
                 << def.key << ": a trade with no condition is a common, not " << RarityName(def.rarity);
@@ -238,6 +272,27 @@ TEST(Registry, TheOriginalCardsAreRareAndEverythingAfterIsATradeLine)
             EXPECT_EQ(def.rarity, Rarity::Uncommon)
                 << def.key << ": a trade with a condition is an uncommon, not " << RarityName(def.rarity);
     }
+}
+
+TEST(Registry, TheRewardShapedGuaranteeCanBePaidWithoutARare)
+{
+    // The measurement docs/commons.md was written around, kept as an
+    // assertion. Every offer set must contain a row flagged MF_RewardShaped
+    // (GauntletGenerator.cpp:810). While every such row was Rare, one slot in
+    // three was a rare before any rarity weight was read, and the early mix
+    // could not reach the plan's targets however the weights were cut.
+    //
+    // What has to stay true is not a count but the existence of a way to pay
+    // the guarantee that is not a rare, at the tier where it bites hardest.
+    uint32 nonRareAtTierOne = 0;
+    for (MechanicDef const& def : AllMechanics())
+        if ((def.flags & MF_RewardShaped) && def.rarity != Rarity::Rare
+            && def.classMask == 0 && def.minTier <= 1)
+            ++nonRareAtTierOne;
+
+    EXPECT_GT(nonRareAtTierOne, 0u)
+        << "every reward-shaped row is rare, class-masked or opens late again, so slot B at "
+           "tier 1 is a rare in every set the generator can build";
 }
 
 TEST(Registry, FamiliesAreInRangeAndMatchTheIdRanges)
@@ -331,10 +386,10 @@ TEST(Registry, LookupsAgreeWithTheTable)
     // one of these is the normal answer for a run migrated from a registry
     // this build has never seen, so nullptr is the contract, not a crash.
     EXPECT_EQ(FindMechanic(static_cast<uint16>(MECHANIC_NONE)), nullptr);
-    // 88, one past the highest id the table carries. Not TABLE_SIZE + 1: the
+    // 91, one past the highest id the table carries. Not TABLE_SIZE + 1: the
     // ids are no longer contiguous, so the count and the highest id are
     // different numbers and only the second one bounds a lookup.
-    EXPECT_EQ(FindMechanic(static_cast<uint16>(88)), nullptr);
+    EXPECT_EQ(FindMechanic(static_cast<uint16>(91)), nullptr);
     EXPECT_EQ(FindMechanic(static_cast<uint16>(72)), nullptr);
     EXPECT_EQ(FindMechanic(static_cast<uint16>(0xFFFF)), nullptr);
     EXPECT_EQ(FindMechanic(std::string_view("")), nullptr);
