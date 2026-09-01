@@ -12,6 +12,7 @@
 #include "GauntletSummons.h"
 
 #include "Creature.h"
+#include "LootMgr.h"
 #include "ItemTemplate.h"
 #include "ObjectMgr.h"
 #include "Player.h"
@@ -48,6 +49,15 @@ namespace Gauntlet
         // uses to actually attack a player, so it is hostile and attackable.
         constexpr uint32 BENCH_TARGET_ENTRY = ENTRY_AMBUSHER;
         constexpr uint32 BENCH_TARGET_LIFE_MS = 30000;
+
+        // A corpse with a real loot table. Every creature this module owns
+        // carries lootid 0, so a card that rolls a table again has nothing to
+        // roll on the bench's own target; Wiry Swoop (2969) is a level-5 world
+        // creature whose table has two entries at Chance 100, which makes the
+        // first fill deterministic and a second roll visible as the item count
+        // doubling rather than as a coin flip. If the world database does not
+        // have it, the probe skips rather than pretends.
+        constexpr uint32 BENCH_LOOT_ENTRY = 2969;
 
         bool Moved(float a, float b) { return std::fabs(a - b) > 0.0001f; }
 
@@ -244,6 +254,20 @@ namespace Gauntlet
         //
         // Forty thousand templates and one virtual call each, once per card;
         // the whole scan is milliseconds and the container is the core's own.
+        // The item-*use* veto, which is a different hook and a different set of
+        // cards: Blood for Bread (89) refuses food, Waste Not (90) refuses
+        // potions, and neither changes a number until someone reaches for one.
+        // Without this scan both read as cards that do nothing, which is the
+        // exact failure this file was rewritten to stop -- a probe that cannot
+        // see the thing the card is for.
+        if (ItemTemplateContainer const* store = sObjectMgr->GetItemTemplateStore())
+            for (auto const& [entry, proto] : *store)
+                if (!sGauntlet->CanUseItem(player, &proto))
+                {
+                    out.reached.emplace_back("using " + proto.Name1 + " refused");
+                    break;
+                }
+
         if (ItemTemplateContainer const* store = sObjectMgr->GetItemTemplateStore())
             for (auto const& [entry, proto] : *store)
                 if (!sGauntlet->CanEquip(player, &proto))
@@ -521,11 +545,28 @@ namespace Gauntlet
                 out.reached.emplace_back("its own timer");
             noteBoth("firing its own event");
 
+            // A card that pays on a kill pays into the health and power bars,
+            // and neither is in the footprint -- Capture reads *max* health,
+            // because a current-health line would report every fight as a
+            // change. So they are read directly, here, around the kill.
+            //
+            // The character is standing at 15% of their health by this point
+            // (the wound above), which is what makes the reading possible at
+            // all: at full health a restore is a no-op and the probe would
+            // report Blood for Bread doing nothing while it worked.
+            uint32 const healthAtKill = player->GetHealth();
+            uint32 const powerAtKill  = player->GetPower(player->getPowerType());
+
             sGauntlet->OnCreatureKill(player, target->ToCreature(), /*byPet*/ false);
             noteBoth("killing");
 
             sGauntlet->OnCreatureKill(player, target->ToCreature(), /*byPet*/ true);
             noteBoth("a pet killing");
+
+            if (player->GetHealth() > healthAtKill)
+                out.reached.emplace_back("a kill restored health");
+            if (player->GetPower(player->getPowerType()) > powerAtKill)
+                out.reached.emplace_back("a kill restored power");
 
             // And then kill it for real. A corpse is a different thing from a
             // hook call: Carrion wants something to scavenge, Echo wants a
@@ -549,6 +590,78 @@ namespace Gauntlet
                     ++out.eventsFired;
                 }
                 noteBoth("firing over the corpse");
+
+                // The loot window, which docs/greed-redesign.md section 7.4
+                // asks for by name. OnLootWindow is a different hook from the
+                // item roll and nothing else in this file opens a corpse, so
+                // a card that acts when loot is opened -- Scavenger's Eye's
+                // second roll, Carrion's counter -- is reached here and
+                // nowhere else.
+                //
+                // What it can and cannot prove is worth being plain about.
+                // The bench's target is the module's own Ambusher and carries
+                // no loot template, so an empty window is the expected result
+                // and "items added" will not fire for a card whose extra roll
+                // is of the creature's own table. What it does prove is that
+                // the card's hook ran over a real corpse it had just watched
+                // die, with whatever the card tracked about that fight intact;
+                // the count of corpses it acted on is in its own counters,
+                // which the summary prints beneath this list.
+                if (Creature* corpse = target->ToCreature())
+                {
+                    std::size_t const itemsBefore = corpse->loot.items.size();
+                    sGauntlet->OnLootWindow(player, corpse->GetGUID(), &corpse->loot);
+                    if (corpse->loot.items.size() != itemsBefore)
+                        out.reached.emplace_back("opening the corpse: loot was added");
+                    noteBoth("opening the corpse");
+                }
+
+                // A clean kill, on something worth looting.
+                //
+                // Both halves are needed and neither exists above. The fight
+                // staged by this probe is one the player was hit in -- the
+                // wound to 15% that the health-gated conditions need makes
+                // sure of it -- so a card that pays for a fight nothing
+                // touched you in reads as doing nothing. And the target is one
+                // of the module's own summons, which carry no loot table, so
+                // there is nothing for a second roll to double.
+                //
+                // Scavenger's Eye (88) needs both at once. This stages them:
+                // a fresh out-of-combat edge (Mgr::OnEnterCombat is that edge
+                // by construction, GauntletMgr.cpp:1585), a kill nothing
+                // interrupts, and a corpse whose table was filled once before
+                // the card is asked. What the card does to the item count is
+                // then the whole answer.
+                if (TempSummon* quarry = player->SummonCreature(BENCH_LOOT_ENTRY, player->GetPosition(),
+                                                                TEMPSUMMON_TIMED_DESPAWN, BENCH_TARGET_LIFE_MS))
+                {
+                    if (Creature* body = quarry->ToCreature())
+                    {
+                        uint32 const lootId = body->GetCreatureTemplate()->lootid;
+
+                        sGauntlet->OnEnterCombat(player, quarry);
+                        if (body->IsAlive())
+                            Unit::Kill(player, body);
+                        sGauntlet->OnCreatureKill(player, body, /*byPet*/ false);
+
+                        if (lootId != 0)
+                        {
+                            body->loot.clear();
+                            body->loot.FillLoot(lootId, LootTemplates_Creature, player, true, true);
+
+                            std::size_t const before = body->loot.items.size();
+                            sGauntlet->OnLootWindow(player, body->GetGUID(), &body->loot);
+                            std::size_t const after = body->loot.items.size();
+
+                            if (after > before)
+                                out.reached.emplace_back(
+                                    "a clean kill's corpse rolled " + std::to_string(before)
+                                    + " -> " + std::to_string(after) + " item(s)");
+                        }
+                    }
+
+                    quarry->DespawnOrUnsummon();
+                }
             }
 
             sGauntlet->OnLeaveCombat(player);
