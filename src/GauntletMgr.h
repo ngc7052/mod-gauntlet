@@ -179,6 +179,13 @@ namespace Gauntlet
 
         // The same for using one, from PlayerScript::OnPlayerCanUseItem.
         bool CanUseItem(Player* player, ItemTemplate const* proto);
+
+        // Whether a condition holds for this character right now. Public only
+        // so the bench can say *why* a conditional card was not reached: Night
+        // Owl benched at noon is a card that did nothing for the right reason,
+        // and a harness that cannot tell that from a broken card is exactly
+        // the blindness section 4 of docs/handoff.md exists to list.
+        bool ConditionHolds(Player* player, Condition c) const;
         void OnMaxHealth(Player* player, float& value);
         void OnGiveXP(Player* player, uint32& amount, Unit* victim);
         void OnLootMoney(Player* player, Loot* loot);

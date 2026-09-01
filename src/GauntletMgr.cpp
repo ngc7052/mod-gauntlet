@@ -1747,6 +1747,11 @@ namespace Gauntlet
         return allowed;
     }
 
+    bool Mgr::ConditionHolds(Player* player, Condition c) const
+    {
+        return ConditionActive(player, c);
+    }
+
     bool Mgr::CanUseItem(Player* player, ItemTemplate const* proto)
     {
         if (!_enabled || !proto || !IsEligible(player))

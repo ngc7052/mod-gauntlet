@@ -10,6 +10,7 @@
 #include "GauntletMechanic.h"
 #include "GauntletMgr.h"
 #include "GauntletRegistry.h"
+#include "GauntletTrades.h"
 #include "GauntletWire.h"
 #include "GauntletScheduler.h"
 #include "GauntletSummons.h"
@@ -573,9 +574,19 @@ namespace Gauntlet
             instance.mechanic   = def.id;
             instance.rarity     = def.rarity;
 
-            // Always, not a rolled condition: a gated affix whose condition is
-            // false does nothing on attach and would be indistinguishable from
-            // a mechanic that leaks nothing. The audit wants the affix awake.
+            // Always, not the card's own condition: a gated affix whose
+            // condition is false does nothing on attach and would be
+            // indistinguishable from a mechanic that leaks nothing. The audit
+            // wants the affix awake.
+            //
+            // This was written when the generator still rolled conditions onto
+            // arbitrary cards, and it survives docs/commons.md's uncommons
+            // unchanged -- but it now means something it did not: ten rows
+            // carry a condition of their own, so benching Sunstruck at five in
+            // the morning still shows its by-day coefficient. That is the
+            // coverage this choice buys and it is the right trade, but it has
+            // to be *said* or the reader concludes the gating is broken. The
+            // per-card summary says it; see the "gated on" line below.
             instance.condition  = Gauntlet::Condition::Always;
 
             // The registry's boon, at the magnitude an offer would pay.
@@ -1924,9 +1935,29 @@ public:
                     for (std::string const& r : probe.reached)
                         handler->PSendSysMessage("    answered: {}", r);
                 else
+                {
                     handler->PSendSysMessage(
                         "    |cffff8040no probe reached it|r -- it needs a condition this bench does not "
                         "produce, or it does nothing.");
+
+                }
+                // A conditional trade is attached ungated (AuditAttach says
+                // why), so everything above is what the card does *while* its
+                // condition holds, not what it is doing right now. Ten rows
+                // carry one since docs/commons.md's uncommons, and a reader
+                // who does not know that concludes the gating is broken the
+                // first time they bench a by-day card at night.
+                //
+                // Gauntlet::Condition spelled out: the core has a Condition
+                // class of its own (ConditionMgr.h) and this file sees both.
+                if (TradeDef const* trade = FindTrade(def.id))
+                    if (trade->condition != Gauntlet::Condition::Always)
+                        handler->PSendSysMessage(
+                            "    gated on {} -- attached ungated by the audit, so the numbers above are "
+                            "what it does while that holds ({} right now).",
+                            ConditionName(trade->condition),
+                            sGauntlet->ConditionHolds(p, trade->condition) ? "it does" : "it does not");
+
                 handler->PSendSysMessage("    events released: {}", probe.eventsFired);
                 if (!probe.diagnose.empty())
                     handler->PSendSysMessage("    its own counters: {}", probe.diagnose);
