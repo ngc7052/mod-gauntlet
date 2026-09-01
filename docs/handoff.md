@@ -9,7 +9,7 @@ and §4 before trusting any test.
 
 `mod-gauntlet`, an AzerothCore (WotLK 3.3.5a) module: a procedurally generated
 hardcore affix challenge. A run offers three "affix" cards per tier, the player
-picks one, and the curses accumulate. 108 mechanics, all implemented: twenty-five
+picks one, and the curses accumulate. 109 mechanics, all implemented: twenty-six
 commons, twelve uncommons, fifty-five rares, fourteen epics and two
 legendaries, with reroll and skip live on every tier.
 Steps 1-4 of `docs/rarity-plan.md` have landed -- the rank system is gone, a
@@ -42,7 +42,7 @@ level with `origin/master`.
 ```bash
 ./tests/compile-check.sh --anchors   # anchors + ladder audit, seconds, no Docker
 ./tests/compile-check.sh             # full compile + link in the build container
-./tests/run-tests.sh                 # 211 unit tests
+./tests/run-tests.sh                 # 212 unit tests
 ./sync-to-server.sh                  # rsync the module into the core tree
 cd /mnt/c/Users/3302/azerothcore-wotlk
 DC="docker compose -f docker-compose.yml -f docker-compose.override.yml --project-directory ."
@@ -70,7 +70,7 @@ that way. Verified after the fact on 2026-09-01: the four live runs, eighteen
 affixes and twenty-seven log rows were untouched by the reapply.
 
 Gate before every commit: anchors, ladders, compile, link, tests. All green
-today — 108 anchors, 4 ladders, 71 objects, 211 tests.
+today — 109 anchors, 4 ladders, 72 objects, 212 tests.
 
 ## 4. The testing rig, and what it cannot see
 
@@ -687,13 +687,40 @@ family the other two slots did not use, and at tier 1 only Rules and Enemy
 could answer with anything but a rare. Attrition could not, so it answered with
 Blood Price. Now it answers with Scavenge.
 
-`docs/commons.md` §4b has the family table that made this predictable, and a
-second card, **Gravedigger** (Spawn), which is **designed and deliberately not
-built**: making a *summoned* creature drop a loot table the module chooses is a
-seam this module has never used, and the alternative -- its death summoning a
-chest, which Trophy Hunter proves works -- makes a common that spawns a fight
-*and* a chest, which is a bigger card than Carrion, a rare. Verify
-`Creature::SetLootRecipient` and `UNIT_DYNFLAG_LOOTABLE` before writing it.
+### And Gravedigger closed the last family (2026-09-01)
+
+**Gravedigger** (114, Common, Spawn): every eighth corpse you loot gets up
+again, and putting it down drops what it was holding back -- that corpse's own
+table, rolled once more. Smaller than Carrion beside it on purpose: one riser
+every eighth against two scavengers every fourth, and this one pays for itself.
+
+Tier 1 now delivers **73/23/5 against 70/25/5**, rare exactly on target, and
+tier 21's epic overshoot is 3% against 2%.
+
+**The seam the last session left open is verified, not guessed.** Making a
+summoned creature drop a table the module chooses is the core's own death path
+run by hand: `Unit::Kill` fills a dying creature's loot and then sets
+`UNIT_DYNFLAG_LOOTABLE` only when that loot is not already looted
+(Unit.cpp:14210-14220). `ENTRY_RISEN` carries lootid 0, so the core fills
+nothing; `Gravedigger::Pay` makes the same four calls in the same order --
+`loot.clear()`, `FillLoot`, `SetLootRecipient`, and the flag under the same
+guard. Benched: `something it raised dropped 2 item(s)`.
+
+**Two more bench probes, and a false leak they caused.** Cards that *count*
+corpses could never be reached by a single loot window -- Carrion needs four,
+Gravedigger eight -- so the probe now drives the hook ten times, and then tells
+whatever the card raised that it died. The first version of that second probe
+used a real `Unit::Kill`, and a summon scaled to the player's own level grants
+experience, and experience procs talents: a hunter came back wearing Rapid
+Killing (35099) and the audit blamed **Gravedigger** for an aura the harness
+had caused. It tells the summon it died instead. Same shape as the
+item-dependent aura false positive above, and worth the same watchfulness --
+when the bench does something to the character, the card gets the blame.
+
+**Carrion is still `Spawned nothing`, and now the reason is known**: it does
+not spawn on the loot, it arms a scheduler event ten seconds out, and the
+bench fires events *before* the loot probe runs. Reordering the probe, or
+firing events again after it, would reach it. §8.
 
 Seams, all verified against the core or the world database before use:
 `Loot::items` and `quest_items` are separate vectors (`LootMgr.h:320-321`) so

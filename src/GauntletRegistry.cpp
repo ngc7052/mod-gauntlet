@@ -821,6 +821,13 @@ namespace
           MF_RewardShaped, "", Boon::None, 0, 0,
           "You take more damage, and every corpse you loot restores health." },
 
+        // And the Spawn family's, for the same reason. Smaller than Carrion on
+        // purpose: one riser every eighth corpse against two scavengers every
+        // fourth, and this one pays for itself.
+        { 114, "gravedigger", "Gravedigger", Family::Spawn, 0, 1, 80, Rarity::Common,
+          MF_RewardShaped, "", Boon::None, 0, 0,
+          "Every eighth corpse you loot gets up again, and drops what it was holding back." },
+
         };
     }
 

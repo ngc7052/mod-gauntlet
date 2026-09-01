@@ -10,6 +10,7 @@
 #include "GauntletMgr.h"
 #include "GauntletScheduler.h"
 #include "GauntletSummons.h"
+#include "mechanics/Nearby.h"
 
 #include "Creature.h"
 #include "LootMgr.h"
@@ -67,6 +68,13 @@ namespace Gauntlet
         // anything but rank 0, so without this those cards read as doing
         // nothing while working.
         constexpr uint32 BENCH_RARE_ENTRY = 61;
+
+        // How many extra loot windows to drive, and how far to look for what a
+        // card stood up. Ten is past Carrion's fourth and Gravedigger's eighth
+        // with room for the next counter; forty yards is well outside anything
+        // this module summons beside the player.
+        constexpr uint32 BENCH_LOOT_WINDOWS = 10;
+        constexpr float  BENCH_SUMMON_YARDS = 40.0f;
 
         bool Moved(float a, float b) { return std::fabs(a - b) > 0.0001f; }
 
@@ -666,6 +674,46 @@ namespace Gauntlet
                                 out.reached.emplace_back(
                                     "a clean kill's corpse rolled " + std::to_string(before)
                                     + " -> " + std::to_string(after) + " item(s)");
+
+                            // Some loot cards count corpses rather than react
+                            // to one: Carrion draws its pack on every fourth,
+                            // Gravedigger raises one on every eighth. One
+                            // window could never reach either, and Carrion has
+                            // been in §8's "spawned nothing" list since it was
+                            // written partly for this reason. The hook is
+                            // driven enough times for a counter to come round.
+                            for (uint32 again = 0; again < BENCH_LOOT_WINDOWS; ++again)
+                                sGauntlet->OnLootWindow(player, body->GetGUID(), &body->loot);
+                            noteBoth("opening corpses until a counter comes round");
+
+                            // And a card that stands something up only pays
+                            // when that thing is put down again. The module's
+                            // own summons are identifiable, so the probe
+                            // finishes what it started rather than leaving the
+                            // card's second half unasked.
+                            //
+                            // Told, not killed, and that distinction cost a
+                            // false LEAK before it was made: a real
+                            // Unit::Kill on a summon scaled to the player's
+                            // own level grants experience, and experience
+                            // procs the player's talents. A hunter came back
+                            // from this probe wearing Rapid Killing (35099),
+                            // the audit compared before against after, and
+                            // Gravedigger was blamed for an aura the harness
+                            // had caused. The card's hook is what is being
+                            // tested; the death itself is the bench's
+                            // business, and it does not need to be real.
+                            for (Creature* raised : CreaturesNear(player, BENCH_SUMMON_YARDS))
+                                if (raised->IsAlive() && sGauntletSummons->IsGauntletSummon(raised))
+                                {
+                                    sGauntlet->OnCreatureKill(player, raised, /*byPet*/ false);
+                                    if (!raised->loot.items.empty())
+                                        out.reached.emplace_back(
+                                            "something it raised dropped "
+                                            + std::to_string(raised->loot.items.size()) + " item(s)");
+                                    raised->DespawnOrUnsummon();
+                                }
+                            noteBoth("what the card raised, told it died");
                         }
                     }
 

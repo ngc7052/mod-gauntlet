@@ -268,5 +268,7 @@ GauntletData = {
                  icon = "Interface\\Icons\\Ability_Warrior_BattleShout", desc = "A rare creature nearby makes everything hit harder. Killing one leaves a chest and banks a reroll." },
         [113] = { name = "Scavenge", key = "scavenge", family = 3, rarity = 0,
                  icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain", desc = "You take more damage, and every corpse you loot restores health." },
+        [114] = { name = "Gravedigger", key = "gravedigger", family = 0, rarity = 0,
+                 icon = "Interface\\Icons\\Spell_Shadow_RaiseDead", desc = "Every eighth corpse you loot gets up again, and drops what it was holding back." },
     },
 }

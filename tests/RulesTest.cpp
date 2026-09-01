@@ -474,3 +474,21 @@ TEST(Rules, ScavengeAndBloodPriceDisagreeAboutWhatLootingCosts)
     EXPECT_GT(Rules::SCAVENGE_HEAL_PCT, 0u);
 }
 
+TEST(Rules, GravediggerIsTheQuieterCardBesideCarrion)
+{
+    // Both stand something up when a corpse is opened, and the common has to
+    // be the smaller of the two or the rare beside it is pointless. Carrion
+    // draws its pack every fourth corpse and pays nothing for them;
+    // Gravedigger raises one every eighth and pays that corpse's own table.
+    //
+    // The number Carrion uses lives inside its own translation unit, which
+    // includes Player.h and is therefore out of this build's reach -- so what
+    // is asserted here is the half that can be: the rhythm is slower than
+    // every-other-corpse, and the payout is a whole extra roll rather than a
+    // fraction of one.
+    EXPECT_GT(Rules::GRAVEDIGGER_EVERY, 4)
+        << "a common that raises something more often than Carrion's rare does is the louder card";
+    EXPECT_GT(Rules::GRAVEDIGGER_ROLLS, 1u);
+    EXPECT_GT(Rules::GRAVEDIGGER_LIFE_MS, 0u);
+}
+
