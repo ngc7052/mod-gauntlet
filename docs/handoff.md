@@ -9,8 +9,8 @@ and §4 before trusting any test.
 
 `mod-gauntlet`, an AzerothCore (WotLK 3.3.5a) module: a procedurally generated
 hardcore affix challenge. A run offers three "affix" cards per tier, the player
-picks one, and the curses accumulate. 94 mechanics, all implemented: 69 rares,
-fourteen commons and eleven uncommons, with reroll and skip live on every
+picks one, and the curses accumulate. 104 mechanics, all implemented: 69 rares,
+twenty-four commons and eleven uncommons, with reroll and skip live on every
 tier.
 Steps 1-4 of `docs/rarity-plan.md` have landed -- the rank system is gone, a
 card is one value and rarity is its only tier -- and step 5, the remaining
@@ -70,7 +70,7 @@ that way. Verified after the fact on 2026-09-01: the four live runs, eighteen
 affixes and twenty-seven log rows were untouched by the reapply.
 
 Gate before every commit: anchors, ladders, compile, link, tests. All green
-today — 94 anchors, 4 ladders, 67 objects, 204 tests.
+today — 104 anchors, 4 ladders, 67 objects, 204 tests.
 
 ## 4. The testing rig, and what it cannot see
 
@@ -546,6 +546,35 @@ Outlander (ids 91-99) -- table rows in four families, no new mechanics.
   Fresh Legs `damage done x0.90` and `max health x1.10`, Outlander `enemy
   speed x1.15`, Saddle-sore `damage taken x1.25`. `leaks all`: 53 audited, 0
   leaked.
+
+### And its ten commons, which finish the batch (2026-09-01)
+
+`docs/commons.md`'s step 3, and the half that settles what the uncommons
+tipped. Eight equipment denials (shoulders, boots, gloves, bracers, shield,
+mace, dagger, staff) and the last two coefficient kinds the table had never
+spent -- `EnemySpeed` as Hunted, `Experience` as Slow Learner. Ids 100-109.
+
+- **Measured, the whole batch now in:** tier 1 delivers **61% common / 25%
+  uncommon / 13% rare** against 70/25/5. Uncommon is exactly on target;
+  common is nine points short and rare eight points over.
+- **Why rare is over target at every tier, and what it is not:** epics and
+  legendaries do not exist yet, so `RollRarity` renormalises their weight into
+  the rarities that do. That is 2% at tiers 21-40, 10% at 41-60 and **25% at
+  61-80** going straight to rare -- which is most of the gap from tier 21 up
+  (tier 61 reads 14/26/60 against 10/25/40). It is not a sign the commons are
+  short; it is the epic pass of `docs/rarity-plan.md` §7.4 not having happened.
+  At tier 1, where both weigh zero, the 8-point rare excess is the
+  reward-shaped guarantee still landing on a rare whenever the three non-rare
+  ones are carried or ineligible.
+- **`Boon::BonusRegen` cannot back a trade line**, and nearly did. Two of
+  these ten were written to pay it before the check: `Boons.cpp`'s `Pays()`
+  does not map it, and the two class cards that name it deliver it themselves
+  on a tick, so a `SimpleTrade` row naming it would print "you recover 15%
+  faster" and do nothing -- the exact fault a player caught once already. The
+  reasoning is written where the next line will meet it.
+- Four of the ten are class-masked and filed **Rules, not Class**, the same
+  call Axeless made: a `Family::Class` row spends `CAP_CLASS`, the run's
+  budget of three class curses, and a small trade must not compete for it.
 
 ### Step 5, the rest -- and what the sweep says it should be
 

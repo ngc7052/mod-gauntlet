@@ -2,7 +2,7 @@
 
 AzerothCore (WotLK 3.3.5a) module: a procedurally generated hardcore affix
 challenge. A run offers three affix cards per tier, the player picks one, and
-the curses accumulate. 94 mechanics today: 69 rares, fourteen commons and
+the curses accumulate. 104 mechanics today: 69 rares, twenty-four commons and
 eleven uncommons. `docs/rarity-plan.md` takes it to ~160; steps 1-4 have landed and
 step 5 -- the remaining cards -- has begun. `docs/commons.md` is the
 measurement that decides what step 5 builds next.

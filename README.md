@@ -2,7 +2,7 @@
 
 A hardcore roguelike challenge module for [AzerothCore](https://www.azerothcore.org/).
 
-One life. A new affix every level — drawn from a registry of **94 mechanics
+One life. A new affix every level — drawn from a registry of **104 mechanics
 across seven families**, never a fixed list. Two runs are never the same.
 
 An affix is not a stat penalty rolled off a table. It is a **mechanic**: a
@@ -11,7 +11,7 @@ it, rather than a multiplier bolted onto your character sheet. A shade that
 hunts you between fights. A strike that lands where you were standing. A
 paladin whose Consecration burns twice as hot for half as long.
 
-> **Status.** **All 94 mechanics are live and offerable.** No registry row is
+> **Status.** **All 104 mechanics are live and offerable.** No registry row is
 > flagged `MF_NotImplemented`, and the `OFFERABLE` list in
 > `tests/RegistryTest.cpp` is what enforces that. Phases 0–4 are complete and
 > reported in `docs/`; Phase 5 is the pacing pass — config, tuning and
@@ -254,6 +254,16 @@ common for the trades after id 74.
 | 97 | **Cornered** | Attrition | Uncommon | any | 1&ndash;80 | Below half health, healing on you is 25% weaker. | +15% damage dealt |
 | 98 | **Fresh Legs** | Attrition | Uncommon | any | 1&ndash;80 | Above half health you deal 10% less damage. | +10% maximum health |
 | 99 | **Outlander** | Enemy | Uncommon | any | 1&ndash;80 | In the open world everything chasing you is 15% faster. | +15% experience |
+| 100 | **Shoulderless** | Rules | Common | any | 1&ndash;80 | You cannot wear shoulders. | +8% damage dealt |
+| 101 | **Barefoot** | Rules | Common | any | 1&ndash;80 | You cannot wear boots. | +8% move speed |
+| 102 | **Bare-handed** | Rules | Common | any | 1&ndash;80 | You cannot wear gloves. | +10% healing received |
+| 103 | **Wristless** | Rules | Common | any | 1&ndash;80 | You cannot wear bracers. | +10% experience |
+| 104 | **Shieldless** | Rules | Common | Warrior, Paladin, Shaman | 1&ndash;80 | You cannot carry a shield. | +10% damage dealt |
+| 105 | **Maceless** | Rules | Common | Warrior, Paladin, Rogue, Priest, Death Knight, Shaman, Druid | 1&ndash;80 | You cannot wield a mace. | +10% damage dealt |
+| 106 | **Daggerless** | Rules | Common | mana users | 1&ndash;80 | You cannot wield a dagger. | +10% damage dealt |
+| 107 | **Staffless** | Rules | Common | Warrior, Hunter, Priest, Shaman, Mage, Warlock, Druid | 1&ndash;80 | You cannot wield a staff. | +5% maximum health |
+| 108 | **Hunted** | Enemy | Common | any | 1&ndash;80 | Everything chasing you is 10% faster. | +8% damage dealt |
+| 109 | **Slow Learner** | Attrition | Common | any | 1&ndash;80 | You gain 15% less experience. | &mdash; |
 <!-- AFFIX-TABLE-END -->
 
 ## Boons

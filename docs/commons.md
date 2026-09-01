@@ -5,7 +5,7 @@ not: it is the measurement behind step 5's next batch and a list of cards to
 cut before any of it becomes rows. The measurement is the part worth keeping
 if the card list is wrong.
 
-**Steps 1 and 2 of §5 have landed (2026-09-01).** The three reward-shaped cards of
+**Steps 1, 2 and 3 of §5 have landed (2026-09-01).** The three reward-shaped cards of
 §3.1 are built — Scavenger's Eye (88), Blood for Bread (89), Waste Not (90) —
 and the live table now delivers **58% common / 34% uncommon / 7% rare** at
 tier 1, against 50/10/40 before them and a 70/25/5 target. The variant sweep
@@ -14,7 +14,22 @@ forecast gets. Everything below is unchanged apart from that: the nineteen
 table rows of §3.2 and §3.3 are still proposals, and the mid-run is still
 short of them — tier 21 delivers 40/8/51.
 
-**Step 2 has landed too.** The nine uncommons of §3.2 are in as ids 91–99, and
+**Step 3 has landed too**, so the whole batch this document proposed is built:
+tier 1 delivers **61% common / 25% uncommon / 13% rare** against 70/25/5, with
+uncommon exactly on target. The remaining gap is not more commons. Rare runs
+over at every tier because epics and legendaries do not exist, so their weight
+renormalises into rare — 25% of it at tiers 61–80 — which is the epic pass of
+`docs/rarity-plan.md` §7.4, not this document. At tier 1, where both weigh
+zero, the eight points of excess rare are the reward-shaped guarantee landing
+on a rare whenever the three non-rare ones are carried or ineligible; a fourth
+would be worth more than any number of ordinary rows, exactly as §0 measured.
+
+One card of the ten was nearly a lie: two were drafted paying `Boon::BonusRegen`,
+which has no generic delivery — `Pays()` does not map it and the two class
+cards that name it pay it themselves on a tick — so the row would have printed
+"you recover 15% faster" and done nothing.
+
+**Step 2 landed before it.** The nine uncommons of §3.2 are in as ids 91–99, and
 tier 1 now delivers **52% common / 38% uncommon / 10% rare**. The uncommon
 share overshoots its 25% target and the common share fell from 58% to 52%,
 which is exactly the half-batch shape §1's table shows: the two halves compete
@@ -248,8 +263,13 @@ Not incidental — this is most of the work of a batch:
 2. ~~**The nine uncommons.**~~ **Done, 2026-09-01.** Uncommon went 34% → 38%
    at tier 1, past its 25% target, and common fell 58% → 52%. Half a batch
    looks like an overshoot; it is the other half missing.
-3. **The ten commons.** Table lines, and the half that is now missing.
-4. **Re-measure, then re-cut the weights.**
+3. ~~**The ten commons.**~~ **Done, 2026-09-01.** Common 52% → 61% at tier 1,
+   uncommon settling to exactly 25%.
+4. **Re-measure, then re-cut the weights.** Measured; **do not re-cut yet.**
+   Rare is over target at every tier for a reason the weights cannot fix — the
+   epic and legendary columns have no cards to draw from, so `RollRarity`
+   renormalises their share into rare. Re-cut after §7.4's epic pass, or the
+   weights will be tuned around an absence.
 
 Step 3 is a day of rows. Step 1 was the one worth doing carefully and doing
 first, and the measurement held: without it, twenty rows bought a 49% common
