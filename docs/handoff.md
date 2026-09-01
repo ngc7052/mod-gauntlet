@@ -9,7 +9,7 @@ and §4 before trusting any test.
 
 `mod-gauntlet`, an AzerothCore (WotLK 3.3.5a) module: a procedurally generated
 hardcore affix challenge. A run offers three "affix" cards per tier, the player
-picks one, and the curses accumulate. 107 mechanics, all implemented: twenty-four
+picks one, and the curses accumulate. 108 mechanics, all implemented: twenty-five
 commons, twelve uncommons, fifty-five rares, fourteen epics and two
 legendaries, with reroll and skip live on every tier.
 Steps 1-4 of `docs/rarity-plan.md` have landed -- the rank system is gone, a
@@ -42,7 +42,7 @@ level with `origin/master`.
 ```bash
 ./tests/compile-check.sh --anchors   # anchors + ladder audit, seconds, no Docker
 ./tests/compile-check.sh             # full compile + link in the build container
-./tests/run-tests.sh                 # 210 unit tests
+./tests/run-tests.sh                 # 211 unit tests
 ./sync-to-server.sh                  # rsync the module into the core tree
 cd /mnt/c/Users/3302/azerothcore-wotlk
 DC="docker compose -f docker-compose.yml -f docker-compose.override.yml --project-directory ."
@@ -70,7 +70,7 @@ that way. Verified after the fact on 2026-09-01: the four live runs, eighteen
 affixes and twenty-seven log rows were untouched by the reapply.
 
 Gate before every commit: anchors, ladders, compile, link, tests. All green
-today — 107 anchors, 4 ladders, 70 objects, 210 tests.
+today — 108 anchors, 4 ladders, 71 objects, 211 tests.
 
 ## 4. The testing rig, and what it cannot see
 
@@ -671,9 +671,29 @@ It worked, and by about what the diagnosis predicted:
   10/22/44/19/5 against 10/25/40/20/5.
 - **Tier 1's rare excess did not move** (13% against 5%), and should not have:
   two of the three new cards are Rare, so they *add* to the pool tier 1 draws
-  from. Fixing that one needs reward-shaped **commons and uncommons**
-  specifically -- §7.3 has Magpie-scale candidates left, and each is worth
-  more there than another rare.
+  from.
+
+### Then one common closed it (2026-09-01)
+
+**Scavenge** (113, Common, Attrition): you take 10% more damage, and every
+corpse you loot restores 4% of your health. Deliberately Blood Price's
+opposite -- the same act, costing health there and restoring it here -- so a
+run offered both is being asked what kind of looter it is.
+
+**Tier 1 went from 63/24/13 to 71/24/6 against a 70/25/5 target, on one card.**
+Tier 21's epic overshoot fell again, 5% to 3% against 2%. That is the whole
+diagnosis confirmed: slot B's guarantee draws from the reward-shaped cards of a
+family the other two slots did not use, and at tier 1 only Rules and Enemy
+could answer with anything but a rare. Attrition could not, so it answered with
+Blood Price. Now it answers with Scavenge.
+
+`docs/commons.md` §4b has the family table that made this predictable, and a
+second card, **Gravedigger** (Spawn), which is **designed and deliberately not
+built**: making a *summoned* creature drop a loot table the module chooses is a
+seam this module has never used, and the alternative -- its death summoning a
+chest, which Trophy Hunter proves works -- makes a common that spawns a fight
+*and* a chest, which is a bigger card than Carrion, a rare. Verify
+`Creature::SetLootRecipient` and `UNIT_DYNFLAG_LOOTABLE` before writing it.
 
 Seams, all verified against the core or the world database before use:
 `Loot::items` and `quest_items` are separate vectors (`LootMgr.h:320-321`) so

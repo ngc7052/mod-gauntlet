@@ -254,6 +254,62 @@ Not incidental — this is most of the work of a batch:
   still disagree. That answers the rarity plan's §7.6, "the weights are
   invented".
 
+## 4b. The reward-shaped low end (2026-09-01)
+
+§0 measured a shortage of non-rare reward-shaped cards and §3.1 fixed it with
+three. Three more loot cards (`docs/greed-redesign.md` §7.3) then took the
+worst of what was left: tier 21's epic overshoot from 14% to 5%, and the
+"no reward-shaped offer" rate from 5.1% to 0.36%.
+
+**One number did not move, and the reason is exact.** Tier 1 delivers 13% rare
+against 5%. Two of those three loot cards are themselves Rare, so they joined
+the pool tier 1 draws from rather than diluting it. Slot B's guarantee draws
+from the reward-shaped cards *of a family none of the other two slots used*,
+and at tier 1 that set is:
+
+| Family | Reward-shaped, tier 1, classless |
+|---|---|
+| Rules | Blood for Bread (C), Waste Not (C), Fresh Kill (R) |
+| Enemy | Scavenger's Eye (U), Trophy Hunter (U), Champions (R) |
+| Spawn | Carrion (R) |
+| Tempo | Hubris (R) |
+| Attrition | Blood Price (R) |
+
+Three families can only answer with a rare. Whenever slot A and slot C use
+Rules and Enemy — which the commons make likely, since that is where they
+live — slot B has no non-rare answer at all.
+
+So the cards worth building next are **reward-shaped commons in Spawn, Tempo
+and Attrition**, and they are worth more there than anywhere else in the table.
+Two are proposed, both classless and open at tier 1:
+
+| Card | Family | The card | Seam |
+|---|---|---|---|
+| **Scavenge** | Attrition | You take 10% more damage. Every corpse you loot restores 4% of your health. | a `DamageTaken` coefficient through `AggregateFactor`; `OnLoot` heals |
+| **Gravedigger** | Spawn | Every 8th corpse you loot gets up again. Kill it and it drops what it was holding back. | **not built — one seam unverified**, see below |
+
+Scavenge is built. Gravedigger is not, and the reason is worth writing down
+rather than guessing at: making a *summoned* creature drop a loot table chosen
+by the module is not a seam this module has ever used. A creature's loot comes
+from its template `lootid`, which for `ENTRY_RISEN` is zero, and filling it
+after death needs the loot recipient and the lootable dynamic flag set by hand
+at a moment (`OnKill`) where the core has not yet decided the creature is
+lootable. The alternative — have the Risen's death summon a chest, which
+Trophy Hunter proves works — makes a common that spawns a fight *and* a chest,
+which is a bigger card than Carrion, a rare. Neither is a guess worth shipping
+on. The next session should verify the first path against
+`Creature::SetLootRecipient` and `UNIT_DYNFLAG_LOOTABLE` before writing it.
+
+Scavenge is deliberately the opposite of Blood Price: one makes looting cost
+health and the other makes it restore health, and a run offered both is being
+asked which kind of looter it is. That is the shape §2 of
+`docs/rarity-plan.md` wants from a common — one small trade, one axis — with
+the payout on the engagement rather than in a boon.
+
+Tempo is left without one on purpose. Every reward-shaped tempo card that
+suggests itself is Frenzy with smaller numbers, and a common that is a rare
+with the volume down is the rank ladder again.
+
 ## 5. Order of work
 
 1. ~~**The three reward-shaped cards.**~~ **Done, 2026-09-01.** Tier 1 went

@@ -266,5 +266,7 @@ GauntletData = {
                  icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain", desc = "Opening a corpse costs health. A corpse opened while hurt is looted twice." },
         [112] = { name = "Trophy Hunter", key = "trophy_hunter", family = 1, rarity = 1,
                  icon = "Interface\\Icons\\Ability_Warrior_BattleShout", desc = "A rare creature nearby makes everything hit harder. Killing one leaves a chest and banks a reroll." },
+        [113] = { name = "Scavenge", key = "scavenge", family = 3, rarity = 0,
+                 icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain", desc = "You take more damage, and every corpse you loot restores health." },
     },
 }

@@ -925,6 +925,7 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_FreshKill();            // 110
     void AddSC_gauntlet_mechanic_BloodPrice();           // 111
     void AddSC_gauntlet_mechanic_TrophyHunter();         // 112
+    void AddSC_gauntlet_mechanic_Scavenge();             // 113
 }
 
 static void AnchorMechanics()
@@ -1048,6 +1049,7 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_FreshKill();
     AddSC_gauntlet_mechanic_BloodPrice();
     AddSC_gauntlet_mechanic_TrophyHunter();
+    AddSC_gauntlet_mechanic_Scavenge();
 }
 
 void Addmod_gauntletScripts()

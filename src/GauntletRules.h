@@ -378,6 +378,38 @@ namespace Rules
     // How long a summoned chest stands before it goes. Long enough to walk
     // back for after the fight it came out of, short enough not to litter.
     constexpr uint32 TROPHY_CHEST_SECONDS = 300;
+
+    // ------------------------------------------------------------------
+    // The reward-shaped low end -- Scavenge (113) and Gravedigger (114),
+    // docs/commons.md section 4b.
+    //
+    // Both are commons, both classless, both open at tier 1, and both are in a
+    // family whose only reward-shaped card was a rare. That is the whole
+    // reason they exist: slot B's guarantee draws from the reward-shaped cards
+    // of a family the other two slots did not use, and at tier 1 only Rules
+    // and Enemy could answer with anything but a rare.
+    // ------------------------------------------------------------------
+
+    // Scavenge: looting is how you recover, and the price is paid all the time.
+    // Deliberately the opposite of Blood Price (111), which makes the same act
+    // cost health -- a run offered both is being asked what kind of looter it
+    // is.
+    constexpr int32  SCAVENGE_TAKEN_PCT = 10;
+    constexpr uint32 SCAVENGE_HEAL_PCT  = 4;
+
+    constexpr uint32 ScavengeHeal(uint32 maxHealth)
+    {
+        return KillRestore(maxHealth, SCAVENGE_HEAL_PCT);
+    }
+
+    // Gravedigger: every eighth corpse gets up. Eight is often enough to be a
+    // rhythm the player plans around and rare enough that looting stays worth
+    // doing; Carrion's every-fourth is the neighbouring card and this is
+    // deliberately slower, because Carrion's scavengers arrive *beside* you
+    // and this one is the corpse you are already standing on.
+    constexpr int32  GRAVEDIGGER_EVERY   = 8;
+    constexpr uint32 GRAVEDIGGER_ROLLS   = 2;
+    constexpr uint32 GRAVEDIGGER_LIFE_MS = 120000;
 }
 }
 

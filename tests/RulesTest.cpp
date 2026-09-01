@@ -451,3 +451,26 @@ TEST(Rules, TrophyHunterIsADangerBeforeItIsAPayday)
     // level banding is decoration.
     EXPECT_NE(Rules::TrophyChestFor(10), Rules::TrophyChestFor(80));
 }
+
+TEST(Rules, ScavengeAndBloodPriceDisagreeAboutWhatLootingCosts)
+{
+    // The two cards are each other's opposite on purpose (docs/commons.md
+    // section 4b): opening a corpse costs health under Blood Price and
+    // restores it under Scavenge. If they ever pointed the same way, one of
+    // them would be the other with different words, and the choice a run makes
+    // between them would not exist.
+    //
+    // Held at several pools because both are percentages of a maximum and the
+    // claim is about their directions, not their sizes.
+    for (uint32 pool : { 100u, 743u, 4200u, 16795u })
+    {
+        EXPECT_GT(Rules::ScavengeHeal(pool), 0u) << "pool " << pool;
+        EXPECT_GT(Rules::BloodPriceCost(pool, pool), 0u) << "pool " << pool;
+    }
+
+    // And the curse is a real one: a card that restored health on loot and
+    // took nothing would be a boon with a sentence attached.
+    EXPECT_GT(Rules::SCAVENGE_TAKEN_PCT, 0);
+    EXPECT_GT(Rules::SCAVENGE_HEAL_PCT, 0u);
+}
+

@@ -813,6 +813,14 @@ namespace
           MF_RewardShaped, "", Boon::None, 0, 0,
           "A rare creature nearby makes everything hit harder. Killing one leaves a chest and banks a reroll." },
 
+        // docs/commons.md section 4b. The Attrition family's reward-shaped
+        // card was Blood Price, a rare, so a tier-1 set whose other two slots
+        // took Rules and Enemy had no non-rare answer for slot B's guarantee.
+        // This is that answer, and it is Blood Price's opposite on purpose.
+        { 113, "scavenge", "Scavenge", Family::Attrition, 0, 1, 80, Rarity::Common,
+          MF_RewardShaped, "", Boon::None, 0, 0,
+          "You take more damage, and every corpse you loot restores health." },
+
         };
     }
 
