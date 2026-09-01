@@ -2,7 +2,7 @@
 
 A hardcore roguelike challenge module for [AzerothCore](https://www.azerothcore.org/).
 
-One life. A new affix every level — drawn from a registry of **85 mechanics
+One life. A new affix every level — drawn from a registry of **94 mechanics
 across seven families**, never a fixed list. Two runs are never the same.
 
 An affix is not a stat penalty rolled off a table. It is a **mechanic**: a
@@ -11,7 +11,7 @@ it, rather than a multiplier bolted onto your character sheet. A shade that
 hunts you between fights. A strike that lands where you were standing. A
 paladin whose Consecration burns twice as hot for half as long.
 
-> **Status.** **All 85 mechanics are live and offerable.** No registry row is
+> **Status.** **All 94 mechanics are live and offerable.** No registry row is
 > flagged `MF_NotImplemented`, and the `OFFERABLE` list in
 > `tests/RegistryTest.cpp` is what enforces that. Phases 0–4 are complete and
 > reported in `docs/`; Phase 5 is the pacing pass — config, tuning and
@@ -245,6 +245,15 @@ common for the trades after id 74.
 | 88 | **Scavenger's Eye** | Enemy | Uncommon | any | 1&ndash;80 | Enemies notice you from further away, and a fight nothing touches you in pays twice. | &mdash; |
 | 89 | **Blood for Bread** | Rules | Common | any | 1&ndash;80 | You cannot eat or drink. Every kill feeds you instead. | &mdash; |
 | 90 | **Waste Not** | Rules | Common | any | 1&ndash;80 | You cannot drink a potion. Every kill mends you instead. | &mdash; |
+| 91 | **Sunstruck** | Attrition | Uncommon | any | 1&ndash;80 | By day you take 10% more damage. | &mdash; |
+| 92 | **Skittish** | Tempo | Uncommon | any | 1&ndash;80 | While you are moving you take 15% more damage. | +8% move speed |
+| 93 | **Rooted** | Tempo | Uncommon | any | 1&ndash;80 | While you stand still you take 15% more damage. | +10% damage dealt |
+| 94 | **Saddle-sore** | Tempo | Uncommon | any | 1&ndash;80 | While you are mounted you take 25% more damage. | +10% move speed |
+| 95 | **Crowd-shy** | Rules | Uncommon | any | 1&ndash;80 | While you are in a group you take 15% more damage. | +20% experience |
+| 96 | **Delver** | Rules | Uncommon | any | 1&ndash;80 | In a dungeon you take 15% more damage. | &mdash; |
+| 97 | **Cornered** | Attrition | Uncommon | any | 1&ndash;80 | Below half health, healing on you is 25% weaker. | +15% damage dealt |
+| 98 | **Fresh Legs** | Attrition | Uncommon | any | 1&ndash;80 | Above half health you deal 10% less damage. | +10% maximum health |
+| 99 | **Outlander** | Enemy | Uncommon | any | 1&ndash;80 | In the open world everything chasing you is 15% faster. | +15% experience |
 <!-- AFFIX-TABLE-END -->
 
 ## Boons

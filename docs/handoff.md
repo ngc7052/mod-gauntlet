@@ -9,8 +9,9 @@ and §4 before trusting any test.
 
 `mod-gauntlet`, an AzerothCore (WotLK 3.3.5a) module: a procedurally generated
 hardcore affix challenge. A run offers three "affix" cards per tier, the player
-picks one, and the curses accumulate. 85 mechanics, all implemented: 69 rares,
-fourteen commons and two uncommons, with reroll and skip live on every tier.
+picks one, and the curses accumulate. 94 mechanics, all implemented: 69 rares,
+fourteen commons and eleven uncommons, with reroll and skip live on every
+tier.
 Steps 1-4 of `docs/rarity-plan.md` have landed -- the rank system is gone, a
 card is one value and rarity is its only tier -- and step 5, the remaining
 cards, has begun with the loot trades.
@@ -69,7 +70,7 @@ that way. Verified after the fact on 2026-09-01: the four live runs, eighteen
 affixes and twenty-seven log rows were untouched by the reapply.
 
 Gate before every commit: anchors, ladders, compile, link, tests. All green
-today — 85 anchors, 4 ladders, 67 objects, 204 tests.
+today — 94 anchors, 4 ladders, 67 objects, 204 tests.
 
 ## 4. The testing rig, and what it cannot see
 
@@ -507,6 +508,44 @@ without a rare for the first time.
   `Trades.EveryCommonRowHasALine` became a *rule* instead: a common with no
   trade line must carry `MF_RewardShaped`, since that is the only honest
   reason to be one.
+
+### And step 5's nine uncommons (2026-09-01)
+
+`docs/commons.md`'s step 2. Nine trades with a condition -- Sunstruck,
+Skittish, Rooted, Saddle-sore, Crowd-shy, Delver, Cornered, Fresh Legs,
+Outlander (ids 91-99) -- table rows in four families, no new mechanics.
+
+- **Measured:** tier 1 now delivers **52% common / 38% uncommon / 10% rare**
+  against 70/25/5. The uncommon share has gone from 9% through 34% to 38%,
+  which **overshoots**, and the common share fell from 58% to 52% because the
+  new rows compete for the same slots. That is the shape `docs/commons.md`
+  predicted for this half on its own, and the ten commons of its section 3.3
+  are what pull it back. Do not re-cut the weights until they land.
+- **A constraint found on the way, written into `GauntletTrades.h`:** a
+  conditional coefficient on **MaxHealth** does not work. Max health is a
+  standing stat rebuilt by `Player::UpdateMaxHealth`, and the core fires the
+  hook this module hangs on only for level and stamina changes -- so the pool
+  would move at the player's next level-up rather than when the condition
+  flipped. Lone Wolf gets away with it only because `Mgr::OnGroupChanged`
+  calls `RefreshStats` by hand. There is no mount hook to do the same, so
+  Saddle-sore was rewritten from "25% less health while mounted" to "25% more
+  damage taken", which is the better card anyway.
+- **The bench attaches a conditional card ungated**, and now says so.
+  `AuditAttach` has always used `Condition::Always` so that a gated affix is
+  awake enough to audit; that was written when the generator rolled conditions
+  onto arbitrary cards. With ten rows carrying one of their own it needs
+  saying, because benching an AtDay card at five in the morning still shows
+  its coefficient -- which reads exactly like broken gating. The per-card
+  summary now prints `gated on <condition> -- attached ungated by the audit,
+  so the numbers above are what it does while that holds (it does not right
+  now)`. The gating itself was verified in `GauntletAggregate.cpp:54`, which
+  skips any instance whose condition is inactive, and `Mgr::Pick` gives a live
+  instance the trade line's condition.
+- Benched every one: each answered with its own curse and boon on the
+  aggregate -- Cornered `healing taken x1.00 -> x0.75` and `damage done x1.15`,
+  Fresh Legs `damage done x0.90` and `max health x1.10`, Outlander `enemy
+  speed x1.15`, Saddle-sore `damage taken x1.25`. `leaks all`: 53 audited, 0
+  leaked.
 
 ### Step 5, the rest -- and what the sweep says it should be
 

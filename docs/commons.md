@@ -5,7 +5,7 @@ not: it is the measurement behind step 5's next batch and a list of cards to
 cut before any of it becomes rows. The measurement is the part worth keeping
 if the card list is wrong.
 
-**Step 1 of §5 has landed (2026-09-01).** The three reward-shaped cards of
+**Steps 1 and 2 of §5 have landed (2026-09-01).** The three reward-shaped cards of
 §3.1 are built — Scavenger's Eye (88), Blood for Bread (89), Waste Not (90) —
 and the live table now delivers **58% common / 34% uncommon / 7% rare** at
 tier 1, against 50/10/40 before them and a 70/25/5 target. The variant sweep
@@ -13,6 +13,23 @@ predicted 57/36/7 for three such rows, which is as close as this kind of
 forecast gets. Everything below is unchanged apart from that: the nineteen
 table rows of §3.2 and §3.3 are still proposals, and the mid-run is still
 short of them — tier 21 delivers 40/8/51.
+
+**Step 2 has landed too.** The nine uncommons of §3.2 are in as ids 91–99, and
+tier 1 now delivers **52% common / 38% uncommon / 10% rare**. The uncommon
+share overshoots its 25% target and the common share fell from 58% to 52%,
+which is exactly the half-batch shape §1's table shows: the two halves compete
+for the same three slots, and the ten commons of §3.3 are what settle it. The
+weights in `docs/rarity-plan.md` §2 should not be re-cut until they land.
+
+Two things §3.2 got wrong and the build corrected. **Saddle-sore cannot curse
+max health**: it is a standing stat and the core only rebuilds it on level and
+stamina changes, so a conditional pool would move at the next level-up rather
+than when the player mounted — Lone Wolf survives only because
+`Mgr::OnGroupChanged` refreshes stats by hand, and there is no mount hook to
+copy. It is 25% more damage taken while mounted instead, which is the better
+card. And the bench attaches a conditional trade **ungated** (`AuditAttach`),
+which is the right call for coverage but has to be said, or a by-day card
+benched at night reads as broken gating; the per-card summary now says it.
 
 Written 2026-09-01, after the first three loot trades landed and
 `build/sweep --rarity` said tier 1 delivers **50% common / 10% uncommon / 40%
@@ -228,10 +245,12 @@ Not incidental — this is most of the work of a batch:
    from 50/10/40 to 58/34/7. Blood for Bread landed as a Common, so the
    disagreement in §3.1 was settled that way; if play says otherwise it is one
    field to change.
-2. **The nine uncommons.** Table lines; the tier has one card today.
-3. **The ten commons.** Table lines.
+2. ~~**The nine uncommons.**~~ **Done, 2026-09-01.** Uncommon went 34% → 38%
+   at tier 1, past its 25% target, and common fell 58% → 52%. Half a batch
+   looks like an overshoot; it is the other half missing.
+3. **The ten commons.** Table lines, and the half that is now missing.
 4. **Re-measure, then re-cut the weights.**
 
-Steps 2 and 3 are a day of rows. Step 1 is the one worth doing carefully, and
-doing first: without it, twenty rows buy a 49% common share at tier 1 and the
-run still opens with a rare in every set.
+Step 3 is a day of rows. Step 1 was the one worth doing carefully and doing
+first, and the measurement held: without it, twenty rows bought a 49% common
+share at tier 1 and the run still opened with a rare in every set.
