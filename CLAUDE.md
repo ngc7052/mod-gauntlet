@@ -135,6 +135,11 @@ strip of a worn item by "on attach: ...". Read `build/sweep --rarity` after.
 
 ## Running the tests
 
+**Deploying** needs `ac-db-import` built *and run* as well as
+`ac-worldserver` -- that container carries its own copy of the module's SQL and
+the worldserver's auto-updater is disabled on this realm, so building only the
+worldserver ships code with no schema. `docs/handoff.md` §3 has the commands.
+
 ```bash
 ./tests/compile-check.sh --anchors   # anchor + ladder audits; seconds, no Docker
 ./tests/compile-check.sh             # compile + link in the build container

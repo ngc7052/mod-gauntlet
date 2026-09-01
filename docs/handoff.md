@@ -43,11 +43,30 @@ level with `origin/master`.
 ./tests/compile-check.sh             # full compile + link in the build container
 ./tests/run-tests.sh                 # 204 unit tests
 ./sync-to-server.sh                  # rsync the module into the core tree
-docker compose -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.yml \
-  -f /mnt/c/Users/3302/azerothcore-wotlk/docker-compose.override.yml \
-  --project-directory /mnt/c/Users/3302/azerothcore-wotlk build ac-worldserver
-# ...then `up -d ac-worldserver` to deploy. Restarting kicks the user offline.
+cd /mnt/c/Users/3302/azerothcore-wotlk
+DC="docker compose -f docker-compose.yml -f docker-compose.override.yml --project-directory ."
+$DC build ac-worldserver ac-db-import   # BOTH, see below
+$DC up -d ac-worldserver                # restarting kicks the user offline
+$DC run --rm --no-deps ac-db-import     # applies this module's SQL
 ```
+
+**Build `ac-db-import` too, and run it, or no SQL update ever reaches the live
+database.** Found the hard way on 2026-09-01: `ac-db-import` has no bind mount
+for `modules/` -- it carries its own copy of every module's SQL, baked in at
+*its* image build -- and the worldserver's own auto-updater is switched off on
+this realm by `AC_UPDATES_ENABLE_DATABASES` in the environment, which overrides
+the `Updates.EnableDatabases = 7` in worldserver.conf. So the documented deploy
+(build worldserver, up worldserver) shipped code and no schema, silently, and
+two updates had accumulated unapplied: the reroll/skip log ENUM and the
+rank-to-rarity normalisation. The first of those mattered -- `gauntlet_affix_log`
+had no `'skip'` or `'reroll'` value, so the first reroll on the live realm
+would have failed to log.
+
+Note that changing a *file that was already applied* makes the updater reapply
+it ("it changed"), so an edit to `base/gauntlet.sql` -- even to a comment --
+re-runs it. That is safe only because every statement in it is guarded; keep it
+that way. Verified after the fact on 2026-09-01: the four live runs, eighteen
+affixes and twenty-seven log rows were untouched by the reapply.
 
 Gate before every commit: anchors, ladders, compile, link, tests. All green
 today — 85 anchors, 4 ladders, 67 objects, 204 tests.
