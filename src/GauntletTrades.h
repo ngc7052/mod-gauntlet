@@ -45,6 +45,15 @@ namespace Gauntlet
         uint8         boonPct;  // what the card pays, as BoonClause prints it
         char const*   noun;     // what a refusal or a stripping names: "helm", "axe"
         char const*   text;     // the curse, present tense, as the card reads it
+
+        // The uncommon shape, "lose X while Y, gain Z" (docs/rarity-plan.md
+        // section 2): the curse holds only while this does. The generator
+        // copies it onto the offer, Pick onto the instance, and the aggregate
+        // already gates every factor on AffixInstance::condition -- so a line
+        // is conditional by saying so and nothing else. The boon is not
+        // gated; it is the standing half of the trade. Always for a common,
+        // and TradesTest holds rarity and condition to agree.
+        Condition     condition = Condition::Always;
     };
 
     // ItemTemplate.h's InventoryType (lines 254-285) and ItemSubclassWeapon
@@ -124,6 +133,18 @@ namespace Gauntlet
           Boon::BonusExperience, 10, "",         "You have 10% less health." },
         { 84, TradeCurse::Coefficient, 0, AggregateKind::HealTaken,   -15,
           Boon::BonusDamage,     8,  "",         "Healing on you is 15% weaker." },
+
+        // -- paid in loot (docs/greed-redesign.md section 7.2) ----------------
+        // The magnitudes are the plan's; nothing has measured them yet.
+        { 85, TradeCurse::DenyInventoryType, InvTypeBit(Inv::WAIST),   AggregateKind::MAX, 0,
+          Boon::BonusLoot,       15, "belt",     "You cannot wear a belt." },
+        { 86, TradeCurse::Coefficient, 0, AggregateKind::DamageDone,  -8,
+          Boon::BonusLoot,       20, "",         "You deal 8% less damage." },
+        // The first uncommon: the same 10% Glass takes all day, taken only by
+        // night, and paid better for the hours it costs.
+        { 87, TradeCurse::Coefficient, 0, AggregateKind::DamageTaken,  10,
+          Boon::BonusLoot,       25, "",         "By night you take 10% more damage.",
+          Condition::AtNight },
     };
 
     constexpr std::size_t TRADE_COUNT = sizeof(TRADES) / sizeof(TRADES[0]);

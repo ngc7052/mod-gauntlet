@@ -46,10 +46,20 @@ namespace Gauntlet
     // has a curse of its own to report simply multiplies the two together.
     //
     // Returns 1.0 for every other boon: BonusMoney is paid at the loot site,
-    // BonusHealing through HealTakenMult, BonusMoveSpeed as an aura, and the
-    // five fixed boons above LastGenericBoon belong to phases that have not
-    // landed. A mechanic naming one of those must deliver it itself.
+    // BonusHealing through HealTakenMult, BonusMoveSpeed as an aura, BonusLoot
+    // at the item roll, and the five fixed boons above LastGenericBoon belong
+    // to phases that have not landed. A mechanic naming one of those must
+    // deliver it itself.
     float BoonFactor(AffixInstance const& self, AggregateKind kind);
+
+    // The multiplier a BonusLoot boon puts on one candidate item's drop
+    // chance, as 1.0 + magnitude%; 1.0 for any other boon, so Mgr::OnItemRoll
+    // multiplies every carried affix in unconditionally. It moves the chance
+    // the core hands GlobalScript::OnItemRoll by reference -- LootMgr.cpp:311
+    // for a plain entry, :1268 for one inside a group -- where 100 or more is
+    // a certain drop (:318), so the most a boon can do to a near-certain drop
+    // is make it certain.
+    float BoonLootMult(AffixInstance const& self);
 
     // The multiplier a BonusMoney boon puts on a purse, as 1.0 + magnitude%.
     // 1.0 when the instance's boon is anything else, so a loot hook can

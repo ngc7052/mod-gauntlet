@@ -879,6 +879,9 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_TradeGlass();         // 82
     void AddSC_gauntlet_mechanic_TradeFrail();         // 83
     void AddSC_gauntlet_mechanic_TradeThinBlood();     // 84
+    void AddSC_gauntlet_mechanic_TradeMagpie();        // 85
+    void AddSC_gauntlet_mechanic_TradeButterfingers(); // 86
+    void AddSC_gauntlet_mechanic_TradeNightOwl();      // 87
 }
 
 static void AnchorMechanics()
@@ -966,6 +969,9 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_TradeGlass();
     AddSC_gauntlet_mechanic_TradeFrail();
     AddSC_gauntlet_mechanic_TradeThinBlood();
+    AddSC_gauntlet_mechanic_TradeMagpie();
+    AddSC_gauntlet_mechanic_TradeButterfingers();
+    AddSC_gauntlet_mechanic_TradeNightOwl();
 }
 
 void Addmod_gauntletScripts()

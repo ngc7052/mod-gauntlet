@@ -6,11 +6,13 @@
 #include "GauntletMgr.h"
 
 #include "mechanics/BoonSpeed.h"
+#include "mechanics/Boons.h"
 #include "GauntletAddon.h"
 #include "GauntletGenerator.h"
 #include "GauntletRules.h"
 #include "GauntletMechanic.h"
 #include "GauntletRegistry.h"
+#include "GauntletTrades.h"
 #include "GauntletSummons.h"
 #include "Chat.h"
 #include "Config.h"
@@ -414,7 +416,13 @@ namespace Gauntlet
         // them deleted every offer carries Always, so the adjective would be on
         // every name in the game and would say nothing at all. A real condition
         // still prints, because the axis itself is kept for a later phase.
-        if (condition != Condition::Always)
+        //
+        // Unless the card was born with it. A trade line that fixes a condition
+        // has it in the card's own name -- Night Owl *is* the night -- and
+        // "Nocturnal Lucky Night Owl" would say it twice. The adjective is for
+        // a condition rolled onto a card that did not have one.
+        TradeDef const* trade = FindTrade(mechanic);
+        if (condition != Condition::Always && !(trade && trade->condition == condition))
             name = ConditionName(condition) + " " + name;
         if (boon != Boon::None)
             name = BoonName(boon) + " " + name;
@@ -2034,6 +2042,14 @@ namespace Gauntlet
         ForEachMechanic(mutablePlayer, st, [&chance](Ctx& ctx, AffixInstance& a)
         {
             a.impl->OnItemRoll(ctx, chance);
+
+            // The one generic loot boon, paid here once for every card that
+            // names it rather than by each card -- the shape BoonSpeed::Sync
+            // gives movement speed. After the mechanic's own say, so a card
+            // that forces a drop (Carrion sets 100) is multiplied into a
+            // number the core reads the same way (LootMgr.cpp:318, 100 or
+            // more drops), never the other way round.
+            chance *= BoonLootMult(a);
         });
     }
 

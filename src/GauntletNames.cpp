@@ -67,6 +67,7 @@ namespace Gauntlet
             case Boon::BonusAbility:    return "Honed";
             case Boon::BonusPetDamage:  return "Savage";
             case Boon::SecondLife:      return "Deathless";
+            case Boon::BonusLoot:       return "Lucky";
             default:                    return "";
         }
     }

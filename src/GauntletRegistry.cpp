@@ -638,6 +638,24 @@ namespace
           MF_None, "", Boon::BonusDamage, 0, 0,
           "Healing on you is 15% weaker." },
 
+        // The first cards paid in loot (docs/greed-redesign.md section 7.2).
+        // Loot is the accelerant WoW's own players chase hardest, and none of
+        // the older boons was it.
+        { 85, "magpie", "Magpie", Family::Rules, 0, 1, 80, Rarity::Common,
+          MF_None, "", Boon::BonusLoot, 0, 0,
+          "You cannot wear a belt." },
+
+        { 86, "butterfingers", "Butterfingers", Family::Attrition, 0, 1, 80, Rarity::Common,
+          MF_None, "", Boon::BonusLoot, 0, 0,
+          "You deal 8% less damage." },
+
+        // The first Uncommon: a trade with a condition, the shape
+        // docs/rarity-plan.md section 2 gives that tier. The condition is the
+        // trade line's (GauntletTrades.h), not rolled.
+        { 87, "night_owl", "Night Owl", Family::Attrition, 0, 1, 80, Rarity::Uncommon,
+          MF_None, "", Boon::BonusLoot, 0, 0,
+          "By night you take 10% more damage." },
+
         };
     }
 

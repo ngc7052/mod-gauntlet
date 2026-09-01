@@ -344,6 +344,9 @@ namespace Gauntlet
     IMechanic* TradeGlass()      { return MakeTrade(82); }
     IMechanic* TradeFrail()      { return MakeTrade(83); }
     IMechanic* TradeThinBlood()  { return MakeTrade(84); }
+    IMechanic* TradeMagpie()        { return MakeTrade(85); }
+    IMechanic* TradeButterfingers() { return MakeTrade(86); }
+    IMechanic* TradeNightOwl()      { return MakeTrade(87); }
 
     GAUNTLET_MECHANIC_FN(75, TradeBareheaded)
     GAUNTLET_MECHANIC_FN(76, TradeCloakless)
@@ -355,4 +358,7 @@ namespace Gauntlet
     GAUNTLET_MECHANIC_FN(82, TradeGlass)
     GAUNTLET_MECHANIC_FN(83, TradeFrail)
     GAUNTLET_MECHANIC_FN(84, TradeThinBlood)
+    GAUNTLET_MECHANIC_FN(85, TradeMagpie)
+    GAUNTLET_MECHANIC_FN(86, TradeButterfingers)
+    GAUNTLET_MECHANIC_FN(87, TradeNightOwl)
 }

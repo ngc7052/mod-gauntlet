@@ -32,7 +32,7 @@ namespace
     // reused, so the holes stay. Killing Floor (74) took Unspent's place in the
     // table and not its number, and 75-84 are the first ten commons of
     // docs/rarity-plan.md step 2.
-    constexpr size_t TABLE_SIZE = 79;
+    constexpr size_t TABLE_SIZE = 82;
     // A tier is a level now, not five of them. Every registry window was
     // multiplied by five with the axis, so the *level* each affix unlocks at
     // is exactly what it was; only the number naming it changed.
@@ -58,7 +58,7 @@ namespace
     // rather than as a count: a row that gains the flag by accident, or loses
     // it before its dispatch is wired, is an affix offered to a live hardcore
     // character that silently does nothing.
-    constexpr std::array<uint16, 79> OFFERABLE = {
+    constexpr std::array<uint16, 82> OFFERABLE = {
         1, 2, 3, 4, 5,           // S1 Shade, S2 Echo, S3 Carrion, S4 Reinforcements, S5 Ambush
         6, 7, 8, 9, 10, 11, 12, 13,  // E1 Champions .. E8 Keen-nosed
         14, 15, 16, 17, 18,      // T1 Falling Sky .. T5 Hubris
@@ -88,10 +88,13 @@ namespace
         61, 62, 63,              // C34 Affliction, C35 Shard Economy, C36 Shared Blood
         65, 66, 67,              // C38 Nature's Toll, C39 Commitment of Roots, C40 Two Faces
 
-        // The commons: seven denials filed as Rules, three coefficient trades
-        // filed as Attrition. Every one is a line in src/GauntletTrades.h.
+        // The trades: seven denials filed as Rules, three coefficient trades
+        // filed as Attrition, then the three paid in loot -- Magpie (Rules),
+        // Butterfingers and Night Owl (Attrition), the last the first uncommon.
+        // Every one is a line in src/GauntletTrades.h.
         75, 76, 77, 78, 79, 80, 81,
-        82, 83, 84
+        82, 83, 84,
+        85, 86, 87
     };
 
     // CONTRACT.md section 8's id ranges, which are fixed forever. The Attrition
@@ -104,22 +107,25 @@ namespace
         size_t count;
     };
 
-    constexpr std::array<Range, 10> RANGES = { {
+    constexpr std::array<Range, 12> RANGES = { {
         {  1,  5, Family::Spawn,      5 },
         {  6, 13, Family::Enemy,      8 },
         { 14, 18, Family::Tempo,      5 },
-        { 19, 22, Family::Attrition,  6 },   // 21 and 22 deleted; 19, 20, 74 and three commons remain
-        { 23, 25, Family::Rules,     10 },   // three rules and seven common denials
+        { 19, 22, Family::Attrition,  8 },   // 21 and 22 deleted; 19, 20, 74 and five trades remain
+        { 23, 25, Family::Rules,     11 },   // three rules and eight common denials
         { 26, 27, Family::Bargain,    2 },
         { 28, 71, Family::Class,     43 },   // 69 deleted with Unspent
         // A5 Killing Floor, outside its family's original band because 21 and
         // 22 are spent and the next free id was 74. The band describes how the
         // table was first laid out; the no-reuse rule outranks it.
-        { 74, 74, Family::Attrition,  6 },
-        // The commons, appended in id order as every row after 74 is: the
-        // denials are Rules, the coefficient trades Attrition.
-        { 75, 81, Family::Rules,     10 },
-        { 82, 84, Family::Attrition,  6 }
+        { 74, 74, Family::Attrition,  8 },
+        // The trades, appended in id order as every row after 74 is: the
+        // denials are Rules, the coefficient trades Attrition. The loot trades
+        // (85-87) interleave the two, which is why the bands split again.
+        { 75, 81, Family::Rules,     11 },
+        { 82, 84, Family::Attrition,  8 },
+        { 85, 85, Family::Rules,     11 },
+        { 86, 87, Family::Attrition,  8 }
     } };
 }
 
@@ -137,7 +143,7 @@ TEST(Registry, HoldsEveryEntryInAscendingIdOrder)
             << " (id " << all[i - 1].id << ") in ascending order";
 
     EXPECT_EQ(all.front().id, 1u);
-    EXPECT_EQ(all.back().id, 84u) << "the table must end at the last common, Thin Blood, id 84";
+    EXPECT_EQ(all.back().id, 87u) << "the table must end at the last trade, Night Owl, id 87";
 }
 
 TEST(Registry, TheDeletedScalarIdsAreGoneAndStayGone)
@@ -199,29 +205,38 @@ TEST(Registry, RarityIsInsideTheEnum)
             << "id " << def.id << " carries a rarity Data.lua cannot name";
 }
 
-// docs/rarity-plan.md, steps 1 and 2. The sixty-nine cards that existed when
-// rarity landed are all Rare, and stay Rare until the plan's section 7.4 --
-// one pass over the whole list deciding which are epics -- rewrites this into
-// a list; a row promoted on its own before then is exactly what the plan says
-// not to do. Everything after them is a common, and a common is a line in the
-// trade table, which is what makes it a table row rather than a file.
-TEST(Registry, TheOriginalCardsAreRareAndEverythingAfterIsACommonWithALine)
+// docs/rarity-plan.md, steps 1, 2 and 5. The sixty-nine cards that existed
+// when rarity landed are all Rare, and stay Rare until the plan's section 7.4
+// -- one pass over the whole list deciding which are epics -- rewrites this
+// into a list; a row promoted on its own before then is exactly what the plan
+// says not to do. Everything after them is a line in the trade table, which is
+// what makes it a table row rather than a file -- and which of the two trade
+// tiers it is, the line says: an uncommon is "a trade with a condition"
+// (section 2), so a line's condition and its row's rarity have to agree. The
+// first real-mechanic uncommon (Scavenger's Eye, greed-redesign 7.2) will turn
+// the trade-line half of this into a list too; that is intended.
+TEST(Registry, TheOriginalCardsAreRareAndEverythingAfterIsATradeLine)
 {
     constexpr uint16 LAST_ORIGINAL = 74;   // A5 Killing Floor
     for (MechanicDef const& def : AllMechanics())
     {
         if (def.id <= LAST_ORIGINAL)
+        {
             EXPECT_EQ(def.rarity, Rarity::Rare)
                 << "id " << def.id << " (" << def.key << ") is " << RarityName(def.rarity)
                 << "; the epic pass is one decision over the whole table, not per row";
-        else
-        {
-            EXPECT_EQ(def.rarity, Rarity::Common)
-                << "id " << def.id << " (" << def.key << ") is " << RarityName(def.rarity)
-                << "; rows after " << LAST_ORIGINAL << " are commons until the plan says otherwise";
-            EXPECT_NE(FindTrade(def.id), nullptr)
-                << "id " << def.id << " (" << def.key << ") is a common with no trade line";
+            continue;
         }
+
+        TradeDef const* line = FindTrade(def.id);
+        ASSERT_NE(line, nullptr)
+            << "id " << def.id << " (" << def.key << ") is past the originals with no trade line";
+        if (line->condition == Condition::Always)
+            EXPECT_EQ(def.rarity, Rarity::Common)
+                << def.key << ": a trade with no condition is a common, not " << RarityName(def.rarity);
+        else
+            EXPECT_EQ(def.rarity, Rarity::Uncommon)
+                << def.key << ": a trade with a condition is an uncommon, not " << RarityName(def.rarity);
     }
 }
 
@@ -316,10 +331,10 @@ TEST(Registry, LookupsAgreeWithTheTable)
     // one of these is the normal answer for a run migrated from a registry
     // this build has never seen, so nullptr is the contract, not a crash.
     EXPECT_EQ(FindMechanic(static_cast<uint16>(MECHANIC_NONE)), nullptr);
-    // 85, one past the highest id the table carries. Not TABLE_SIZE + 1: the
+    // 88, one past the highest id the table carries. Not TABLE_SIZE + 1: the
     // ids are no longer contiguous, so the count and the highest id are
     // different numbers and only the second one bounds a lookup.
-    EXPECT_EQ(FindMechanic(static_cast<uint16>(85)), nullptr);
+    EXPECT_EQ(FindMechanic(static_cast<uint16>(88)), nullptr);
     EXPECT_EQ(FindMechanic(static_cast<uint16>(72)), nullptr);
     EXPECT_EQ(FindMechanic(static_cast<uint16>(0xFFFF)), nullptr);
     EXPECT_EQ(FindMechanic(std::string_view("")), nullptr);

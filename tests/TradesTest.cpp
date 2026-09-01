@@ -16,6 +16,8 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <iterator>
 #include <set>
 
 namespace
@@ -37,13 +39,15 @@ namespace
     }
 }
 
-TEST(Trades, EveryLineBacksACommonRow)
+TEST(Trades, EveryLineBacksATradeRow)
 {
     for (TradeDef const& t : TRADES)
     {
         MechanicDef const* def = FindMechanic(t.id);
         ASSERT_NE(def, nullptr) << "trade line " << t.id << " has no registry row";
-        EXPECT_EQ(def->rarity, Rarity::Common) << def->key << " has a trade line but is not a common";
+        EXPECT_TRUE(def->rarity == Rarity::Common || def->rarity == Rarity::Uncommon)
+            << def->key << " has a trade line but is " << RarityName(def->rarity)
+            << "; a line is a common or an uncommon, nothing rarer is one number";
         EXPECT_EQ(def->boon, t.boon)
             << def->key << ": the registry names one boon and the trade line pays another";
         EXPECT_TRUE(IsImplemented(*def)) << def->key;
@@ -59,6 +63,29 @@ TEST(Trades, EveryCommonRowHasALine)
         if (def.rarity == Rarity::Common)
             EXPECT_NE(FindTrade(def.id), nullptr)
                 << def.key << " (id " << def.id << ") is a common with no trade line";
+}
+
+TEST(Trades, AnUncommonIsATradeWithACondition)
+{
+    // docs/rarity-plan.md section 2: a common is "lose X, gain Y" and an
+    // uncommon "lose X while Y, gain Z". The condition is the whole of what
+    // separates the two tiers, so a line's condition and its row's rarity have
+    // to agree: a conditional common is an uncommon drawn at common weight, and
+    // an unconditional uncommon a common wearing green.
+    for (TradeDef const& t : TRADES)
+    {
+        MechanicDef const* def = FindMechanic(t.id);
+        ASSERT_NE(def, nullptr) << "trade line " << t.id;
+        EXPECT_EQ(def->rarity == Rarity::Uncommon, t.condition != Condition::Always)
+            << def->key << " is " << RarityName(def->rarity) << " with condition "
+            << static_cast<uint32>(t.condition);
+        EXPECT_LT(static_cast<uint8>(t.condition), static_cast<uint8>(Condition::MAX)) << def->key;
+    }
+
+    // And the tier exists on the table, or the claim above is about nothing.
+    EXPECT_TRUE(std::any_of(std::begin(TRADES), std::end(TRADES),
+                            [](TradeDef const& t) { return t.condition != Condition::Always; }))
+        << "no trade line carries a condition; the uncommon shape is untested";
 }
 
 TEST(Trades, IdsAreUniqueAndFindable)

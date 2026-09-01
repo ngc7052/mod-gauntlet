@@ -163,6 +163,9 @@ namespace
             case Boon::BonusMoney:      return 0;
             case Boon::BonusMaxHealth:  base =  5; break;   // TODO(design)
             case Boon::BonusRegen:      base = 15; break;   // TODO(design)
+            // For a loot card without a trade line (docs/greed-redesign.md
+            // section 7.3); a trade names its own magnitude above.
+            case Boon::BonusLoot:       base = 15; break;   // TODO(design)
             default:                    return 0;           // Boon::None
         }
 
@@ -518,11 +521,16 @@ namespace
         offer.mechanic  = def.id;
         offer.kind      = kind;
         // Every mechanic's boon is named by its registry row and delivered by
-        // the mechanic itself; the condition axis is unused since the scalars
-        // were deleted. Neither consumes the stream any more, so an offer's
-        // roll order is rarity, family, mechanic and -- for a swap -- the slot
-        // it replaces.
+        // the mechanic itself. The condition is the card's too: a trade line
+        // may fix one -- "by night you take 10% more damage" is the whole of
+        // Night Owl, the uncommon tier's "a trade with a condition" from
+        // docs/rarity-plan.md section 2 -- and every other card carries
+        // Always. Nothing is rolled for either, so neither consumes the
+        // stream, and an offer's roll order is rarity, family, mechanic and
+        // -- for a swap -- the slot it replaces.
         offer.condition = Condition::Always;
+        if (TradeDef const* trade = FindTrade(def.id))
+            offer.condition = trade->condition;
         offer.boon      = def.boon;
 
         // The card's own rarity, not the one the slot rolled. The roll decides

@@ -16,6 +16,7 @@
 #include "GauntletGenerator.h"
 #include "GauntletRegistry.h"
 #include "GauntletRules.h"
+#include "GauntletTrades.h"
 
 #include <gtest/gtest.h>
 
@@ -405,6 +406,35 @@ TEST(GeneratorDeterminism, CountIsHonoured)
     for (uint32 count = 1; count <= 5; ++count)
         EXPECT_EQ(BuildOffers(1, 5, view, empty, count, full).offers.size(), count)
             << "count=" << count;
+}
+
+TEST(GeneratorConditions, AnOfferCarriesItsTradeLinesCondition)
+{
+    // Nothing rolls a condition. A trade line may fix one -- the uncommon
+    // shape -- and the offer has to say what the line says, because the
+    // aggregate gates the curse on the instance's condition and the instance
+    // gets it from the offer. The sweep has to actually meet a conditional
+    // line, or the claim is about nothing.
+    RegistryView full;
+    full.includeUnimplemented = true;
+    std::vector<AffixInstance> const empty;
+
+    uint32 conditional = 0;
+    for (uint8 cls : CLASSES)
+    {
+        StubView const view(cls, 1);
+        for (uint8 tier = 1; tier <= 80; tier = static_cast<uint8>(tier + 7))
+            for (uint32 seed = 1; seed <= 60; ++seed)
+                for (Offer const& o : BuildOffers(seed, tier, view, empty, 3, full).offers)
+                {
+                    TradeDef const* line = FindTrade(o.mechanic);
+                    EXPECT_EQ(o.condition, line ? line->condition : Condition::Always)
+                        << "id " << o.mechanic << " tier " << uint32(tier) << " seed " << seed;
+                    if (o.condition != Condition::Always)
+                        ++conditional;
+                }
+    }
+    EXPECT_GT(conditional, 0u) << "no conditional trade was ever offered; nothing above was tested";
 }
 
 TEST(GeneratorSwaps, ASwapTierOffersNoSwapToARunCarryingNothing)

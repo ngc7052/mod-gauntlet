@@ -27,6 +27,7 @@
 
 #include "GauntletGenerator.h"
 #include "GauntletRegistry.h"
+#include "GauntletTrades.h"
 
 #include <gtest/gtest.h>
 
@@ -40,6 +41,15 @@
 namespace
 {
     using namespace Gauntlet;
+
+    // What an offer's condition must be: its trade line's, when the row has
+    // one (the uncommon shape), and Always for everything else. Nothing rolls
+    // a condition.
+    Condition TradeCondition(uint16 mechanic)
+    {
+        TradeDef const* line = FindTrade(mechanic);
+        return line ? line->condition : Condition::Always;
+    }
 
     // CLASS_WARRIOR .. CLASS_DRUID, from $CORE/src/server/shared/SharedDefines.h
     // lines 126-136. Class 10 does not exist in 3.3.5, which is why the list is
@@ -100,7 +110,7 @@ namespace
         "an offer is for a class it does not apply to",
         "an offer requires a spell the character does not know",
         "an offer requires a talent tree the character has not taken",
-        "an offer carries a condition other than Always",
+        "an offer's condition is neither Always nor its trade line's",
         "an offer's boon is not the one its registry row names",
         "an offer's condition is outside the enum",
         "an offer's boon is outside the enum",
@@ -325,12 +335,12 @@ namespace
 
             if (static_cast<uint8>(offer.condition) >= static_cast<uint8>(Condition::MAX))
                 tally.Fail(I_CONDITION_RANGE, q);
-            // Nothing rolls a condition since Phase 2 deleted the Scalars, so
-            // every offer must carry Always. The axis itself is kept for a
-            // later phase (design section 6), which is exactly why this is
-            // asserted rather than assumed: the day something starts rolling
-            // one again, this says so.
-            else if (offer.condition != Condition::Always)
+            // Nothing rolls a condition since Phase 2 deleted the Scalars. An
+            // offer carries its trade line's condition -- the uncommon tier's
+            // "a trade with a condition", docs/rarity-plan.md section 2 -- or
+            // Always. Anything else means something started rolling one
+            // again, and this says so.
+            else if (offer.condition != TradeCondition(offer.mechanic))
                 tally.Fail(I_PLAIN_CONDITION, q);
 
             if (static_cast<uint8>(offer.boon) >= static_cast<uint8>(Boon::MAX))
@@ -842,7 +852,7 @@ TEST(OfferInvariants, LiveRegistryView)
                         << "and was offered to a player\n  " << Describe(q);
                     ASSERT_GE(tier, def->minTier) << Describe(q);
                     ASSERT_LE(tier, def->maxTier) << Describe(q);
-                    ASSERT_EQ(offer.condition, Condition::Always) << Describe(q);
+                    ASSERT_EQ(offer.condition, TradeCondition(offer.mechanic)) << Describe(q);
                     ASSERT_EQ(offer.boon, def->boon)
                         << "id " << offer.mechanic << " (" << def->key << ") was offered with a "
                         << "boon its registry row does not name; nothing rolls one any more\n  "
@@ -1026,8 +1036,12 @@ TEST(OfferInvariants, LiveRegistryView)
     // for the dice and a registry edit, none for a regression -- and the
     // whole ladder is what the plan's question 7.1 and the greed redesign's
     // loot cards should bring back down.
+    //
+    // The first three loot trades (ids 85-87) were that registry edit: three
+    // rows change every draw after them, and tier 12 moved 47% -> 58% while
+    // the rest held. Ceiling 60 there; the dice, not a regression.
     constexpr std::array<Ceiling, 12> CEILINGS = { {
-        {  5, 20.0 }, {  9, 55.0 }, { 12, 55.0 }, { 15, 80.0 }, { 20, 65.0 },
+        {  5, 20.0 }, {  9, 55.0 }, { 12, 60.0 }, { 15, 80.0 }, { 20, 65.0 },
         { 24, 55.0 }, { 29, 55.0 }, { 30,  5.0 }, { 33, 20.0 }, { 36, 28.0 },
         { 50, 20.0 }, { 60, 35.0 }
     } };

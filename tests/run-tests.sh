@@ -80,8 +80,11 @@ if [ ! -f "$GTEST_MAIN_OBJ" ] || [ "$GTEST_ROOT/src/gtest_main.cc" -nt "$GTEST_M
 fi
 
 # Player-free module sources: same detection rule as tests/syntax-check.sh.
+# The mechanics tree is walked too: most of it includes Player.h and is
+# skipped, but mechanics/Boons.cpp -- the boon clauses and multipliers -- does
+# not, and BoonLootMult is tested here.
 module_srcs=()
-for src in "$ROOT"/src/*.cpp; do
+for src in "$ROOT"/src/*.cpp "$ROOT"/src/mechanics/*.cpp; do
   [ -e "$src" ] || continue
   if grep -E -q "$CORE_HEADER_PATTERN" "$src"; then
     echo "==> skipping $(basename "$src") (needs core game headers)"

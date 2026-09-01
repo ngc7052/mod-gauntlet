@@ -97,6 +97,8 @@ namespace Gauntlet
         BonusAbility,     // a bespoke buff to one ability; the blurb says which
         BonusPetDamage,   // your pet or demon hits harder, not you
         SecondLife,       // a death you walk away from (B1, C43, C44)
+        BonusLoot,        // things drop more often; paid once for every card that
+                          // names it, in Mgr::OnItemRoll (docs/greed-redesign.md 7.2)
         MAX
     };
 

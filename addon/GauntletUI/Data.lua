@@ -42,6 +42,7 @@ GauntletData = {
         [10] = "Honed",
         [11] = "Savage",
         [12] = "Deathless",
+        [13] = "Lucky",
     },
     rarities = {
         [0] = { name = "Common", color = "ffffff" },
@@ -209,5 +210,11 @@ GauntletData = {
                  icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain", desc = "You have 10% less health." },
         [84] = { name = "Thin Blood", key = "thin_blood", family = 3, rarity = 0,
                  icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain", desc = "Healing on you is 15% weaker." },
+        [85] = { name = "Magpie", key = "magpie", family = 4, rarity = 0,
+                 icon = "Interface\\Icons\\INV_Scroll_03", desc = "You cannot wear a belt." },
+        [86] = { name = "Butterfingers", key = "butterfingers", family = 3, rarity = 0,
+                 icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain", desc = "You deal 8% less damage." },
+        [87] = { name = "Night Owl", key = "night_owl", family = 3, rarity = 1,
+                 icon = "Interface\\Icons\\Spell_Shadow_ShadowWordPain", desc = "By night you take 10% more damage." },
     },
 }

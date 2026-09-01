@@ -20,6 +20,7 @@
 
 #include "GauntletAggregate.h"
 #include "GauntletMechanic.h"
+#include "mechanics/Boons.h"
 
 #include <gtest/gtest.h>
 
@@ -366,6 +367,32 @@ TEST(Aggregate, TheAggregatePaysNoBoonOfItsOwn)
             EXPECT_FLOAT_EQ(Aggregate(carried, Everything(kind), caps), 1.2f)
                 << KindName(kind) << " was moved by boon " << unsigned(b);
         }
+}
+
+TEST(Aggregate, TheLootBoonMultipliesTheRollUpAndOnlyForLoot)
+{
+    // BonusLoot is paid at the item roll (Mgr::OnItemRoll), not through the
+    // aggregate -- loot is not one of its kinds -- so the aggregate test above
+    // already holds that it moves no product. This holds the other half: the
+    // multiplier is 1 + magnitude%, up, and 1.0 for every other boon so the
+    // roll hook can multiply every carried affix in without asking.
+    FixedFactor inert(AggregateKind::DamageDone, 1.0f);
+    AffixInstance instance = Carrying(&inert);
+
+    instance.boon    = Boon::BonusLoot;
+    instance.boonMag = 15;
+    EXPECT_FLOAT_EQ(BoonLootMult(instance), 1.15f);
+    instance.boonMag = 0;
+    EXPECT_FLOAT_EQ(BoonLootMult(instance), 1.0f) << "a zero magnitude pays nothing";
+
+    for (uint8 b = 0; b < static_cast<uint8>(Boon::MAX); ++b)
+    {
+        if (static_cast<Boon>(b) == Boon::BonusLoot)
+            continue;
+        instance.boon    = static_cast<Boon>(b);
+        instance.boonMag = 30;
+        EXPECT_FLOAT_EQ(BoonLootMult(instance), 1.0f) << "boon " << unsigned(b) << " moved the roll";
+    }
 }
 
 TEST(Aggregate, CapsAreConfigurable)

@@ -22,6 +22,7 @@ namespace Gauntlet
             case Boon::BonusMoney:      return " In exchange, you loot " + mag + "% more money.";
             case Boon::BonusMaxHealth:  return " In exchange, you have " + mag + "% more health.";
             case Boon::BonusRegen:      return " In exchange, you recover " + mag + "% faster.";
+            case Boon::BonusLoot:       return " In exchange, things drop " + mag + "% more often.";
             default:                    return "";
         }
     }
@@ -67,6 +68,13 @@ namespace Gauntlet
     float BoonHealMult(AffixInstance const& self)
     {
         if (self.boon != Boon::BonusHealing || self.boonMag == 0)
+            return 1.0f;
+        return 1.0f + Pct(self.boonMag);
+    }
+
+    float BoonLootMult(AffixInstance const& self)
+    {
+        if (self.boon != Boon::BonusLoot || self.boonMag == 0)
             return 1.0f;
         return 1.0f + Pct(self.boonMag);
     }
