@@ -410,10 +410,14 @@ difficulty, and a redesign that made a card easier would have failed it.
    loot card's boon column names. **Landed 2026-09-01** — the boon, Magpie,
    Butterfingers and Night Owl; Scavenger's Eye is a mechanic, not a line, and
    is still open.
-3. **Craven and Grudge** — the two brakes felt on every single kill.
-4. **Falter and Cunning** — the role taxes.
-5. **Ambush.**
-6. **The three sharpenings** (Nimble, Call to Arms, Blood Magic).
+3. ~~**Craven and Grudge**~~ **Done, 2026-09-01.**
+4. ~~**Falter and Cunning**~~ **Done, 2026-09-01.**
+5. ~~**Ambush.**~~ **Done, 2026-09-01.**
+6. ~~**The three sharpenings**~~ **Done, 2026-09-01.** Iron Purse and No
+   Sanctuary retired with them. §7 of `docs/handoff.md` records what each one
+   became, and the one place this document's proposed seam was wrong: Craven's
+   extra loot roll cannot come from `OnItemRoll`, because the item roll
+   happens inside `FillLoot` and is finished before `OnLoot` is called.
 7. **The loot cards** (§7.3). **Begun 2026-09-01** with Fresh Kill, Blood
    Price and Trophy Hunter -- not the order given here, and for a reason this
    document could not have known: §7 of `docs/handoff.md` measured the

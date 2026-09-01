@@ -55,7 +55,13 @@ namespace
     // E1-E8 = 6-13, T1-T5 = 14-18, A1-A4 = 19-22, R1-R3 = 23-25, B1-B2 = 26-27,
     // C1-C44 = 28-71. Ids 21, 22, 72 and 73 -- Exposed, Feeble, Withering and
     // Forgetful -- were the four flat scalars and were deleted in Phase 2, and
-    // 69 -- Unspent -- was deleted in Phase 6.
+    // 69 -- Unspent -- was deleted in Phase 6. 25 (Iron Purse) and 34 (No
+    // Sanctuary) were retired on 2026-09-01 by docs/greed-redesign.md section
+    // 3: the first was the table's weakest row by its own file's admission and
+    // the rarity plan's commons took away its one structural argument, and the
+    // second never acted at all -- "a card that never acts is
+    // indistinguishable from a broken one, and it has nothing to become".
+    // Neither id is ever reused.
     //
     // The design's ranges therefore stop describing the table from 74 onward.
     // A new mechanic takes the next free id and not the next id in its family's
@@ -158,23 +164,22 @@ namespace
 
         { 7, "craven", "Craven", Family::Enemy, 0, 12, 60, Rarity::Rare,
           MF_None, "", Boon::BonusDamage, 0, 0,
-          "Enemies flee at 25% health, and come back with friends." },
+          "Enemies flee at 25% health. Cut one down before it reaches its camp and it pays double." },
 
         { 8, "call_to_arms", "Call to Arms", Family::Enemy, 0, 25, 65, Rarity::Rare,
           MF_OnKill, "", Boon::BonusExperience, 0, 0,
-          "Killing an enemy alerts its nearest kin." },
+          "Killing an enemy alerts its nearest kin. The kin that answer are worth more." },
 
         { 9, "death_rattle", "Death Rattle", Family::Enemy, CM_MELEE, 20, 60, Rarity::Rare,
           MF_Timed | MF_OnKill, "onkill-positional", Boon::BonusDamage, 0, 0,
           "Corpses burst two seconds after death, hurting anyone within five yards." },
 
         { 10, "grudge", "Grudge", Family::Enemy, CM_MELEE, 8, 50, Rarity::Rare,
-          MF_OnKill, "onkill-positional", Boon::BonusHealing, 0, 0,
-          "Everything you kill leaves a ghost on its corpse that drains your health"
-          " while you stand near it." },
+          MF_OnKill, "onkill-positional", Boon::BonusMoveSpeed, 0, 0,
+          "A spirit rises on each corpse four seconds after the kill. Loot it first and nothing rises." },
 
         { 11, "nimble", "Nimble", Family::Enemy, 0, 30, 80, Rarity::Rare,
-          MF_None, "", Boon::BonusMaxHealth, 0, 0,
+          MF_None, "", Boon::BonusMoveSpeed, 0, 0,
           "Enemies move 30% faster." },
 
         { 12, "cunning", "Cunning", Family::Enemy, CM_CAST_TIME, 30, 80, Rarity::Rare,
@@ -235,7 +240,7 @@ namespace
 
         { 20, "blood_magic", "Blood Magic", Family::Attrition, CM_MANA_USERS, 25, 60, Rarity::Rare,
           MF_None, "", Boon::BonusDamage, 0, 0,
-          "Spells cost 3% of your maximum health in addition to mana." },
+          "Spells cost 3% of your maximum health. Below a third, they cost nothing and hit harder." },
 
 
         // Ids 21 and 22 were Exposed and Feeble, the last two flat scalars, and
@@ -271,15 +276,6 @@ namespace
           MF_None, "rule", Boon::BonusExperience, 0, 0,
           "Half health in a group; more experience alone." },
 
-        // TODO(design): the family says rules always come with a boon; this
-        // card names none, and it is left that way on purpose. The obvious
-        // boon for a gold tax is more gold, which would make the affix a wash
-        // -- a curse and a boon that cancel are worse than either alone. See
-        // the head of mechanics/rules/IronPurse.cpp for why this row is kept
-        // anyway despite being the weakest in the table.
-        { 25, "iron_purse", "Iron Purse", Family::Rules, 0, 1, 15, Rarity::Rare,
-          MF_None, "rule", Boon::None, 0, 0,
-          "Repairs cost double." },
 
         // --- Family B: bargains ----------------------------------------
         // The boon is the cheat death itself: a killing blow leaves you at one
@@ -351,10 +347,6 @@ namespace
           MF_None, "", Boon::BonusAbility, 26573, 0,
           "You take 25% more damage while not standing in your own Consecration." },
 
-        // The boon takes a minute off Divine Shield's cooldown.
-        { 34, "c07_no_sanctuary", "No Sanctuary", Family::Class, CM_PALADIN, 15, 60, Rarity::Rare,
-          MF_None, "shortcut:divine-shield", Boon::BonusCooldown, 642, 0,
-          "Your Hearthstone will not answer under Divine Shield." },
 
         // The boon halves Hammer of Justice's cooldown.
         { 35, "c08_commitment", "Commitment", Family::Class, CM_PALADIN, 20, 80, Rarity::Rare,

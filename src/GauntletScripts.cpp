@@ -842,7 +842,6 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_DeafeningRoar();      // 31  C4  warrior
     void AddSC_gauntlet_mechanic_LongForbearance();    // 32  C5  paladin
     void AddSC_gauntlet_mechanic_ConsecratedGround();  // 33  C6  paladin
-    void AddSC_gauntlet_mechanic_NoSanctuary();        // 34  C7  paladin
     void AddSC_gauntlet_mechanic_Commitment();         // 35  C8  paladin
     void AddSC_gauntlet_mechanic_HalfTamed();          // 36  C9  hunter
     void AddSC_gauntlet_mechanic_DeadWeight();         // 37  C10 hunter
@@ -881,7 +880,6 @@ namespace Gauntlet
     void AddSC_gauntlet_mechanic_StoneOfTheDamned();   // 71  C44 warlock
     void AddSC_gauntlet_mechanic_SelfFound();          // 23
     void AddSC_gauntlet_mechanic_LoneWolf();           // 24
-    void AddSC_gauntlet_mechanic_IronPurse();          // 25
 
     // The commons, all in src/mechanics/common/SimpleTrade.cpp. One anchor
     // per registry id because the anchor audit reads registrations by text;
@@ -963,7 +961,6 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_DeafeningRoar();
     AddSC_gauntlet_mechanic_LongForbearance();
     AddSC_gauntlet_mechanic_ConsecratedGround();
-    AddSC_gauntlet_mechanic_NoSanctuary();
     AddSC_gauntlet_mechanic_Commitment();
     AddSC_gauntlet_mechanic_HalfTamed();
     AddSC_gauntlet_mechanic_DeadWeight();
@@ -1000,7 +997,6 @@ static void AnchorMechanics()
     AddSC_gauntlet_mechanic_Faint();
     AddSC_gauntlet_mechanic_AnkhPact();
     AddSC_gauntlet_mechanic_StoneOfTheDamned();
-    AddSC_gauntlet_mechanic_IronPurse();
     AddSC_gauntlet_mechanic_SelfFound();
     AddSC_gauntlet_mechanic_LoneWolf();
 

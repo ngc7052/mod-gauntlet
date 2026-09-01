@@ -410,6 +410,73 @@ namespace Rules
     constexpr int32  GRAVEDIGGER_EVERY   = 8;
     constexpr uint32 GRAVEDIGGER_ROLLS   = 2;
     constexpr uint32 GRAVEDIGGER_LIFE_MS = 120000;
+
+    // ------------------------------------------------------------------
+    // The greed redesign's brakes (docs/greed-redesign.md section 3). Each of
+    // these cards already made the run slower and then charged for the
+    // slowness; the redesign leaves the curse alone and gives the player
+    // something to win by beating it.
+    // ------------------------------------------------------------------
+
+    // Craven (7): a runner cut down before it reaches its camp is a bounty.
+    // The chase was always the brake; now it is a race worth running.
+    constexpr uint32 CRAVEN_BOUNTY_XP_MULT = 2;
+    constexpr uint32 CRAVEN_BOUNTY_ROLLS   = 2;
+
+    constexpr uint32 CravenBountyXP(uint32 amount)
+    {
+        uint64 const paid = uint64(amount) * CRAVEN_BOUNTY_XP_MULT;
+        return paid > 0xFFFFFFFFull ? 0xFFFFFFFFu : uint32(paid);
+    }
+
+    // Grudge (10): the spirit rises four seconds after the kill instead of at
+    // once, and looting the corpse first stops it forming and pays a roll.
+    // The drain rises with the window -- the card is no longer punishing a
+    // player for playing quickly, so it can afford to hurt the one who stands
+    // still.
+    constexpr uint32 GRUDGE_RISE_MS   = 4000;
+    constexpr uint32 GRUDGE_DRAIN_PCT = 5;
+    constexpr uint32 GRUDGE_LOOT_ROLLS = 2;
+
+    // Falter (17): the stumble ends and the next thing you do is a Reprisal.
+    constexpr uint32 FALTER_REPRISAL_PCT   = 50;
+    constexpr uint32 FALTER_REPRISAL_MS    = 5000;
+
+    constexpr float FalterReprisalMult()
+    {
+        return 1.0f + float(FALTER_REPRISAL_PCT) / 100.0f;
+    }
+
+    // Cunning (12): a cast that completes with a kicker in melee range is the
+    // high roll. The puzzle is unchanged; this is the reason to stop solving
+    // it and commit.
+    constexpr uint32 CUNNING_PAYOFF_PCT = 40;
+
+    constexpr float CunningPayoffMult()
+    {
+        return 1.0f + float(CUNNING_PAYOFF_PCT) / 100.0f;
+    }
+
+    // Ambush (5): killing the Ambusher finishes the rest it interrupted.
+    constexpr uint32 AMBUSH_RESTORE_PCT = 100;
+
+    // Call to Arms (8): the kin that answer are worth more than the kill that
+    // called them.
+    constexpr uint32 CALL_TO_ARMS_XP_PCT = 25;
+
+    constexpr uint32 CallToArmsXP(uint32 amount)
+    {
+        return amount + uint32(uint64(amount) * CALL_TO_ARMS_XP_PCT / 100u);
+    }
+
+    // Blood Magic (20): below the line the cost stops and the payoff starts.
+    constexpr uint32 BLOOD_MAGIC_LINE_PCT   = 35;
+    constexpr uint32 BLOOD_MAGIC_PAYOFF_PCT = 25;
+
+    constexpr float BloodMagicPayoffMult()
+    {
+        return 1.0f + float(BLOOD_MAGIC_PAYOFF_PCT) / 100.0f;
+    }
 }
 }
 

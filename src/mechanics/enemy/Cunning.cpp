@@ -7,6 +7,7 @@
 
 #include "GauntletAddon.h"
 #include "GauntletRegistry.h"
+#include "GauntletRules.h"
 #include "GauntletSummons.h"
 #include "../Boons.h"
 #include "../Nearby.h"
@@ -87,6 +88,48 @@ namespace Gauntlet
             void OnLeaveCombat(Ctx&) override { _kickers.clear(); }
             void OnTick(Ctx& ctx, uint32 diffMs) override;
 
+            // The cast that lands. docs/greed-redesign.md section 3: a card
+            // that only interrupts is a brake with a special hatred for
+            // casters, and the whole puzzle -- fake-cast, root, cast at range
+            // -- stays. What is added is the reason to stop solving it: once a
+            // kicker has spent its kick, the next cast in its face is the high
+            // roll.
+            //
+            // OnSpellCast fires as the cast completes (Spell.cpp:3776), so a
+            // cast that was interrupted never reaches here and never pays.
+            void OnSpellCast(Ctx& ctx, Spell* spell) override
+            {
+                _payoffSpellId = 0;
+
+                Player* player = ctx.player;
+                if (!player || !spell || !spell->GetSpellInfo())
+                    return;
+
+                for (Kicker const& kicker : _kickers)
+                {
+                    Creature* c = ObjectAccessor::GetCreature(*player, kicker.guid);
+                    if (!c || !c->IsAlive())
+                        continue;
+                    if (player->GetDistance(c) > MELEE_YARDS)
+                        continue;
+
+                    _payoffSpellId = spell->GetSpellInfo()->Id;
+                    return;
+                }
+            }
+
+            float DamageDoneMult(Ctx& /*ctx*/, Unit* /*victim*/, SpellInfo const* info) override
+            {
+                if (_payoffSpellId == 0 || !info || info->Id != _payoffSpellId)
+                    return 1.0f;
+
+                // Spent on the first thing it pays for: a spell that hits five
+                // targets is one cast, and one cast is one reward.
+                _payoffSpellId = 0;
+                ++_paid;
+                return Rules::CunningPayoffMult();
+            }
+
             // BonusDamage. The curse takes casts away; the boon makes the ones
             // that land worth more, which is the trade the card describes when
             // it tells a caster to use fewer, bigger casts.
@@ -96,6 +139,15 @@ namespace Gauntlet
             }
 
             std::string Describe(AffixInstance const& self) const override;
+
+            std::string Diagnose(Ctx&) const override
+            {
+                std::string out = "cunning: " + std::to_string(_kickers.size()) + " kicker(s) tracked, "
+                                + std::to_string(_paid) + " cast(s) paid";
+                out += _payoffSpellId != 0 ? "; a cast is marked and waiting to land"
+                                           : "; nothing marked";
+                return out;
+            }
 
         private:
             // One attacker's personal cooldown, counted down here rather than
@@ -111,6 +163,8 @@ namespace Gauntlet
             void    Kick(Ctx& ctx, Player* player, Creature* kicker, Spell* spell);
 
             std::vector<Kicker> _kickers;
+            uint32              _payoffSpellId = 0;
+            uint32              _paid          = 0;
         };
 
         Cunning::Kicker* Cunning::Find(ObjectGuid const& guid)

@@ -7,6 +7,7 @@
 
 #include "GauntletAddon.h"
 #include "GauntletRegistry.h"
+#include "GauntletRules.h"
 #include "../Boons.h"
 
 #include "Chat.h"
@@ -87,6 +88,17 @@ namespace Gauntlet
 
             void OnSpellCast(Ctx& ctx, Spell* spell) override;
 
+            // Berserker's Bargain's shape, for the classes that pay in mana
+            // (docs/greed-redesign.md section 3). Above the line the card is
+            // unchanged; the line is where it starts to pay.
+            float DamageDoneMult(Ctx& ctx, Unit* /*victim*/, SpellInfo const*) override
+            {
+                Player* player = ctx.player;
+                if (!player || player->GetHealthPct() >= float(Rules::BLOOD_MAGIC_LINE_PCT))
+                    return 1.0f;
+                return Rules::BloodMagicPayoffMult();
+            }
+
             // Boon::BonusDamage, and the card asks for it by name: "pair with a
             // spell-power boon in every offer". A caster paying health per cast
             // needs each cast to be worth more, or the affix is only ever an
@@ -100,12 +112,14 @@ namespace Gauntlet
 
             std::string Diagnose(Ctx& /*ctx*/) const override
             {
+                std::string const extra = "; " + std::to_string(_freeCasts) + " free cast(s) below the line";
                 return "blood magic: " + std::to_string(PCT_OF_MAX)
                      + "% of max per cast, " + std::to_string(_paid) + " cast(s) paid this session, "
-                     + std::to_string(_spared) + " spared at low health";
+                     + std::to_string(_spared) + " spared at low health" + extra;
             }
 
         private:
+            uint32 _freeCasts = 0;
             void Publish(Ctx& ctx);
 
             uint32 _paid   = 0;
@@ -122,6 +136,16 @@ namespace Gauntlet
                 return;
             if (!player->IsAlive())
                 return;
+
+            // Below the line the blood price stops. This is the half of the
+            // sharpening that makes the other half safe to want: a card that
+            // paid more for casting hurt while still charging health for it
+            // would be asking the player to kill themselves faster.
+            if (player->GetHealthPct() < float(Rules::BLOOD_MAGIC_LINE_PCT))
+            {
+                ++_freeCasts;
+                return;
+            }
 
             uint32 const pct  = PCT_OF_MAX;
             uint32 const want = uint32(uint64(player->GetMaxHealth()) * pct / 100u);

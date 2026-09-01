@@ -7,10 +7,12 @@
 
 #include "GauntletAddon.h"
 #include "GauntletRegistry.h"
+#include "GauntletRules.h"
 #include "GauntletScheduler.h"
 #include "../Boons.h"
 
 #include "Chat.h"
+#include "GameTime.h"
 #include "Player.h"
 #include "SharedDefines.h"
 #include "SpellAuras.h"
@@ -152,6 +154,29 @@ namespace Gauntlet
             void OnWarn(Ctx& ctx, uint32 eventId) override;
             void OnEvent(Ctx& ctx, uint32 eventId) override;
 
+            // The Reprisal. docs/greed-redesign.md section 3: a scheduled three
+            // seconds of not playing is the purest brake in the table, and the
+            // planning it asks for pays nothing. It pays now -- the stumble is
+            // when you reposition and line up the big one, and the first thing
+            // that lands afterwards hits half again as hard.
+            float DamageDoneMult(Ctx& /*ctx*/, Unit* /*victim*/, SpellInfo const*) override
+            {
+                return ReprisalOpen() ? Rules::FalterReprisalMult() : 1.0f;
+            }
+
+            // Closed by the first blow that actually lands rather than by the
+            // multiplier being read: DamageDoneMult is asked speculatively in
+            // places a hit never follows, and a window spent on one of those
+            // would be a window the player never got.
+            void OnCreatureDamaged(Ctx& /*ctx*/, Creature* /*victim*/, uint32 damage) override
+            {
+                if (damage != 0 && ReprisalOpen())
+                {
+                    _reprisalUntilMs = 0;
+                    ++_reprisalsSpent;
+                }
+            }
+
             // BonusMaxHealth. Two to four seconds with no hands is survived or
             // it is not, and a bigger pool is what survives it -- the one
             // resource that answers a window in which the player cannot act.
@@ -162,6 +187,16 @@ namespace Gauntlet
 
             std::string Describe(AffixInstance const& self) const override;
 
+            bool ReprisalOpen() const;
+
+            std::string Diagnose(Ctx&) const override
+            {
+                std::string out = "falter: " + std::to_string(_stumbles) + " stumble(s), "
+                                + std::to_string(_reprisalsSpent) + " reprisal(s) spent";
+                out += ReprisalOpen() ? "; the window is open now" : "; no window open";
+                return out;
+            }
+
         private:
             void Sync(Ctx& ctx);
             void Arm(Ctx& ctx);
@@ -169,6 +204,10 @@ namespace Gauntlet
             void Land(Ctx& ctx, Player* player);
 
             uint32 _eventId = 0;
+            uint32 _reprisalFromMs  = 0;
+            uint32 _reprisalUntilMs = 0;
+            uint32 _stumbles        = 0;
+            uint32 _reprisalsSpent  = 0;
             bool   _armed   = false;
         };
 
@@ -262,6 +301,18 @@ namespace Gauntlet
                 Disarm(ctx);
         }
 
+        // Open from the moment the stumble ends until the window closes or
+        // something lands. Read against the clock rather than ticked, so a
+        // scheduler that runs late cannot hand out a longer window than the
+        // card promises.
+        bool Falter::ReprisalOpen() const
+        {
+            if (_reprisalUntilMs == 0)
+                return false;
+            uint32 const now = static_cast<uint32>(GameTime::GetGameTimeMS().count());
+            return now >= _reprisalFromMs && now < _reprisalUntilMs;
+        }
+
         void Falter::Land(Ctx& ctx, Player* player)
         {
             bool const   silence = Silenced(player);
@@ -286,6 +337,12 @@ namespace Gauntlet
             // (SpellAuras.h:134).
             aura->SetMaxDuration(static_cast<int32>(ms));
             aura->SetDuration(static_cast<int32>(ms));
+
+            // The window opens when the hands come back, not now.
+            uint32 const now = static_cast<uint32>(GameTime::GetGameTimeMS().count());
+            _reprisalFromMs  = now + ms;
+            _reprisalUntilMs = _reprisalFromMs + Rules::FALTER_REPRISAL_MS;
+            ++_stumbles;
 
             // It can end a run by taking the heal that would have saved it, so
             // it claims the death the moment it acts. Mgr::Tick has already

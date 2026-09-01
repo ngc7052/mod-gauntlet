@@ -7,6 +7,7 @@
 
 #include "GauntletAddon.h"
 #include "GauntletRegistry.h"
+#include "GauntletRules.h"
 #include "GauntletSummons.h"
 #include "../Boons.h"
 #include "../Nearby.h"
@@ -17,6 +18,8 @@
 #include "Player.h"
 #include "Unit.h"
 
+#include <algorithm>
+#include <vector>
 #include <string>
 #include <iterator>
 
@@ -65,6 +68,25 @@ namespace Gauntlet
             void OnKill(Ctx& ctx, Creature* killed) override { Alert(ctx, killed); }
             void OnPetKill(Ctx& ctx, Creature* killed) override { Alert(ctx, killed); }
 
+            // docs/greed-redesign.md section 3's sharpening: fighting next to
+            // the camp becomes the lean-in instead of the mistake. This file is
+            // what sends the kin, so it is the only thing that knows which
+            // creatures arrived because of the card -- and the XP hook carries
+            // the victim, so no guessing.
+            void OnXP(Ctx& /*ctx*/, uint32& amount, Unit* victim) override
+            {
+                if (!victim)
+                    return;
+
+                auto const it = std::find(_answered.begin(), _answered.end(), victim->GetGUID());
+                if (it == _answered.end())
+                    return;
+
+                _answered.erase(it);
+                amount = Rules::CallToArmsXP(amount);
+                ++_paid;
+            }
+
             // BonusExperience. The curse manufactures extra fights out of a
             // camp the player was going to clear anyway, and the boon is what
             // those fights are worth -- which is the one thing design section 5
@@ -77,7 +99,31 @@ namespace Gauntlet
             std::string Describe(AffixInstance const& self) const override;
 
         private:
+            std::string Diagnose(Ctx&) const override
+            {
+                std::string out = "call to arms: " + std::to_string(_answered.size())
+                                + " kin still owed the bonus, " + std::to_string(_paid) + " paid";
+                if (_answered.empty() && _paid == 0)
+                    out += "; nothing has answered a call since this was attached";
+                return out;
+            }
+
+        private:
             void Alert(Ctx& ctx, Creature* killed);
+
+            // The kin this card pulled, waiting to be worth more than they
+            // would have been. Capped: a camp is a handful and nothing else
+            // prunes this.
+            void Answered(ObjectGuid const& guid)
+            {
+                constexpr std::size_t MAX_ANSWERED = 16;
+                if (_answered.size() >= MAX_ANSWERED)
+                    _answered.erase(_answered.begin());
+                _answered.push_back(guid);
+            }
+
+            std::vector<ObjectGuid> _answered;
+            uint32                  _paid = 0;
         };
 
         void CallToArms::Alert(Ctx& ctx, Creature* killed)
@@ -118,6 +164,8 @@ namespace Gauntlet
             for (uint32 n = 0; n < wanted; ++n)
             {
                 Creature* kin = NearestIdleKin(player, killed, killed, range, previous);
+                if (kin)
+                    Answered(kin->GetGUID());
                 if (!kin)
                     break;
 

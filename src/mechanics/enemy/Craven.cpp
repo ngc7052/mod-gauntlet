@@ -7,6 +7,7 @@
 
 #include "GauntletAddon.h"
 #include "GauntletRegistry.h"
+#include "GauntletRules.h"
 #include "GauntletSummons.h"
 #include "../Boons.h"
 #include "../Nearby.h"
@@ -79,8 +80,47 @@ namespace Gauntlet
         class Craven final : public IMechanic
         {
         public:
-            void OnDetach(Ctx&) override { _runners.clear(); }
+            void OnDetach(Ctx&) override { _runners.clear(); _bounty.clear(); }
+
+            // The runners go when the fight does; the bounties do not. A
+            // corpse is looted after the fight far more often than during it,
+            // and the reward for winning the chase must not expire because the
+            // player won it.
             void OnLeaveCombat(Ctx&) override { _runners.clear(); }
+
+            void OnKill(Ctx& ctx, Creature* killed) override { Claim(ctx, killed); }
+            void OnPetKill(Ctx& ctx, Creature* killed) override { Claim(ctx, killed); }
+
+            // The bounty's first half. The hook carries the victim, so no
+            // guesswork about which kill this experience is for.
+            void OnXP(Ctx& /*ctx*/, uint32& amount, Unit* victim) override
+            {
+                if (!victim || !IsStillRunning(victim->GetGUID()))
+                    return;
+
+                amount = Rules::CravenBountyXP(amount);
+                ++_paidXp;
+            }
+
+            // And its second. The doc proposed flagging the corpse here so
+            // OnItemRoll could double the chance, and that cannot work: the
+            // item roll happens inside FillLoot, which the core has already
+            // finished by the time this hook is called
+            // (OnPlayerBeforeSendLoot). Rolling the creature's own table a
+            // second time is what "rolls its loot twice" means anyway, and it
+            // is the seam Fresh Kill and three other cards already use.
+            void OnLoot(Ctx& ctx, ObjectGuid const& lootGuid, Loot* loot) override;
+
+            std::string Diagnose(Ctx&) const override
+            {
+                std::string out = "craven: " + std::to_string(_runners.size()) + " runner(s) tracked, "
+                                + std::to_string(_paidXp) + " bounty XP paid, "
+                                + std::to_string(_paidLoot) + " corpse(s) rolled twice, "
+                                + std::to_string(_bounty.size()) + " bounty corpse(s) unopened";
+                if (_runners.empty() && _bounty.empty())
+                    out += "; nothing has fled since this was attached";
+                return out;
+            }
             void OnCreatureDamaged(Ctx& ctx, Creature* victim, uint32 damage) override;
             void OnTick(Ctx& ctx, uint32 diffMs) override;
 
@@ -111,8 +151,23 @@ namespace Gauntlet
             Runner* Find(ObjectGuid const& guid);
             void    Flee(Ctx& ctx, Creature* victim);
             void    Fetch(Ctx& ctx, Runner& runner);
+            void    Claim(Ctx& ctx, Creature* killed);
 
-            std::vector<Runner> _runners;
+            // A runner that is still running: tracked, and has not yet reached
+            // its camp. Once it has fetched, the chase is lost and there is no
+            // bounty to pay.
+            bool IsStillRunning(ObjectGuid const& guid) const
+            {
+                for (Runner const& r : _runners)
+                    if (r.guid == guid)
+                        return !r.fetched;
+                return false;
+            }
+
+            std::vector<Runner>     _runners;
+            std::vector<ObjectGuid> _bounty;
+            uint32                  _paidXp   = 0;
+            uint32                  _paidLoot = 0;
         };
 
         Craven::Runner* Craven::Find(ObjectGuid const& guid)
@@ -293,6 +348,47 @@ namespace Gauntlet
             return out;
         }
     }
+
+        // A runner cut down before it reached its camp. The guid is kept so the
+        // corpse can pay when it is opened, which is usually after the fight.
+        void Craven::Claim(Ctx& /*ctx*/, Creature* killed)
+        {
+            if (!killed || !IsStillRunning(killed->GetGUID()))
+                return;
+
+            constexpr std::size_t MAX_BOUNTY = 8;
+            if (_bounty.size() >= MAX_BOUNTY)
+                _bounty.erase(_bounty.begin());
+
+            _bounty.push_back(killed->GetGUID());
+        }
+
+        void Craven::OnLoot(Ctx& ctx, ObjectGuid const& lootGuid, Loot* loot)
+        {
+            Player* player = ctx.player;
+            if (!loot || !player)
+                return;
+
+            auto const it = std::find(_bounty.begin(), _bounty.end(), lootGuid);
+            if (it == _bounty.end())
+                return;
+
+            _bounty.erase(it);
+
+            Creature* corpse = ObjectAccessor::GetCreature(*player, lootGuid);
+            uint32 const lootId = corpse ? corpse->GetCreatureTemplate()->lootid : 0;
+            if (lootId == 0)
+                return;
+
+            for (uint32 roll = 1; roll < Rules::CRAVEN_BOUNTY_ROLLS; ++roll)
+                loot->FillLoot(lootId, LootTemplates_Creature, player, true, true);
+
+            ++_paidLoot;
+
+            if (player->GetSession())
+                ChatHandler(player->GetSession()).PSendSysMessage(
+                    "|cffff2020[Gauntlet]|r It did not make it home. Its pockets are yours twice over.");
+        }
 
     GAUNTLET_MECHANIC(7, Craven);
 }

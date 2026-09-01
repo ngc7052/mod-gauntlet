@@ -7,6 +7,7 @@
 
 #include "GauntletAddon.h"
 #include "GauntletRegistry.h"
+#include "GauntletRules.h"
 #include "GauntletScheduler.h"
 #include "GauntletSummons.h"
 #include "../Boons.h"
@@ -122,6 +123,51 @@ namespace Gauntlet
 
         class Ambush final : public IMechanic
         {
+        public:
+            // docs/greed-redesign.md section 3. The old card's only answer was
+            // "stand up and walk three steps", which interrupts the one slow
+            // activity the game has and pays nothing. Now the rest has a second
+            // answer: fight for it. A fight that replaces a thirty-second drink
+            // is the run getting faster, and sitting through the footsteps on
+            // purpose is the lean-in.
+            void OnKill(Ctx& ctx, Creature* killed) override { Finish(ctx, killed); }
+            void OnPetKill(Ctx& ctx, Creature* killed) override { Finish(ctx, killed); }
+
+        private:
+            void Finish(Ctx& ctx, Creature* killed)
+            {
+                Player* player = ctx.player;
+                if (!player || !killed || !player->IsInWorld() || !player->IsAlive())
+                    return;
+                if (killed->GetGUID() != _ambusherGuid)
+                    return;
+
+                _ambusherGuid = ObjectGuid::Empty;
+                ++_finished;
+
+                // The rest it interrupted, finished. Both bars, because the
+                // thing it interrupted would have filled both.
+                player->SetHealth(player->GetMaxHealth());
+                if (player->getPowerType() == POWER_MANA)
+                    player->SetPower(POWER_MANA, player->GetMaxPower(POWER_MANA));
+
+                if (player->GetSession())
+                    ChatHandler(player->GetSession()).PSendSysMessage(
+                        "|cffff2020[Gauntlet]|r You take your rest from its body. That is one way to do it.");
+            }
+
+        public:
+            std::string Diagnose(Ctx&) const override
+            {
+                std::string out = "ambush: " + std::to_string(_finished) + " rest(s) taken from a body";
+                out += _ambusherGuid ? "; one is up now" : "; nothing of this card's is standing";
+                return out;
+            }
+
+        private:
+            ObjectGuid _ambusherGuid;
+            uint32     _finished = 0;
+
         public:
             void OnAttach(Ctx& ctx) override { Reset(ctx); }
             void OnDetach(Ctx& ctx) override;
@@ -266,6 +312,10 @@ namespace Gauntlet
 
             Creature* ambusher = sGauntletSummons->Summon(player, ENTRY_AMBUSHER, at, LIFETIME_MS,
                                                           /*countsAsStalker*/ true, MECHANIC_AMBUSH);
+
+            // Remembered so the kill can be recognised as *this* card's.
+            if (ambusher)
+                _ambusherGuid = ambusher->GetGUID();
 
             // The rest clock restarts either way. If the caps refused, the
             // player still stood still for their twenty seconds and the affix

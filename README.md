@@ -2,7 +2,7 @@
 
 A hardcore roguelike challenge module for [AzerothCore](https://www.azerothcore.org/).
 
-One life. A new affix every level — drawn from a registry of **109 mechanics
+One life. A new affix every level — drawn from a registry of **107 mechanics
 across seven families**, never a fixed list. Two runs are never the same.
 
 An affix is not a stat penalty rolled off a table. It is a **mechanic**: a
@@ -11,7 +11,7 @@ it, rather than a multiplier bolted onto your character sheet. A shade that
 hunts you between fights. A strike that lands where you were standing. A
 paladin whose Consecration burns twice as hot for half as long.
 
-> **Status.** **All 109 mechanics are live and offerable.** No registry row is
+> **Status.** **All 107 mechanics are live and offerable.** No registry row is
 > flagged `MF_NotImplemented`, and the `OFFERABLE` list in
 > `tests/RegistryTest.cpp` is what enforces that. Phases 0–4 are complete and
 > reported in `docs/`; Phase 5 is the pacing pass — config, tuning and
@@ -171,11 +171,11 @@ common for the trades after id 74.
 | 4 | **Reinforcements** | Spawn | Rare | any | 25&ndash;80 | Fights longer than 30 seconds draw another enemy every 15 seconds. | +8% damage dealt |
 | 5 | **Ambush** | Spawn | Rare | any | 4&ndash;45 | Resting in the wild attracts an ambush. | +5% maximum health |
 | 6 | **Champions** | Enemy | Rare | any | 1&ndash;80 | Every 8th fight you start opens against a Champion: twice the health, harder hits, double the reward. | +15% experience |
-| 7 | **Craven** | Enemy | Rare | any | 12&ndash;60 | Enemies flee at 25% health, and come back with friends. | +8% damage dealt |
-| 8 | **Call to Arms** | Enemy | Rare | any | 25&ndash;65 | Killing an enemy alerts its nearest kin. | +15% experience |
+| 7 | **Craven** | Enemy | Rare | any | 12&ndash;60 | Enemies flee at 25% health. Cut one down before it reaches its camp and it pays double. | +8% damage dealt |
+| 8 | **Call to Arms** | Enemy | Rare | any | 25&ndash;65 | Killing an enemy alerts its nearest kin. The kin that answer are worth more. | +15% experience |
 | 9 | **Death Rattle** | Enemy | Rare | melee | 20&ndash;60 | Corpses burst two seconds after death, hurting anyone within five yards. | +8% damage dealt |
-| 10 | **Grudge** | Enemy | Rare | melee | 8&ndash;50 | Everything you kill leaves a ghost on its corpse that drains your health while you stand near it. | +10% healing received |
-| 11 | **Nimble** | Enemy | Rare | any | 30&ndash;80 | Enemies move 30% faster. | +5% maximum health |
+| 10 | **Grudge** | Enemy | Rare | melee | 8&ndash;50 | A spirit rises on each corpse four seconds after the kill. Loot it first and nothing rises. | +5% move speed |
+| 11 | **Nimble** | Enemy | Rare | any | 30&ndash;80 | Enemies move 30% faster. | +5% move speed |
 | 12 | **Cunning** | Enemy | Rare | Paladin, Hunter, Priest, Shaman, Mage, Warlock, Druid | 30&ndash;80 | Enemies in melee range kick the spell you are casting, once every 12 seconds each. | +8% damage dealt |
 | 13 | **Keen-nosed** | Enemy | Rare | any | 4&ndash;55 | Enemies notice you from further away. | +5% move speed |
 | 14 | **Falling Sky** | Tempo | Rare | any | 25&ndash;80 | Stand still in combat and the sky marks the ground under you. Keep moving. | +5% move speed |
@@ -184,10 +184,9 @@ common for the trades after id 74.
 | 17 | **Falter** | Tempo | Rare | any | 25&ndash;65 | Every 45 seconds in combat your hands fail you for three seconds. | +5% maximum health |
 | 18 | **Hubris** | Tempo | Rare | any | 1&ndash;50 | The first enemy in a fight is your duel: it hurts you less, everything else more. | +8% damage dealt |
 | 19 | **Deep Wounds** | Attrition | Epic | any | 10&ndash;60 | A third of the damage you take becomes a wound. Only a kill closes one. | +8% damage dealt |
-| 20 | **Blood Magic** | Attrition | Rare | Paladin, Hunter, Priest, Shaman, Mage, Warlock, Druid | 25&ndash;60 | Spells cost 3% of your maximum health in addition to mana. | +8% damage dealt |
+| 20 | **Blood Magic** | Attrition | Rare | Paladin, Hunter, Priest, Shaman, Mage, Warlock, Druid | 25&ndash;60 | Spells cost 3% of your maximum health. Below a third, they cost nothing and hit harder. | +8% damage dealt |
 | 23 | **Self-found** | Rules | Epic | any | 1&ndash;60 | You cannot trade, mail, or use the auction house. | +8% damage dealt |
 | 24 | **Lone Wolf** | Rules | Rare | any | 1&ndash;30 | Half health in a group; more experience alone. | +15% experience |
-| 25 | **Iron Purse** | Rules | Rare | any | 1&ndash;15 | Repairs cost double. | &mdash; |
 | 26 | **Last Rites** | Bargain | Legendary | any | 40&ndash;80 | A hit that would kill you leaves you at 1 health instead, once per level. | a second life |
 | 27 | **Cursed Hoard** | Bargain | Epic | any | 30&ndash;80 | Chests give twice as much loot, but opening one makes you take triple damage until you kill three enemies. | +8% damage dealt |
 | 28 | **Red Mist** | Class | Rare | Warrior | 15&ndash;80 | At 100 rage you lose your mind for three seconds and your rage empties. | +15% resource regeneration |
@@ -196,7 +195,6 @@ common for the trades after id 74.
 | 31 | **Deafening Roar** | Class | Rare | Warrior | 20&ndash;80 | Your shouts wake every enemy within thirty yards. | a bespoke buff to the ability it names |
 | 32 | **Long Forbearance** | Class | Rare | Paladin | 15&ndash;80 | Forbearance lasts three minutes, and Divine Shield empties your mana. | +10% a bespoke buff to the ability it names |
 | 33 | **Consecrated Ground** | Class | Epic | Paladin | 25&ndash;80 | You take 25% more damage while not standing in your own Consecration. | a bespoke buff to the ability it names |
-| 34 | **No Sanctuary** | Class | Rare | Paladin | 15&ndash;60 | Your Hearthstone will not answer under Divine Shield. | a shorter cooldown on the ability it names |
 | 35 | **Commitment** | Class | Rare | Paladin | 20&ndash;80 | Hammer of Justice roots you for its duration. | a shorter cooldown on the ability it names |
 | 36 | **Half-Tamed** | Class | Rare | Hunter | 15&ndash;80 | An unhappy pet turns on you. | your pet's damage |
 | 37 | **Dead Weight** | Class | Rare | Hunter | 20&ndash;80 | Feign Death has a three-minute cooldown. | a shorter cooldown on the ability it names |

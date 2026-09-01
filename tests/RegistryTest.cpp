@@ -33,7 +33,7 @@ namespace
     // reused, so the holes stay. Killing Floor (74) took Unspent's place in the
     // table and not its number, and 75-84 are the first ten commons of
     // docs/rarity-plan.md step 2.
-    constexpr size_t TABLE_SIZE = 109;
+    constexpr size_t TABLE_SIZE = 107;
     // A tier is a level now, not five of them. Every registry window was
     // multiplied by five with the axis, so the *level* each affix unlocks at
     // is exactly what it was; only the number naming it changed.
@@ -47,7 +47,7 @@ namespace
     // 69 is Unspent, and it is the first retirement that was not a scalar: the
     // affix worked exactly as written and the design was wrong. See
     // docs/unspent-replacement-plan.md.
-    constexpr std::array<uint16, 5> DELETED = { 21, 22, 69, 72, 73 };
+    constexpr std::array<uint16, 7> DELETED = { 21, 22, 25, 34, 69, 72, 73 };
 
     // The mechanics the generator may offer: Phase 1's vertical slice -- The
     // Shade (1), Champions (6), Falling Sky (14) and Deep Wounds (19) --
@@ -59,12 +59,12 @@ namespace
     // rather than as a count: a row that gains the flag by accident, or loses
     // it before its dispatch is wired, is an affix offered to a live hardcore
     // character that silently does nothing.
-    constexpr std::array<uint16, 109> OFFERABLE = {
+    constexpr std::array<uint16, 107> OFFERABLE = {
         1, 2, 3, 4, 5,           // S1 Shade, S2 Echo, S3 Carrion, S4 Reinforcements, S5 Ambush
         6, 7, 8, 9, 10, 11, 12, 13,  // E1 Champions .. E8 Keen-nosed
         14, 15, 16, 17, 18,      // T1 Falling Sky .. T5 Hubris
         19, 20, 74,              // A1 Deep Wounds, A2 Blood Magic, A5 Killing Floor
-        23, 24, 25,              // R1 Self-found, R2 Lone Wolf, R3 Iron Purse
+        23, 24,              // R1 Self-found, R2 Lone Wolf (R3 Iron Purse retired)
         26, 27,                  // B1 Last Rites, B2 Cursed Hoard
         28, 29, 31,              // C1 Red Mist, C2 Berserker's Bargain, C4 Deafening Roar
         32, 33,                  // C5 Long Forbearance, C6 Consecrated Ground
@@ -80,7 +80,7 @@ namespace
         70, 71,                  // C43 Ankh Pact, C44 Stone of the Damned
 
         // Wave B.
-        30, 34, 35,              // C3 Iron Discipline, C7 No Sanctuary, C8 Commitment
+        30, 35,              // C3 Iron Discipline, C8 Commitment (C7 No Sanctuary retired)
         39, 41, 43,              // C12 Blood Bond, C14 Poisoned Blades, C16 Slow Hands
         45, 46,                  // C18 Faithless Form, C19 Penance of Silence
         50, 51,                  // C23 Cold Presence, C24 One Ward
@@ -128,9 +128,9 @@ namespace
         {  6, 13, Family::Enemy,     12 },
         { 14, 18, Family::Tempo,      8 },
         { 19, 22, Family::Attrition, 14 },   // 21 and 22 deleted; 19, 20, 74 and five trades remain
-        { 23, 25, Family::Rules,     24 },   // three rules, sixteen denials, two reward-shaped, two uncommons
+        { 23, 25, Family::Rules,     23 },   // two rules (Iron Purse retired), the denials, the reward-shaped, the uncommons
         { 26, 27, Family::Bargain,    2 },
-        { 28, 71, Family::Class,     43 },   // 69 deleted with Unspent
+        { 28, 71, Family::Class,     42 },   // 69 deleted with Unspent, 34 retired with No Sanctuary
         // A5 Killing Floor, outside its family's original band because 21 and
         // 22 are spent and the next free id was 74. The band describes how the
         // table was first laid out; the no-reuse rule outranks it.
@@ -138,28 +138,28 @@ namespace
         // The trades, appended in id order as every row after 74 is: the
         // denials are Rules, the coefficient trades Attrition. The loot trades
         // (85-87) interleave the two, which is why the bands split again.
-        { 75, 81, Family::Rules,     24 },
+        { 75, 81, Family::Rules,     23 },
         { 82, 84, Family::Attrition, 14 },
-        { 85, 85, Family::Rules,     24 },
+        { 85, 85, Family::Rules,     23 },
         { 86, 87, Family::Attrition, 14 },
         // docs/commons.md's three reward-shaped rows: the first two Rules
         // cards since the denials, and the Enemy family's first non-rare.
         { 88, 88, Family::Enemy,     12 },
-        { 89, 90, Family::Rules,     24 },
+        { 89, 90, Family::Rules,     23 },
         // The nine uncommons, interleaving four families in id order.
         { 91, 91, Family::Attrition, 14 },
         { 92, 94, Family::Tempo,      8 },
-        { 95, 96, Family::Rules,     24 },
+        { 95, 96, Family::Rules,     23 },
         { 97, 98, Family::Attrition, 14 },
         { 99, 99, Family::Enemy,     12 },
         // The ten commons: eight denials filed Rules (four of them
         // class-masked, as Axeless is), and the last two coefficient kinds.
-        { 100, 107, Family::Rules,     24 },
+        { 100, 107, Family::Rules,     23 },
         { 108, 108, Family::Enemy,     12 },
         { 109, 109, Family::Attrition, 14 },
         // The first loot cards: Fresh Kill is Rules, Blood Price Attrition,
         // Trophy Hunter Enemy.
-        { 110, 110, Family::Rules,     24 },
+        { 110, 110, Family::Rules,     23 },
         { 111, 111, Family::Attrition, 14 },
         { 112, 112, Family::Enemy,     12 },
         { 113, 113, Family::Attrition, 14 },
@@ -417,7 +417,7 @@ TEST(Registry, FamiliesAreInRangeAndMatchTheIdRanges)
     // never a class curse in anything but its filing -- it had no class mask.
     // Spelled out because the addon's family filter and the offer builder's
     // family weights both assume the class family is the large one.
-    EXPECT_EQ(counted[static_cast<size_t>(Family::Class)], 43u);
+    EXPECT_EQ(counted[static_cast<size_t>(Family::Class)], 42u);
 }
 
 TEST(Registry, OnlyTheImplementedMechanicsMayBeOffered)

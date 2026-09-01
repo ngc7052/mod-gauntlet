@@ -321,89 +321,19 @@ namespace Gauntlet
 
         constexpr uint32 SPELL_HEARTHSTONE        = 8690;
         constexpr uint32 SPELL_HAND_OF_PROTECTION = 1022;
-
-        class NoSanctuary final : public IMechanic
-        {
-        public:
-            void OnSpellCast(Ctx& ctx, Spell* spell) override;
-
-            std::string Describe(AffixInstance const& self) const override
-            {
-
-                std::string out = "Your Hearthstone is refused while Divine Shield or Hand of"
-                                  " Protection is on you, and while Forbearance is up.";
-
-                if (self.boonMag != 0)
-                    out += " In exchange, Divine Shield comes back "
-                         + std::to_string(self.boonMag) + "% sooner.";
-
-                return out;
-            }
-
-            std::string Diagnose(Ctx&) const override
-            {
-                return "no sanctuary: " + std::to_string(_refused) + " hearth(s) refused";
-            }
-
-        private:
-            uint32 _refused = 0;
-        };
-
-        void NoSanctuary::OnSpellCast(Ctx& ctx, Spell* spell)
-        {
-            Player* player = ctx.player;
-            if (!player || !spell)
-                return;
-
-            SpellInfo const* info = spell->GetSpellInfo();
-            if (!info)
-                return;
-
-            // The boon: Divine Shield comes back sooner. The affix takes away
-            // what the bubble was being used for, so it gives back more of the
-            // bubble.
-            if (IsChainOf(info->Id, SPELL_DIVINE_SHIELD) && ctx.self && ctx.self->boonMag != 0)
-            {
-                uint32 const now = player->GetSpellCooldownDelay(info->Id);
-                if (now != 0)
-                    player->ModifySpellCooldown(info->Id,
-                                                -int32(uint64(now) * ctx.self->boonMag / 100u));
-            }
-
-            if (info->Id != SPELL_HEARTHSTONE)
-                return;
-
-
-            bool const shielded = player->HasAura(SPELL_DIVINE_SHIELD)
-                               || player->HasAura(SPELL_HAND_OF_PROTECTION)
-                               || player->HasAura(SPELL_FORBEARANCE);
-            if (!shielded)
-                return;
-
-            player->InterruptNonMeleeSpells(false, info->Id);
-            ++_refused;
-
-            if (player->GetSession())
-                ChatHandler(player->GetSession()).PSendSysMessage(
-                    "|cffff2020[Gauntlet]|r No sanctuary. Run, or fight.");
-        }
-
-        // ==================================================================
-        // C8 - Commitment (35)
+        // 34 -- No Sanctuary -- was retired on 2026-09-01.
         //
-        // "Hammer of Justice roots you for its duration."
-        //
-        // Stun-and-run becomes stun-and-finish. The button that used to buy an
-        // escape now buys free seconds of melee instead, and the card halves
-        // its cooldown to say so: this is not a punishment, it is a different
-        // use for the same button.
-        // ==================================================================
+        // docs/greed-redesign.md section 3: "No Sanctuary is retired
+        // outright: a card that never acts is indistinguishable from a broken
+        // one, and it has nothing to become." Its Hearthstone denial fired
+        // only while Divine Shield or Hand of Protection was up, which is a
+        // few seconds of a run, and the card spent the rest of it being
+        // invisible. The id is spent forever; nothing may fill the hole.
 
+        // Commitment's own constants, which sat between it and the retired No
+        // Sanctuary and came out with it the first time.
         constexpr uint16 MECHANIC_COMMITMENT = 35;
-
         constexpr uint32 SPELL_HAMMER_OF_JUSTICE = 853;
-
-        // The card's ladder, in seconds of root on the paladin.
         constexpr uint32 COMMIT_MS = 4000;
 
         class Commitment final : public IMechanic
@@ -477,7 +407,6 @@ namespace Gauntlet
         };
     }
 
-    GAUNTLET_MECHANIC(34, NoSanctuary);
     GAUNTLET_MECHANIC(35, Commitment);
     GAUNTLET_MECHANIC(32, LongForbearance);
     GAUNTLET_MECHANIC(33, ConsecratedGround);

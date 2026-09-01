@@ -7,6 +7,7 @@
 
 #include "GauntletAddon.h"
 #include "GauntletRegistry.h"
+#include "GauntletRules.h"
 #include "GauntletScheduler.h"
 #include "GauntletSummons.h"
 #include "../Boons.h"
@@ -46,7 +47,7 @@ namespace Gauntlet
         // The card's ladder: 2 -> 3 -> 5% of maximum health per second, and
         // 7% at rank IV. Walking away still stops it at every rank, so the
         // ladder prices standing on a corpse rather than removing the out.
-        constexpr uint32 DRAIN_PCT = 3;
+        constexpr uint32 DRAIN_PCT = Rules::GRUDGE_DRAIN_PCT;
 
         // The card's other numbers, which do not ladder: 25 s, 4 yd, and half
         // the healing while inside one.
@@ -83,8 +84,23 @@ namespace Gauntlet
         {
         public:
             void OnDetach(Ctx& ctx) override;
-            void OnKill(Ctx& ctx, Creature* killed) override { Raise(ctx, killed); }
-            void OnPetKill(Ctx& ctx, Creature* killed) override { Raise(ctx, killed); }
+            // Four seconds, not at once. The corpse is a race now: loot it
+            // before the spirit forms and it never does. docs/greed-redesign.md
+            // section 3 -- the spirit still punishes standing around, it just
+            // stopped punishing playing quickly.
+            void OnKill(Ctx& ctx, Creature* killed) override { Mark(ctx, killed); }
+            void OnPetKill(Ctx& ctx, Creature* killed) override { Mark(ctx, killed); }
+
+            void OnLoot(Ctx& ctx, ObjectGuid const& lootGuid, Loot* loot) override;
+
+            std::string Diagnose(Ctx&) const override
+            {
+                std::string out = "grudge: " + std::to_string(_pending.size()) + " corpse(s) counting down, "
+                                + std::to_string(_spirits.size()) + " spirit(s) standing, "
+                                + std::to_string(_beaten) + " beaten to the corpse";
+                out += _inSpirit ? "; standing in one now" : "; not in one";
+                return out;
+            }
             void OnTick(Ctx& ctx, uint32 diffMs) override;
 
             // The curse's own healing cut, and the boon, in one place. The card
@@ -112,7 +128,21 @@ namespace Gauntlet
                 uint32     instanceId = 0;
             };
 
-            void Raise(Ctx& ctx, Creature* killed);
+            void Mark(Ctx& ctx, Creature* killed);
+            void RaiseAt(Ctx& ctx, Position const& at);
+
+            // A corpse whose spirit has not formed yet. Kept small: it lives
+            // four seconds and a pull leaves a handful.
+            struct Pending
+            {
+                ObjectGuid guid;
+                Position   at;
+                uint32     lootId = 0;
+                uint32     leftMs = 0;
+            };
+
+            std::vector<Pending> _pending;
+            uint32               _beaten = 0;
             void Drain(Ctx& ctx, Player* player);
             void Publish(Ctx& ctx, bool inside);
 
@@ -133,20 +163,72 @@ namespace Gauntlet
             _inSpirit = false;
         }
 
-        void Grudge::Raise(Ctx& ctx, Creature* killed)
+        // The kill only starts a clock. Everything Raise refuses -- this
+        // module's own summons, anything that is not an ordinary foe -- is
+        // refused here too, so a corpse that could never have grown a spirit
+        // does not pretend it is about to.
+        void Grudge::Mark(Ctx& ctx, Creature* killed)
         {
             Player* player = ctx.player;
             if (!player || !killed || !player->IsInWorld() || !player->IsAlive())
                 return;
             if (ctx.run && (ctx.run->dead || OfferHoldsBack(*ctx.run)))
                 return;
-
-            // Nothing this module spawned leaves a spirit: a Shade killed on
-            // ground the player chose must not then deny them that ground.
             if (sGauntletSummons->IsGauntletSummon(killed))
                 return;
-
             if (!IsOrdinaryFoe(killed))
+                return;
+
+            constexpr std::size_t MAX_PENDING = 8;
+            if (_pending.size() >= MAX_PENDING)
+                _pending.erase(_pending.begin());
+
+            Pending p;
+            p.guid   = killed->GetGUID();
+            p.at     = killed->GetPosition();
+            p.lootId = killed->GetCreatureTemplate()->lootid;
+            p.leftMs = Rules::GRUDGE_RISE_MS;
+            _pending.push_back(p);
+
+            if (ctx.addon)
+                ctx.addon->SendEvent(ctx.player, MechanicKey(),
+                                     Rules::GRUDGE_RISE_MS / 1000u, MechanicName());
+        }
+
+        // Beat the clock and the corpse pays for it. The spirit never forms.
+        void Grudge::OnLoot(Ctx& ctx, ObjectGuid const& lootGuid, Loot* loot)
+        {
+            Player* player = ctx.player;
+            if (!loot || !player)
+                return;
+
+            auto const it = std::find_if(_pending.begin(), _pending.end(),
+                                         [&](Pending const& p) { return p.guid == lootGuid; });
+            if (it == _pending.end())
+                return;
+
+            uint32 const lootId = it->lootId;
+            _pending.erase(it);
+            ++_beaten;
+
+            if (lootId != 0)
+                for (uint32 roll = 1; roll < Rules::GRUDGE_LOOT_ROLLS; ++roll)
+                    loot->FillLoot(lootId, LootTemplates_Creature, player, true, true);
+
+            if (player->GetSession())
+                ChatHandler(player->GetSession()).PSendSysMessage(
+                    "|cffff2020[Gauntlet]|r You got there first. Nothing rises, and it gives up more.");
+        }
+
+        // The summon itself. Everything that decides *whether* a corpse earns
+        // a spirit now happens in Mark, four seconds earlier; what is left here
+        // is the part that has to happen at the moment it forms.
+        void Grudge::RaiseAt(Ctx& ctx, Position const& at)
+        {
+            Player* player = ctx.player;
+            if (!player || !player->IsInWorld() || !player->IsAlive())
+                return;
+            if (ctx.run && (ctx.run->dead || OfferHoldsBack(*ctx.run)))
                 return;
 
             // Prune what has already gone before asking for room, so a camp
@@ -163,8 +245,6 @@ namespace Gauntlet
             if (_spirits.size() >= MAX_SPIRITS)
                 return;
 
-            Position const at = killed->GetPosition();
-
             Creature* spirit = sGauntletSummons->Summon(player, ENTRY_RESTLESS, at, SPIRIT_LIFE_MS,
                                                         /*countsAsStalker*/ false, MECHANIC_GRUDGE);
             if (!spirit)
@@ -176,9 +256,6 @@ namespace Gauntlet
             record.mapId      = player->GetMapId();
             record.instanceId = player->GetInstanceId();
             _spirits.push_back(record);
-
-            if (ctx.addon)
-                ctx.addon->SendEvent(player, MechanicKey(), SPIRIT_LIFE_MS / 1000u, MechanicName());
         }
 
         void Grudge::OnTick(Ctx& ctx, uint32 diffMs)
@@ -186,6 +263,22 @@ namespace Gauntlet
             Player* player = ctx.player;
             if (!player)
                 return;
+
+            // The pending corpses come first, and above the early return
+            // below: while a spirit is still forming there are no spirits at
+            // all, which is exactly when this has to run.
+            for (std::size_t i = _pending.size(); i-- > 0; )
+            {
+                if (_pending[i].leftMs > diffMs)
+                {
+                    _pending[i].leftMs -= diffMs;
+                    continue;
+                }
+
+                Position const at = _pending[i].at;
+                _pending.erase(_pending.begin() + static_cast<std::ptrdiff_t>(i));
+                RaiseAt(ctx, at);
+            }
 
             if (_spirits.empty())
             {

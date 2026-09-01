@@ -9,8 +9,8 @@ and §4 before trusting any test.
 
 `mod-gauntlet`, an AzerothCore (WotLK 3.3.5a) module: a procedurally generated
 hardcore affix challenge. A run offers three "affix" cards per tier, the player
-picks one, and the curses accumulate. 109 mechanics, all implemented: twenty-six
-commons, twelve uncommons, fifty-five rares, fourteen epics and two
+picks one, and the curses accumulate. 107 mechanics, all implemented: twenty-six
+commons, twelve uncommons, fifty-three rares, fourteen epics and two
 legendaries, with reroll and skip live on every tier.
 Steps 1-4 of `docs/rarity-plan.md` have landed -- the rank system is gone, a
 card is one value and rarity is its only tier -- and step 5, the remaining
@@ -42,7 +42,7 @@ level with `origin/master`.
 ```bash
 ./tests/compile-check.sh --anchors   # anchors + ladder audit, seconds, no Docker
 ./tests/compile-check.sh             # full compile + link in the build container
-./tests/run-tests.sh                 # 212 unit tests
+./tests/run-tests.sh                 # 215 unit tests
 ./sync-to-server.sh                  # rsync the module into the core tree
 cd /mnt/c/Users/3302/azerothcore-wotlk
 DC="docker compose -f docker-compose.yml -f docker-compose.override.yml --project-directory ."
@@ -70,7 +70,7 @@ that way. Verified after the fact on 2026-09-01: the four live runs, eighteen
 affixes and twenty-seven log rows were untouched by the reapply.
 
 Gate before every commit: anchors, ladders, compile, link, tests. All green
-today — 109 anchors, 4 ladders, 72 objects, 212 tests.
+today — 107 anchors, 4 ladders, 71 objects, 215 tests.
 
 ## 4. The testing rig, and what it cannot see
 
@@ -745,6 +745,87 @@ elite cards will want too. Benched: Fresh Kill `a clean kill's corpse rolled 1
 `1 -> 3 item(s)` and `950 health paid`; Trophy Hunter `2 rare(s) killed, 2
 chest(s) left, 2 charge(s) banked`. `leaks all`: 64 audited, 0 leaked.
 
+### The greed redesign's brakes (2026-09-01)
+
+`docs/greed-redesign.md` §3, steps 3-6 of its order of work, in one pass. The
+brief it answers is the user's: hardcore is hard by design, but an offer has to
+*tempt* -- make you faster or richer while it endangers you. Six cards made the
+run slower and then charged for the slowness. Every curse is unchanged; what is
+added is something to win by beating it.
+
+- **Craven** -- a runner cut down before it reaches its camp pays double
+  experience and its table is rolled twice. The chase was always the brake;
+  now it is a race worth running. **The document's seam was wrong and the code
+  does not follow it**: it proposed flagging the corpse in `OnLoot` so
+  `OnItemRoll` could double the chance, and the item roll happens *inside*
+  `FillLoot`, which the core has finished before `OnPlayerBeforeSendLoot`
+  fires. Rolling the creature's own table again is what "twice" means anyway,
+  and it is the seam four other cards already use.
+- **Grudge** -- the spirit rises four seconds *after* the kill, and looting the
+  corpse first means it never forms and the corpse gives up an extra roll.
+  Drain 3% -> 5%: the card no longer punishes playing quickly, so it can
+  afford to hurt the player who stands still. Boon healing -> movement speed
+  (get there first). `Raise(Creature*)` became `RaiseAt(Position)` with the
+  eligibility checks moved four seconds earlier into `Mark`.
+- **Falter** -- when the hands come back, the first thing that lands is a
+  Reprisal at +50% for five seconds. Closed by `OnCreatureDamaged` rather than
+  by the multiplier being read, because `DamageDoneMult` is asked
+  speculatively in places no hit follows.
+- **Cunning** -- a cast that *completes* with a kicker in melee range hits 40%
+  harder. `OnSpellCast` fires on completion (Spell.cpp:3776), so an
+  interrupted cast never pays.
+- **Ambush** -- killing the Ambusher finishes the rest it interrupted, both
+  bars. A fight that replaces a thirty-second drink is the run getting faster.
+- **Call to Arms** -- the kin that answer are worth +25% XP each. This file
+  sends them, so it is the only thing that knows which creatures came because
+  of the card.
+- **Blood Magic** -- below 35% health the blood price stops *and* spells hit
+  25% harder. Both halves: paying more for casting hurt while still charging
+  health would be asking the player to die faster.
+- **Nimble** -- boon max health -> movement speed. "They are faster; so are
+  you" is the card the blurb already described.
+
+**Two cards retired**, both to `DELETED` in `tests/RegistryTest.cpp`, ids never
+reused: **Iron Purse** (25), whose own file called it "the weakest row in the
+table" and whose one structural argument -- the cheapest row that widened tier
+1 -- was spent by the rarity plan's commons; and **No Sanctuary** (34), which
+fired only while Divine Shield or Hand of Protection was up and was otherwise
+invisible. Blood for Bread (89) already holds the seat §3 gave it.
+
+### What the bench proved about the redesigns, and what it did not
+
+Every one of the eight attaches clean and detaches clean -- `leaks all`, 0
+leaked -- and the halves that are *standing* effects are proven: Grudge now
+reports `run speed x1.00 -> x1.05` (the boon moved from healing), Nimble
+`aggregate: enemy speed`, Call to Arms `experience x1.15`, Falter and Ambush
+their max-health boons, Craven `damage done x1.08`.
+
+**The new reward halves are not reached, and the cards now say so themselves.**
+Five of the six redesigned cards had no `Diagnose()` at all, which is the one
+thing CLAUDE.md says every mechanic owes -- "the difference between 'the
+trigger never ran' and 'it ran and did nothing'". They have one now, and it is
+what turned a shrug into a list:
+
+- `craven: 0 runner(s) tracked ... nothing has fled since this was attached` --
+  the bench kills its target outright at full health, and the flee is at 25%.
+  A probe that damages the target *down to* the flee threshold and then kills
+  it is what this needs.
+- `grudge: 0 corpse(s) counting down, 0 beaten to the corpse` -- the kill that
+  should mark a corpse is not marking one. Worth chasing: the quarry is an
+  ordinary foe and the loot window follows immediately, so on paper the race
+  should fire. Something between `OnCreatureKill` and `Mark` is refusing.
+- `call to arms: nothing has answered a call` -- no kin stand near the bench's
+  summoned target, so nothing is ever alerted to pay.
+- `falter: 3 stumble(s), 0 reprisal(s) spent` -- the stumbles fire; the window
+  opens three seconds later and the probe's damage has already happened. A
+  probe that ticks past the stumble and *then* hits would close it.
+- `ambush: one is up now` -- the Ambusher is summoned, which is more than the
+  Spawn verdict credited.
+
+None of these is evidence of a broken card; all of them are evidence the
+harness cannot produce the situation. That is the distinction §4 exists for,
+and it is now readable per card instead of per session.
+
 ### Step 5, the rest -- and what the sweep says it should be
 
 `docs/commons.md` (2026-09-01) is the measurement and the proposed batch. It
@@ -804,6 +885,10 @@ Things step 2 left for a later pass, deliberately:
 - `docs/checklists.md` — 672 lines of in-game checks, still mostly undone.
 - `.gauntlet debug remove all` does not exist, so undoing `give-class` means
   removing ~30 affixes one slot at a time.
+- The redesigned brakes' reward halves each need a situation the bench does
+  not stage: a target damaged to its flee threshold (Craven), kin standing
+  near the target (Call to Arms), a tick past the stumble before the damage
+  probe (Falter), and Grudge's mark-on-kill chased to ground.
 - The bench cannot reach the *aggro* half of Keen-nosed or Scavenger's Eye
   (§7): it needs a creature summoned outside its own aggro range, with the
   character out of combat, and then an assertion that it attacked.

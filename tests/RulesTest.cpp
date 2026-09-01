@@ -492,3 +492,58 @@ TEST(Rules, GravediggerIsTheQuieterCardBesideCarrion)
     EXPECT_GT(Rules::GRAVEDIGGER_LIFE_MS, 0u);
 }
 
+// ---------------------------------------------------------------------------
+// The greed redesign's brakes (docs/greed-redesign.md section 3). Each of these
+// cards made the run slower and then charged for the slowness. The redesign
+// leaves every curse alone and gives the player something to win by beating it,
+// so the claim worth holding is the same one for all of them: the thing the
+// card now offers is worth more than not having it.
+// ---------------------------------------------------------------------------
+
+TEST(Rules, EveryBrakeNowPaysForBeatingIt)
+{
+    // One assertion per card, and the same assertion, because it is the brief:
+    // "an offer must tempt -- make you faster or richer while it endangers
+    // you". A payoff that did not beat 1.0 would be a card that still only
+    // takes.
+    EXPECT_GT(Rules::CravenBountyXP(1000u), 1000u) << "Craven's runner is worth chasing";
+    EXPECT_GT(Rules::CRAVEN_BOUNTY_ROLLS, 1u);
+
+    EXPECT_GT(Rules::GRUDGE_LOOT_ROLLS, 1u) << "Grudge pays for beating the spirit to the corpse";
+    EXPECT_GT(Rules::GRUDGE_RISE_MS, 0u) << "a window of zero is not a race";
+
+    EXPECT_GT(Rules::FalterReprisalMult(), 1.0f) << "Falter's stumble is followed by something";
+    EXPECT_GT(Rules::FALTER_REPRISAL_MS, 0u);
+
+    EXPECT_GT(Rules::CunningPayoffMult(), 1.0f) << "Cunning pays for the cast that lands";
+    EXPECT_GT(Rules::CallToArmsXP(1000u), 1000u) << "the kin that answer are worth more";
+    EXPECT_GT(Rules::BloodMagicPayoffMult(), 1.0f) << "Blood Magic pays below the line";
+}
+
+TEST(Rules, TheBrakesStillBrake)
+{
+    // The other half, and the one that keeps this from being a pile of free
+    // upsides: every one of these cards still has to cost something. A reward
+    // with no curse left is not a curse card, and the redesign's own rule 1 is
+    // that the curse stays.
+    EXPECT_GT(Rules::GRUDGE_DRAIN_PCT, 0u) << "the spirit still drains";
+
+    // Blood Magic's line has to sit where being under it is a real state
+    // rather than the normal one: a payoff that applied most of the time would
+    // be a flat bonus wearing a condition.
+    EXPECT_LT(Rules::BLOOD_MAGIC_LINE_PCT, 50u);
+    EXPECT_GT(Rules::BLOOD_MAGIC_LINE_PCT, 0u);
+
+    // And Falter's window has to be short enough that it is a window rather
+    // than a state: five seconds of a forty-five second cadence.
+    EXPECT_LT(Rules::FALTER_REPRISAL_MS, 15000u);
+}
+
+TEST(Rules, AmbushRestoresTheRestItInterrupted)
+{
+    // The card's whole redesign is that killing the Ambusher *replaces* the
+    // rest, so a partial restore would leave the player doing both -- the
+    // fight and then the drink -- which is the chore the redesign removes.
+    EXPECT_EQ(Rules::AMBUSH_RESTORE_PCT, 100u);
+}
+
